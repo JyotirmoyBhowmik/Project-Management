@@ -24,9 +24,13 @@ export const useTenantStore = create<TenantState>((set, get) => ({
     id: 'a0000000-0000-0000-0000-000000000001',
     name: 'Acme Corporation',
     slug: 'acme-corp',
+    tenant_code: 'ACME-CORP',
     code: 'ACME-CORP',
     domain: 'acme.pms.internal',
+    is_active: true,
     status: 'active',
+    week_starts_on: 1,
+    weekend_days: [0, 6],
     branding_json: {
       primary_color: '#2563eb',
       theme_preset: 'navy',

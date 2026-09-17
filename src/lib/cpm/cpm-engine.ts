@@ -167,9 +167,10 @@ export function calculateCPM(
       const predEF = parseISODate(predTask.early_finish || predTask.end_date);
       const lag = dep.lag_days || 0;
 
-      let candidateStart: Date;
+      let candidateStart: Date = new Date(predEF.getTime());
 
-      switch (dep.type) {
+      const depType = dep.dep_type || dep.type;
+      switch (depType) {
         case 'FS': {
           // Finish-to-Start: successor starts after predecessor finishes + 1 day + lag
           const nextDay = new Date(predEF.getTime());
@@ -256,9 +257,10 @@ export function calculateCPM(
         const succLF = parseISODate(succTask.late_finish || succTask.early_finish!);
         const lag = dep.lag_days || 0;
 
-        let candidateLateFinish: Date;
+        let candidateLateFinish: Date = new Date(succLS.getTime());
 
-        switch (dep.type) {
+        const depType = dep.dep_type || dep.type;
+        switch (depType) {
           case 'FS': {
             // Pred LF <= succ LS - 1 day - lag
             const prevDay = new Date(succLS.getTime());

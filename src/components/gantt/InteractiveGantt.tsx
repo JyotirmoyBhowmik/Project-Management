@@ -624,11 +624,11 @@ export function InteractiveGantt({
                     />
 
                     {/* Progress Fill Bar */}
-                    {task.progress_percent > 0 && (
+                    {(task.progress ?? task.progress_percent ?? 0) > 0 && (
                       <rect
                         x={startX}
                         y={y}
-                        width={(width * task.progress_percent) / 100}
+                        width={(width * (task.progress ?? task.progress_percent ?? 0)) / 100}
                         height="24"
                         rx="5"
                         fill="rgba(255, 255, 255, 0.25)"

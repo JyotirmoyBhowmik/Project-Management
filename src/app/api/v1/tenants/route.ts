@@ -28,6 +28,11 @@ export const POST = apiHandler(async (req: NextRequest, { correlationId }) => {
   const newTenant = {
     ...validated,
     id: `tenant-${Date.now()}`,
+    tenant_code: validated.code || (validated as { tenant_code?: string }).tenant_code || 'NEW-TENANT',
+    code: validated.code || (validated as { tenant_code?: string }).tenant_code || 'NEW-TENANT',
+    is_active: true,
+    week_starts_on: 1,
+    weekend_days: [0, 6],
     domain: validated.domain || null,
     status: 'active' as const,
     feature_flags: { cpm_enabled: true, export_enabled: true, audit_enabled: true },

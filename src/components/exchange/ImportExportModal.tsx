@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   FileText,
   Sparkles,
+  Users,
+  GitFork,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Modal } from '@/components/ui/dialog';
@@ -27,6 +29,35 @@ interface ImportExportModalProps {
   onImportCompleted: () => void;
 }
 
+const STANDARD_TEMPLATE_DATA = [
+  {
+    phase: 'Sprint 1 - Foundation',
+    task_id: 'T-101',
+    title: 'Database Architecture & RLS Migration',
+    description: 'Establish core PostgreSQL tables and security policies',
+    start_date: '2026-10-01',
+    duration_days: 4,
+    priority: 'high',
+    status: 'in_progress',
+    progress: 60,
+    assignee_emails: ['admin@acme.com', 'elena@acme.com'],
+    predecessors: [],
+  },
+  {
+    phase: 'Sprint 1 - Foundation',
+    task_id: 'T-102',
+    title: 'Interactive Gantt Viewport Implementation',
+    description: 'Render SVG bars, dependency lines, and zoom controls',
+    start_date: '2026-10-07',
+    duration_days: 6,
+    priority: 'urgent',
+    status: 'todo',
+    progress: 0,
+    assignee_emails: ['marcus@acme.com'],
+    predecessors: [{ id: 'T-101', type: 'FS', lag_days: 0 }],
+  },
+];
+
 export function ImportExportModal({
   mode,
   isOpen,
@@ -36,91 +67,123 @@ export function ImportExportModal({
   dependencies,
   onImportCompleted,
 }: ImportExportModalProps) {
-  const [activeTab, setActiveTab] = React.useState<'xlsx' | 'json'>('xlsx');
   const [dryRunResult, setDryRunResult] = React.useState<{
     totalRows: number;
     validCount: number;
     errorCount: number;
+    hasCycle?: boolean;
+    cycleError?: string;
     preview: Array<{
       rowIndex: number;
       isValid: boolean;
       errors: string[];
+      warnings?: string[];
       parsed?: any;
+      matchedAssignees?: string[];
     }>;
   } | null>(null);
 
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [parsedRows, setParsedRows] = React.useState<any[]>([]);
 
-  // 1. Download Standardized CSV / XLSX Template
-  const handleDownloadTemplate = (format: 'csv' | 'xlsx') => {
-    const templateData = [
-      {
-        title: 'Backend Microservice Architecture',
-        start_date: '2026-10-01',
-        duration_days: 5,
-        status: 'todo',
-        priority: 'high',
-        assignee: 'Elena Rostova',
-      },
-      {
-        title: 'PostgreSQL Connection Pooling',
-        start_date: '2026-10-08',
-        duration_days: 4,
-        status: 'todo',
-        priority: 'medium',
-        assignee: 'David Miller',
-      },
-    ];
-
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tasks');
-
-    if (format === 'csv') {
-      XLSX.writeFile(workbook, 'pms-import-template.csv', { bookType: 'csv' });
-    } else {
-      XLSX.writeFile(workbook, 'pms-import-template.xlsx', { bookType: 'xlsx' });
-    }
-  };
-
-  // 2. Export Project Data
-  const handleExport = (format: 'json' | 'csv' | 'xlsx') => {
+  // 1. One-click Download Standardized Template (JSON, XLSX, CSV)
+  const handleDownloadTemplate = (format: 'json' | 'xlsx' | 'csv') => {
     if (format === 'json') {
-      const payload = {
-        exported_at: new Date().toISOString(),
-        project,
-        tasks,
-        dependencies,
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(STANDARD_TEMPLATE_DATA, null, 2)], {
+        type: 'application/json',
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${project.code}-schedule.json`;
+      a.download = 'pms-standard-template.json';
       a.click();
       URL.revokeObjectURL(url);
     } else {
-      const rows = tasks.map(t => ({
-        ID: t.id,
+      const flatRows = STANDARD_TEMPLATE_DATA.map((t) => ({
+        Phase: t.phase,
+        'Task ID': t.task_id,
         Title: t.title,
-        Status: t.status,
-        Priority: t.priority,
+        Description: t.description,
         'Start Date': t.start_date,
-        'End Date': t.end_date,
         'Duration Days': t.duration_days,
-        'Progress %': t.progress_percent,
-        'Critical Path': t.is_critical ? 'YES' : 'NO',
+        Priority: t.priority,
+        Status: t.status,
+        'Progress %': t.progress,
+        'Assignee Emails': t.assignee_emails.join(', '),
+        Predecessors: t.predecessors.map((p) => `${p.id}:${p.type}+${p.lag_days}`).join(', '),
       }));
 
-      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const worksheet = XLSX.utils.json_to_sheet(flatRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'StandardTemplate');
+
+      if (format === 'csv') {
+        XLSX.writeFile(workbook, 'pms-standard-template.csv', { bookType: 'csv' });
+      } else {
+        XLSX.writeFile(workbook, 'pms-standard-template.xlsx', { bookType: 'xlsx' });
+      }
+    }
+  };
+
+  // 2. Export Project Data Conforming to Standard Schema
+  const handleExport = (format: 'json' | 'csv' | 'xlsx') => {
+    const formattedExport = tasks.map((t) => {
+      const preds = dependencies
+        .filter((d) => d.successor_id === t.id)
+        .map((d) => {
+          const predTask = tasks.find((pt) => pt.id === d.predecessor_id);
+          return {
+            id: predTask?.code || d.predecessor_id,
+            type: d.dep_type || d.type || 'FS',
+            lag_days: d.lag_days,
+          };
+        });
+
+      return {
+        phase: 'Phase 1',
+        task_id: t.id,
+        title: t.title,
+        description: t.description,
+        start_date: t.start_date,
+        duration_days: t.duration_days,
+        priority: t.priority,
+        status: t.status,
+        progress: t.progress ?? t.progress_percent ?? 0,
+        assignee_emails: t.assignees?.map((a) => a.user?.email).filter(Boolean) || [],
+        predecessors: preds,
+      };
+    });
+
+    if (format === 'json') {
+      const blob = new Blob([JSON.stringify(formattedExport, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.code || 'project'}-schedule.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const flatRows = formattedExport.map((r) => ({
+        'Task ID': r.task_id,
+        Title: r.title,
+        Status: r.status,
+        Priority: r.priority,
+        'Start Date': r.start_date,
+        'Duration Days': r.duration_days,
+        'Progress %': r.progress,
+        'Assignee Emails': r.assignee_emails.join(', '),
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(flatRows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Schedule');
 
       if (format === 'csv') {
-        XLSX.writeFile(workbook, `${project.code}-schedule.csv`, { bookType: 'csv' });
+        XLSX.writeFile(workbook, `${project.code || 'project'}-schedule.csv`, { bookType: 'csv' });
       } else {
-        XLSX.writeFile(workbook, `${project.code}-schedule.xlsx`, { bookType: 'xlsx' });
+        XLSX.writeFile(workbook, `${project.code || 'project'}-schedule.xlsx`, { bookType: 'xlsx' });
       }
     }
   };
@@ -142,7 +205,24 @@ export function ImportExportModal({
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array' });
         const firstSheet = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(firstSheet);
+        const rawRows: any[] = XLSX.utils.sheet_to_json(firstSheet);
+
+        // Normalize flat tabular spreadsheet into standard JSON schema
+        rows = rawRows.map((r) => ({
+          phase: r.Phase || r.phase,
+          task_id: r['Task ID'] || r.task_id,
+          title: r.Title || r.title,
+          description: r.Description || r.description,
+          start_date: r['Start Date'] || r.start_date,
+          duration_days: r['Duration Days'] || r.duration_days,
+          priority: (r.Priority || r.priority || 'medium').toLowerCase(),
+          status: (r.Status || r.status || 'todo').toLowerCase(),
+          progress: r['Progress %'] || r.progress || 0,
+          assignee_emails: typeof r['Assignee Emails'] === 'string'
+            ? r['Assignee Emails'].split(',').map((s: string) => s.trim())
+            : r.assignee_emails || [],
+          predecessors: [],
+        }));
       }
 
       setParsedRows(rows);
@@ -202,18 +282,27 @@ export function ImportExportModal({
       title={mode === 'export' ? 'Export Project Schedule' : 'Data Exchange: Import Schedule'}
       description={
         mode === 'export'
-          ? 'Download complete WBS schedule with CPM dependency matrices.'
-          : 'Dry-run preview with schema validation and conflict detection.'
+          ? 'Download complete WBS schedule with CPM dependency matrices and assignee emails.'
+          : 'Upload wizard supporting .xlsx, .csv, and .json with pre-validation dry-run.'
       }
       maxWidth="max-w-2xl"
     >
       {mode === 'export' ? (
         <div className="space-y-4 text-xs">
           <p className="text-[var(--muted-foreground)]">
-            Select export format to download schedule parameters, working day durations, and dependency relations:
+            Select export format. Export files preserve task hierarchy, assignees, working days duration, and dependency relations:
           </p>
 
           <div className="grid grid-cols-3 gap-3 pt-2">
+            <button
+              onClick={() => handleExport('json')}
+              className="flex flex-col items-center justify-center p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] hover:bg-[var(--secondary)] transition-all cursor-pointer group"
+            >
+              <FileJson className="h-8 w-8 text-amber-500 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="font-bold text-xs text-[var(--foreground)]">Standard JSON</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">.json</span>
+            </button>
+
             <button
               onClick={() => handleExport('xlsx')}
               className="flex flex-col items-center justify-center p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] hover:bg-[var(--secondary)] transition-all cursor-pointer group"
@@ -231,38 +320,32 @@ export function ImportExportModal({
               <span className="font-bold text-xs text-[var(--foreground)]">Delimited CSV</span>
               <span className="text-[10px] text-[var(--muted-foreground)] font-mono">.csv</span>
             </button>
-
-            <button
-              onClick={() => handleExport('json')}
-              className="flex flex-col items-center justify-center p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)] hover:bg-[var(--secondary)] transition-all cursor-pointer group"
-            >
-              <FileJson className="h-8 w-8 text-amber-500 mb-2 group-hover:scale-110 transition-transform" />
-              <span className="font-bold text-xs text-[var(--foreground)]">CPM Schema JSON</span>
-              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">.json</span>
-            </button>
           </div>
         </div>
       ) : (
         <div className="space-y-4 text-xs">
           {/* Template Download Section */}
-          <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/30">
+          <div className="flex items-center justify-between p-3.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/30">
             <div>
-              <div className="font-semibold text-[var(--foreground)]">Download Standardized Template</div>
-              <div className="text-[11px] text-[var(--muted-foreground)]">Use this template for error-free ingestion</div>
+              <div className="font-semibold text-[var(--foreground)]">Download Blank Standardized Template</div>
+              <div className="text-[11px] text-[var(--muted-foreground)]">Pre-formatted with schema fields and dependency samples</div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => handleDownloadTemplate('xlsx')}>
-                XLSX Template
+              <Button size="sm" variant="outline" onClick={() => handleDownloadTemplate('json')} className="gap-1 text-xs">
+                <FileJson className="h-3 w-3" /> JSON
               </Button>
-              <Button size="sm" variant="outline" onClick={() => handleDownloadTemplate('csv')}>
-                CSV Template
+              <Button size="sm" variant="outline" onClick={() => handleDownloadTemplate('xlsx')} className="gap-1 text-xs">
+                <FileSpreadsheet className="h-3 w-3" /> XLSX
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleDownloadTemplate('csv')} className="gap-1 text-xs">
+                <FileText className="h-3 w-3" /> CSV
               </Button>
             </div>
           </div>
 
           {/* File Upload Area */}
           <div>
-            <label className="font-semibold block mb-1">Select Excel (.xlsx) or JSON File</label>
+            <label className="font-semibold block mb-1">Select .xlsx, .csv, or .json File</label>
             <input
               type="file"
               accept=".xlsx,.xls,.csv,.json"
@@ -271,11 +354,14 @@ export function ImportExportModal({
             />
           </div>
 
-          {/* Dry-Run Preview Table */}
+          {/* Dry-Run Pre-Validation Preview */}
           {dryRunResult && (
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-xs">Dry-Run Validation Analysis</span>
+                <span className="font-bold text-xs flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-[var(--primary)]" />
+                  Pre-Validation Dry-Run Analysis
+                </span>
                 <div className="flex gap-2">
                   <Badge variant="success">{dryRunResult.validCount} Valid</Badge>
                   {dryRunResult.errorCount > 0 && (
@@ -284,14 +370,21 @@ export function ImportExportModal({
                 </div>
               </div>
 
+              {dryRunResult.hasCycle && (
+                <div className="p-3 rounded-lg border border-rose-500/50 bg-rose-500/10 text-rose-500 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{dryRunResult.cycleError}</span>
+                </div>
+              )}
+
               <div className="max-h-52 overflow-y-auto rounded-lg border border-[var(--border)]">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[var(--secondary)] font-semibold border-b border-[var(--border)]">
                     <tr>
                       <th className="p-2">Row</th>
                       <th className="p-2">Title</th>
-                      <th className="p-2">Start Date</th>
-                      <th className="p-2">Status</th>
+                      <th className="p-2">Assignees Matched</th>
+                      <th className="p-2">Validation Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
@@ -299,7 +392,16 @@ export function ImportExportModal({
                       <tr key={p.rowIndex} className={p.isValid ? '' : 'bg-rose-500/10'}>
                         <td className="p-2 font-mono">{p.rowIndex}</td>
                         <td className="p-2 font-medium">{p.parsed?.title || 'Unknown'}</td>
-                        <td className="p-2 font-mono">{p.parsed?.start_date || 'Invalid'}</td>
+                        <td className="p-2 text-[11px]">
+                          {p.matchedAssignees && p.matchedAssignees.length > 0 ? (
+                            <span className="flex items-center gap-1 text-emerald-500">
+                              <Users className="h-3 w-3" />
+                              {p.matchedAssignees.join(', ')}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted-foreground)]">Unassigned</span>
+                          )}
+                        </td>
                         <td className="p-2">
                           {p.isValid ? (
                             <span className="flex items-center gap-1 text-emerald-500">
@@ -317,7 +419,7 @@ export function ImportExportModal({
                 </table>
               </div>
 
-              {dryRunResult.validCount > 0 && (
+              {dryRunResult.validCount > 0 && !dryRunResult.hasCycle && (
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={onClose}>
                     Cancel

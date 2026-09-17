@@ -1,7 +1,7 @@
 // ==============================================================================
 // src/lib/supabase/mock-db.ts
 // Enterprise In-Memory Database Adapter & Fallback Provider
-// Reflects migrations 00001 - 00006 for zero-config local execution & tests.
+// Aligned with exact migrations 00001 - 00007 and security definer functions.
 // ==============================================================================
 
 import {
@@ -11,27 +11,32 @@ import {
   WorkingCalendar,
   CalendarHoliday,
   Project,
-  ProjectMember,
-  Phase,
+  ProjectGuestAccess,
+  ProjectPhase,
   Task,
-  TaskAssignment,
+  TaskAssignee,
   TaskDependency,
   AuditLog,
+  TenantTeam,
+  TeamMember,
 } from '@/types/database';
 import { calculateCPM, CPMResult } from '../cpm/cpm-engine';
+import { calculate_working_end_date } from '../calendar/calendar-engine';
 import { EntityNotFoundException, GuestAccessViolationException } from '../error/domain-errors';
 
 class DatabaseStore {
   public tenants: Tenant[] = [];
   public users: UserProfile[] = [];
   public memberships: TenantMembership[] = [];
+  public teams: TenantTeam[] = [];
+  public teamMembers: TeamMember[] = [];
   public calendars: WorkingCalendar[] = [];
   public holidays: CalendarHoliday[] = [];
   public projects: Project[] = [];
-  public projectMembers: ProjectMember[] = [];
-  public phases: Phase[] = [];
+  public projectGuestAccess: ProjectGuestAccess[] = [];
+  public phases: ProjectPhase[] = [];
   public tasks: Task[] = [];
-  public assignments: TaskAssignment[] = [];
+  public assignees: TaskAssignee[] = [];
   public dependencies: TaskDependency[] = [];
   public auditLogs: AuditLog[] = [];
 
@@ -46,8 +51,13 @@ class DatabaseStore {
         id: 'a0000000-0000-0000-0000-000000000001',
         name: 'Acme Corporation',
         slug: 'acme-corp',
+        tenant_code: 'ACME-CORP',
         code: 'ACME-CORP',
         domain: 'acme.pms.internal',
+        logo_url: null,
+        is_active: true,
+        week_starts_on: 1, // Monday
+        weekend_days: [0, 6], // Sunday, Saturday
         status: 'active',
         branding_json: {
           primary_color: '#2563eb',
@@ -63,8 +73,13 @@ class DatabaseStore {
         id: 'a0000000-0000-0000-0000-000000000002',
         name: 'Globex Industries',
         slug: 'globex',
+        tenant_code: 'GLOBEX',
         code: 'GLOBEX',
         domain: 'globex.pms.internal',
+        logo_url: null,
+        is_active: true,
+        week_starts_on: 0, // Sunday
+        weekend_days: [5, 6], // Friday, Saturday
         status: 'active',
         branding_json: {
           primary_color: '#059669',
@@ -78,7 +93,7 @@ class DatabaseStore {
       },
     ];
 
-    // 2. Users
+    // 2. Profiles (Users)
     this.users = [
       {
         id: 'b0000000-0000-0000-0000-000000000001',
@@ -87,7 +102,6 @@ class DatabaseStore {
         avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop',
         is_superadmin: true,
         created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
       },
       {
         id: 'b0000000-0000-0000-0000-000000000002',
@@ -96,7 +110,6 @@ class DatabaseStore {
         avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
         is_superadmin: false,
         created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
       },
       {
         id: 'b0000000-0000-0000-0000-000000000003',
@@ -105,7 +118,6 @@ class DatabaseStore {
         avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
         is_superadmin: false,
         created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
       },
       {
         id: 'b0000000-0000-0000-0000-000000000004',
@@ -114,7 +126,6 @@ class DatabaseStore {
         avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop',
         is_superadmin: false,
         created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
       },
       {
         id: 'b0000000-0000-0000-0000-000000000005',
@@ -123,7 +134,6 @@ class DatabaseStore {
         avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
         is_superadmin: false,
         created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
       },
       {
         id: 'b0000000-0000-0000-0000-000000000006',
@@ -132,26 +142,37 @@ class DatabaseStore {
         avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop',
         is_superadmin: false,
         created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
       },
     ];
 
-    // 3. Memberships
     const acmeId = this.tenants[0].id;
     const globexId = this.tenants[1].id;
 
+    // 3. Tenant Memberships
     this.memberships = [
-      { id: 'm1', tenant_id: acmeId, user_id: this.users[0].id, role: 'superadmin', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
-      { id: 'm2', tenant_id: acmeId, user_id: this.users[1].id, role: 'tenant_admin', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
-      { id: 'm3', tenant_id: acmeId, user_id: this.users[2].id, role: 'project_manager', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
-      { id: 'm4', tenant_id: acmeId, user_id: this.users[3].id, role: 'contributor', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
-      { id: 'm5', tenant_id: acmeId, user_id: this.users[4].id, role: 'contributor', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
-      { id: 'm6', tenant_id: acmeId, user_id: this.users[5].id, role: 'guest', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
-      { id: 'm7', tenant_id: globexId, user_id: this.users[0].id, role: 'superadmin', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
-      { id: 'm8', tenant_id: globexId, user_id: this.users[1].id, role: 'contributor', is_active: true, created_at: '2026-01-01', updated_at: '2026-01-01' },
+      { id: 'm1', tenant_id: acmeId, user_id: this.users[0].id, role: 'admin', is_active: true, created_at: '2026-01-01' },
+      { id: 'm2', tenant_id: acmeId, user_id: this.users[1].id, role: 'owner', is_active: true, created_at: '2026-01-01' },
+      { id: 'm3', tenant_id: acmeId, user_id: this.users[2].id, role: 'project_manager', is_active: true, created_at: '2026-01-01' },
+      { id: 'm4', tenant_id: acmeId, user_id: this.users[3].id, role: 'member', is_active: true, created_at: '2026-01-01' },
+      { id: 'm5', tenant_id: acmeId, user_id: this.users[4].id, role: 'member', is_active: true, created_at: '2026-01-01' },
+      { id: 'm6', tenant_id: acmeId, user_id: this.users[5].id, role: 'guest', is_active: true, created_at: '2026-01-01' },
+      // Globex
+      { id: 'm7', tenant_id: globexId, user_id: this.users[0].id, role: 'admin', is_active: true, created_at: '2026-01-01' },
+      { id: 'm8', tenant_id: globexId, user_id: this.users[1].id, role: 'member', is_active: true, created_at: '2026-01-01' },
     ];
 
-    // 4. Calendars & Holidays
+    // 4. Teams
+    this.teams = [
+      { id: 'team1', tenant_id: acmeId, name: 'Core Infrastructure', description: 'Backend and Database', created_at: '2026-01-01' },
+      { id: 'team2', tenant_id: acmeId, name: 'Web Applications', description: 'Frontend and Design Systems', created_at: '2026-01-01' },
+    ];
+
+    this.teamMembers = [
+      { team_id: 'team1', user_id: this.users[3].id, created_at: '2026-01-01' },
+      { team_id: 'team2', user_id: this.users[4].id, created_at: '2026-01-01' },
+    ];
+
+    // 5. Calendars & Holidays
     const calId = 'c0000000-0000-0000-0000-000000000001';
     this.calendars = [
       {
@@ -169,15 +190,15 @@ class DatabaseStore {
     ];
 
     this.holidays = [
-      { id: 'h1', tenant_id: acmeId, calendar_id: calId, name: 'New Year Holiday', date: '2026-01-01', is_recurring: true, created_at: '2026-01-01' },
-      { id: 'h2', tenant_id: acmeId, calendar_id: calId, name: 'Memorial Day', date: '2026-05-25', is_recurring: true, created_at: '2026-01-01' },
-      { id: 'h3', tenant_id: acmeId, calendar_id: calId, name: 'Independence Day', date: '2026-07-03', is_recurring: true, created_at: '2026-01-01' },
-      { id: 'h4', tenant_id: acmeId, calendar_id: calId, name: 'Labor Day', date: '2026-09-07', is_recurring: true, created_at: '2026-01-01' },
-      { id: 'h5', tenant_id: acmeId, calendar_id: calId, name: 'Thanksgiving Day', date: '2026-11-26', is_recurring: true, created_at: '2026-01-01' },
-      { id: 'h6', tenant_id: acmeId, calendar_id: calId, name: 'Christmas Day', date: '2026-12-25', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h1', tenant_id: acmeId, calendar_id: calId, name: 'New Year Holiday', holiday_date: '2026-01-01', date: '2026-01-01', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h2', tenant_id: acmeId, calendar_id: calId, name: 'Memorial Day', holiday_date: '2026-05-25', date: '2026-05-25', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h3', tenant_id: acmeId, calendar_id: calId, name: 'Independence Day', holiday_date: '2026-07-03', date: '2026-07-03', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h4', tenant_id: acmeId, calendar_id: calId, name: 'Labor Day', holiday_date: '2026-09-07', date: '2026-09-07', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h5', tenant_id: acmeId, calendar_id: calId, name: 'Thanksgiving Day', holiday_date: '2026-11-26', date: '2026-11-26', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h6', tenant_id: acmeId, calendar_id: calId, name: 'Christmas Day', holiday_date: '2026-12-25', date: '2026-12-25', is_recurring: true, created_at: '2026-01-01' },
     ];
 
-    // 5. Projects
+    // 6. Projects
     const prjId = 'd0000000-0000-0000-0000-000000000001';
     const soc2Id = 'd0000000-0000-0000-0000-000000000002';
     this.projects = [
@@ -213,27 +234,32 @@ class DatabaseStore {
       },
     ];
 
-    // Project Members (Scoped Guest: user 5 only has access to prjId)
-    this.projectMembers = [
-      { id: 'pm1', tenant_id: acmeId, project_id: prjId, user_id: this.users[2].id, role: 'lead', created_at: '2026-01-01' },
-      { id: 'pm2', tenant_id: acmeId, project_id: prjId, user_id: this.users[3].id, role: 'editor', created_at: '2026-01-01' },
-      { id: 'pm3', tenant_id: acmeId, project_id: prjId, user_id: this.users[4].id, role: 'editor', created_at: '2026-01-01' },
-      { id: 'pm4', tenant_id: acmeId, project_id: prjId, user_id: this.users[5].id, role: 'guest', created_at: '2026-01-01' },
+    // 7. Project Guest Access (Explicitly scopes user 5 to prjId)
+    this.projectGuestAccess = [
+      {
+        id: 'pga1',
+        project_id: prjId,
+        tenant_id: acmeId,
+        email: this.users[5].email,
+        user_id: this.users[5].id,
+        access_level: 'comment',
+        created_at: '2026-01-01',
+      },
     ];
 
-    // Phases
+    // 8. Project Phases
     const ph1 = 'e0000000-0000-0000-0000-000000000001';
     const ph2 = 'e0000000-0000-0000-0000-000000000002';
     const ph3 = 'e0000000-0000-0000-0000-000000000003';
     const ph4 = 'e0000000-0000-0000-0000-000000000004';
     this.phases = [
-      { id: ph1, tenant_id: acmeId, project_id: prjId, name: 'Phase 1: Architecture & DB Specs', order_index: 1, color: '#3b82f6', start_date: '2026-10-01', end_date: '2026-10-14', created_at: '2026-01-01' },
-      { id: ph2, tenant_id: acmeId, project_id: prjId, name: 'Phase 2: Scheduling & CPM Engines', order_index: 2, color: '#8b5cf6', start_date: '2026-10-15', end_date: '2026-11-04', created_at: '2026-01-01' },
-      { id: ph3, tenant_id: acmeId, project_id: prjId, name: 'Phase 3: Interactive SVG Gantt & Canvas', order_index: 3, color: '#10b981', start_date: '2026-11-05', end_date: '2026-11-25', created_at: '2026-01-01' },
-      { id: ph4, tenant_id: acmeId, project_id: prjId, name: 'Phase 4: QA, Security & Vercel Launch', order_index: 4, color: '#f59e0b', start_date: '2026-11-26', end_date: '2026-12-15', created_at: '2026-01-01' },
+      { id: ph1, tenant_id: acmeId, project_id: prjId, name: 'Phase 1: Architecture & DB Specs', sort_order: 1, order_index: 1, color: '#3b82f6', start_date: '2026-10-01', end_date: '2026-10-14', created_at: '2026-01-01' },
+      { id: ph2, tenant_id: acmeId, project_id: prjId, name: 'Phase 2: Scheduling & CPM Engines', sort_order: 2, order_index: 2, color: '#8b5cf6', start_date: '2026-10-15', end_date: '2026-11-04', created_at: '2026-01-01' },
+      { id: ph3, tenant_id: acmeId, project_id: prjId, name: 'Phase 3: Interactive SVG Gantt & Canvas', sort_order: 3, order_index: 3, color: '#10b981', start_date: '2026-11-05', end_date: '2026-11-25', created_at: '2026-01-01' },
+      { id: ph4, tenant_id: acmeId, project_id: prjId, name: 'Phase 4: QA, Security & Vercel Launch', sort_order: 4, order_index: 4, color: '#f59e0b', start_date: '2026-11-26', end_date: '2026-12-15', created_at: '2026-01-01' },
     ];
 
-    // Tasks
+    // 9. Tasks
     const t1 = 'f0000000-0000-0000-0000-000000000001';
     const t2 = 'f0000000-0000-0000-0000-000000000002';
     const t3 = 'f0000000-0000-0000-0000-000000000003';
@@ -249,25 +275,26 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph1,
+        parent_task_id: null,
         parent_id: null,
         title: 'Multi-Tenant DB Schema & RLS Matrix',
         description: 'Design strict tenant_id isolation policies and pgcrypto secrets table',
-        status: 'completed',
+        status: 'done',
         priority: 'urgent',
         start_date: '2026-10-01',
         end_date: '2026-10-07',
         duration_days: 5,
+        progress: 100,
         progress_percent: 100,
         is_milestone: false,
+        sort_order: 1,
+        order_index: 1,
         early_start: '2026-10-01',
         early_finish: '2026-10-07',
         late_start: '2026-10-01',
         late_finish: '2026-10-07',
         total_float: 0,
-        free_float: 0,
         is_critical: true,
-        order_index: 1,
-        created_by: this.users[3].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -276,25 +303,26 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph1,
+        parent_task_id: t1,
         parent_id: t1,
         title: 'Postgres Performance Tuning & Trigram Indexes',
         description: 'Configure pg_trgm for fuzzy search and audit triggers',
-        status: 'completed',
+        status: 'done',
         priority: 'high',
         start_date: '2026-10-08',
         end_date: '2026-10-14',
         duration_days: 5,
+        progress: 100,
         progress_percent: 100,
         is_milestone: false,
+        sort_order: 2,
+        order_index: 2,
         early_start: '2026-10-08',
         early_finish: '2026-10-14',
         late_start: '2026-10-08',
         late_finish: '2026-10-14',
         total_float: 0,
-        free_float: 0,
         is_critical: true,
-        order_index: 2,
-        created_by: this.users[3].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -303,6 +331,7 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph2,
+        parent_task_id: null,
         parent_id: null,
         title: 'CPM Forward/Backward Pass Engine',
         description: 'Implement topological sort, float calculator, and cycle detection',
@@ -311,17 +340,17 @@ class DatabaseStore {
         start_date: '2026-10-15',
         end_date: '2026-10-23',
         duration_days: 7,
+        progress: 65,
         progress_percent: 65,
         is_milestone: false,
+        sort_order: 3,
+        order_index: 3,
         early_start: '2026-10-15',
         early_finish: '2026-10-23',
         late_start: '2026-10-15',
         late_finish: '2026-10-23',
         total_float: 0,
-        free_float: 0,
         is_critical: true,
-        order_index: 3,
-        created_by: this.users[3].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -330,6 +359,7 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph2,
+        parent_task_id: null,
         parent_id: null,
         title: 'Working Days & Regional Calendar Engine',
         description: 'Calculate weekend skip and floating/recurring holidays',
@@ -338,17 +368,17 @@ class DatabaseStore {
         start_date: '2026-10-15',
         end_date: '2026-10-21',
         duration_days: 5,
+        progress: 80,
         progress_percent: 80,
         is_milestone: false,
+        sort_order: 4,
+        order_index: 4,
         early_start: '2026-10-15',
         early_finish: '2026-10-21',
         late_start: '2026-10-19',
         late_finish: '2026-10-27',
         total_float: 4,
-        free_float: 0,
         is_critical: false,
-        order_index: 4,
-        created_by: this.users[4].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -357,6 +387,7 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph2,
+        parent_task_id: null,
         parent_id: null,
         title: 'Milestone: Scheduling Core Benchmark Passed',
         description: 'Verification of scheduling engine on 10,000 node DAG',
@@ -365,17 +396,17 @@ class DatabaseStore {
         start_date: '2026-10-26',
         end_date: '2026-10-26',
         duration_days: 0,
+        progress: 0,
         progress_percent: 0,
         is_milestone: true,
+        sort_order: 5,
+        order_index: 5,
         early_start: '2026-10-26',
         early_finish: '2026-10-26',
         late_start: '2026-10-26',
         late_finish: '2026-10-26',
         total_float: 0,
-        free_float: 0,
         is_critical: true,
-        order_index: 5,
-        created_by: this.users[2].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -384,6 +415,7 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph3,
+        parent_task_id: null,
         parent_id: null,
         title: 'Interactive SVG Gantt & Drag Dependency Engine',
         description: 'Pure SVG timeline with drag handles, snapping, and bezier connectors',
@@ -392,17 +424,17 @@ class DatabaseStore {
         start_date: '2026-10-27',
         end_date: '2026-11-13',
         duration_days: 14,
+        progress: 0,
         progress_percent: 0,
         is_milestone: false,
+        sort_order: 6,
+        order_index: 6,
         early_start: '2026-10-27',
         early_finish: '2026-11-13',
         late_start: '2026-10-27',
         late_finish: '2026-11-13',
         total_float: 0,
-        free_float: 0,
         is_critical: true,
-        order_index: 6,
-        created_by: this.users[4].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -411,6 +443,7 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph3,
+        parent_task_id: null,
         parent_id: null,
         title: 'Synchronized Kanban & Hierarchical Grid Views',
         description: 'Card movement with optimistic TanStack Query cache updates',
@@ -419,17 +452,17 @@ class DatabaseStore {
         start_date: '2026-11-02',
         end_date: '2026-11-16',
         duration_days: 10,
+        progress: 0,
         progress_percent: 0,
         is_milestone: false,
+        sort_order: 7,
+        order_index: 7,
         early_start: '2026-11-02',
         early_finish: '2026-11-16',
         late_start: '2026-11-04',
         late_finish: '2026-11-18',
         total_float: 2,
-        free_float: 0,
         is_critical: false,
-        order_index: 7,
-        created_by: this.users[3].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
@@ -438,6 +471,7 @@ class DatabaseStore {
         tenant_id: acmeId,
         project_id: prjId,
         phase_id: ph4,
+        parent_task_id: null,
         parent_id: null,
         title: 'Vercel Deployment & Triple-Layer Test Suite',
         description: 'End-to-end integration, RLS penetration testing, and Vercel build',
@@ -446,48 +480,48 @@ class DatabaseStore {
         start_date: '2026-11-16',
         end_date: '2026-12-04',
         duration_days: 15,
+        progress: 0,
         progress_percent: 0,
         is_milestone: false,
+        sort_order: 8,
+        order_index: 8,
         early_start: '2026-11-16',
         early_finish: '2026-12-04',
         late_start: '2026-11-16',
         late_finish: '2026-12-04',
         total_float: 0,
-        free_float: 0,
         is_critical: true,
-        order_index: 8,
-        created_by: this.users[2].id,
         created_at: '2026-01-01',
         updated_at: '2026-01-01',
       },
     ];
 
-    // Dependencies
+    // 10. Dependencies
     this.dependencies = [
-      { id: 'dep1', tenant_id: acmeId, project_id: prjId, predecessor_id: t1, successor_id: t2, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
-      { id: 'dep2', tenant_id: acmeId, project_id: prjId, predecessor_id: t2, successor_id: t3, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
-      { id: 'dep3', tenant_id: acmeId, project_id: prjId, predecessor_id: t2, successor_id: t4, type: 'SS', lag_days: 1, created_at: '2026-01-01' },
-      { id: 'dep4', tenant_id: acmeId, project_id: prjId, predecessor_id: t3, successor_id: t5, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
-      { id: 'dep5', tenant_id: acmeId, project_id: prjId, predecessor_id: t5, successor_id: t6, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
-      { id: 'dep6', tenant_id: acmeId, project_id: prjId, predecessor_id: t5, successor_id: t7, type: 'SS', lag_days: 2, created_at: '2026-01-01' },
-      { id: 'dep7', tenant_id: acmeId, project_id: prjId, predecessor_id: t6, successor_id: t8, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
-      { id: 'dep8', tenant_id: acmeId, project_id: prjId, predecessor_id: t7, successor_id: t8, type: 'FF', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep1', tenant_id: acmeId, project_id: prjId, predecessor_id: t1, successor_id: t2, dep_type: 'FS', type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep2', tenant_id: acmeId, project_id: prjId, predecessor_id: t2, successor_id: t3, dep_type: 'FS', type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep3', tenant_id: acmeId, project_id: prjId, predecessor_id: t2, successor_id: t4, dep_type: 'SS', type: 'SS', lag_days: 1, created_at: '2026-01-01' },
+      { id: 'dep4', tenant_id: acmeId, project_id: prjId, predecessor_id: t3, successor_id: t5, dep_type: 'FS', type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep5', tenant_id: acmeId, project_id: prjId, predecessor_id: t5, successor_id: t6, dep_type: 'FS', type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep6', tenant_id: acmeId, project_id: prjId, predecessor_id: t5, successor_id: t7, dep_type: 'SS', type: 'SS', lag_days: 2, created_at: '2026-01-01' },
+      { id: 'dep7', tenant_id: acmeId, project_id: prjId, predecessor_id: t6, successor_id: t8, dep_type: 'FS', type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep8', tenant_id: acmeId, project_id: prjId, predecessor_id: t7, successor_id: t8, dep_type: 'FF', type: 'FF', lag_days: 0, created_at: '2026-01-01' },
     ];
 
-    // Assignments
-    this.assignments = [
-      { id: 'a1', tenant_id: acmeId, task_id: t1, user_id: this.users[3].id, team_id: null, effort_percent: 100, created_at: '2026-01-01' },
-      { id: 'a2', tenant_id: acmeId, task_id: t2, user_id: this.users[3].id, team_id: null, effort_percent: 60, created_at: '2026-01-01' },
-      { id: 'a3', tenant_id: acmeId, task_id: t2, user_id: this.users[4].id, team_id: null, effort_percent: 40, created_at: '2026-01-01' },
-      { id: 'a4', tenant_id: acmeId, task_id: t3, user_id: this.users[3].id, team_id: null, effort_percent: 80, created_at: '2026-01-01' },
-      { id: 'a5', tenant_id: acmeId, task_id: t4, user_id: this.users[4].id, team_id: null, effort_percent: 100, created_at: '2026-01-01' },
-      { id: 'a6', tenant_id: acmeId, task_id: t6, user_id: this.users[4].id, team_id: null, effort_percent: 100, created_at: '2026-01-01' },
-      { id: 'a7', tenant_id: acmeId, task_id: t7, user_id: this.users[3].id, team_id: null, effort_percent: 50, created_at: '2026-01-01' },
-      { id: 'a8', tenant_id: acmeId, task_id: t7, user_id: this.users[4].id, team_id: null, effort_percent: 50, created_at: '2026-01-01' },
-      { id: 'a9', tenant_id: acmeId, task_id: t8, user_id: this.users[2].id, team_id: null, effort_percent: 100, created_at: '2026-01-01' },
+    // 11. Assignees
+    this.assignees = [
+      { task_id: t1, user_id: this.users[3].id, allocation_percent: 100, created_at: '2026-01-01' },
+      { task_id: t2, user_id: this.users[3].id, allocation_percent: 60, created_at: '2026-01-01' },
+      { task_id: t2, user_id: this.users[4].id, allocation_percent: 40, created_at: '2026-01-01' },
+      { task_id: t3, user_id: this.users[3].id, allocation_percent: 80, created_at: '2026-01-01' },
+      { task_id: t4, user_id: this.users[4].id, allocation_percent: 100, created_at: '2026-01-01' },
+      { task_id: t6, user_id: this.users[4].id, allocation_percent: 100, created_at: '2026-01-01' },
+      { task_id: t7, user_id: this.users[3].id, allocation_percent: 50, created_at: '2026-01-01' },
+      { task_id: t7, user_id: this.users[4].id, allocation_percent: 50, created_at: '2026-01-01' },
+      { task_id: t8, user_id: this.users[2].id, allocation_percent: 100, created_at: '2026-01-01' },
     ];
 
-    // Audit Logs
+    // 12. Audit Logs
     this.auditLogs = [
       {
         id: 'aud1',
@@ -506,22 +540,49 @@ class DatabaseStore {
     ];
   }
 
+  // --- SECURITY DEFINER SIMULATION METHODS ---
+
+  public is_member_of(userId: string, tenantId: string): boolean {
+    const user = this.users.find(u => u.id === userId);
+    if (user?.is_superadmin) return true;
+    return this.memberships.some(m => m.tenant_id === tenantId && m.user_id === userId);
+  }
+
+  public has_guest_project_access(userId: string, projectId: string): boolean {
+    const user = this.users.find(u => u.id === userId);
+    if (user?.is_superadmin) return true;
+
+    const prj = this.projects.find(p => p.id === projectId);
+    if (!prj) return false;
+
+    // Check membership role
+    const membership = this.memberships.find(m => m.tenant_id === prj.tenant_id && m.user_id === userId);
+    if (membership && membership.role !== 'guest') return true;
+
+    // Check explicit project guest access
+    return this.projectGuestAccess.some(pga => pga.project_id === projectId && (pga.user_id === userId || (user && pga.email === user.email)));
+  }
+
+  public calculate_working_end_date(tenantId: string, startDate: string, durationDays: number): string {
+    const tenant = this.tenants.find(t => t.id === tenantId);
+    const weekends = tenant?.weekend_days || [0, 6];
+    const hols = this.holidays.filter(h => h.tenant_id === tenantId);
+    return calculate_working_end_date(tenantId, startDate, durationDays, weekends, hols);
+  }
+
   // --- QUERY & MUTATION REPOSITORY METHODS ---
 
   public getTenantBySlugOrCode(val: string): Tenant | null {
     const term = val.toLowerCase();
-    return this.tenants.find(t => t.slug.toLowerCase() === term || t.code.toLowerCase() === term) || null;
+    return this.tenants.find(t => t.slug.toLowerCase() === term || (t.tenant_code && t.tenant_code.toLowerCase() === term) || (t.code && t.code.toLowerCase() === term)) || null;
   }
 
   public getProjectsForUser(tenantId: string, userId: string, role: string): Project[] {
     const tenantProjects = this.projects.filter(p => p.tenant_id === tenantId && !p.is_archived);
 
-    // Guest Scoping: Only return projects where the user is an explicit member
+    // Guest Scoping: Only return projects where the user is an explicit guest or member
     if (role === 'guest') {
-      const allowedIds = new Set(
-        this.projectMembers.filter(pm => pm.tenant_id === tenantId && pm.user_id === userId).map(pm => pm.project_id)
-      );
-      return tenantProjects.filter(p => allowedIds.has(p.id));
+      return tenantProjects.filter(p => this.has_guest_project_access(userId, p.id));
     }
 
     return tenantProjects;
@@ -533,11 +594,8 @@ class DatabaseStore {
       throw new EntityNotFoundException('Project', projectId);
     }
 
-    if (role === 'guest') {
-      const isMember = this.projectMembers.some(pm => pm.project_id === projectId && pm.user_id === userId);
-      if (!isMember) {
-        throw new GuestAccessViolationException(`project '${prj.name}'`);
-      }
+    if (role === 'guest' && !this.has_guest_project_access(userId, projectId)) {
+      throw new GuestAccessViolationException(`project '${prj.name}'`);
     }
 
     return prj;
@@ -547,7 +605,7 @@ class DatabaseStore {
     const projectTasks = this.tasks.filter(t => t.project_id === projectId && t.tenant_id === tenantId);
 
     return projectTasks.map(t => {
-      const assignments = this.assignments
+      const assignees = this.assignees
         .filter(a => a.task_id === t.id)
         .map(a => ({
           ...a,
@@ -556,11 +614,22 @@ class DatabaseStore {
 
       const preds = this.dependencies.filter(d => d.successor_id === t.id);
       const succs = this.dependencies.filter(d => d.predecessor_id === t.id);
-      const subtasks = this.tasks.filter(sub => sub.parent_id === t.id);
+      const subtasks = this.tasks.filter(sub => (sub.parent_task_id === t.id || sub.parent_id === t.id));
 
       return {
         ...t,
-        assignments,
+        assignees,
+        // backward compatibility
+        assignments: assignees.map(a => ({
+          id: `${a.task_id}-${a.user_id}`,
+          tenant_id: t.tenant_id,
+          task_id: a.task_id,
+          user_id: a.user_id,
+          team_id: null,
+          effort_percent: a.allocation_percent,
+          created_at: a.created_at,
+          user: a.user,
+        })),
         predecessors: preds,
         successors: succs,
         subtasks,
@@ -571,12 +640,14 @@ class DatabaseStore {
   public recalculateProjectCPM(projectId: string, tenantId: string): CPMResult {
     const projectTasks = this.tasks.filter(t => t.project_id === projectId && t.tenant_id === tenantId);
     const projectDeps = this.dependencies.filter(d => d.project_id === projectId && d.tenant_id === tenantId);
-    const calendar = this.calendars.find(c => c.tenant_id === tenantId) || { working_days: [1, 2, 3, 4, 5] };
+    const tenant = this.tenants.find(t => t.id === tenantId);
+    const calendar = {
+      working_days: tenant?.weekend_days ? [0, 1, 2, 3, 4, 5, 6].filter(d => !tenant.weekend_days?.includes(d)) : [1, 2, 3, 4, 5],
+    };
     const projectHolidays = this.holidays.filter(h => h.tenant_id === tenantId);
 
     const cpm = calculateCPM(projectTasks, projectDeps, calendar, projectHolidays);
 
-    // Update internal tasks with newly calculated CPM dates and critical flags
     for (const updated of cpm.tasks) {
       const idx = this.tasks.findIndex(t => t.id === updated.id);
       if (idx !== -1) {
@@ -602,7 +673,6 @@ class DatabaseStore {
     this.tasks[idx] = { ...before, ...updates, updated_at: new Date().toISOString() };
     const after = this.tasks[idx];
 
-    // Log Audit mutation
     this.auditLogs.unshift({
       id: `aud-${Date.now()}`,
       tenant_id: after.tenant_id,
@@ -618,13 +688,15 @@ class DatabaseStore {
       created_at: new Date().toISOString(),
     });
 
-    // Re-run CPM calculation for affected project
     this.recalculateProjectCPM(after.project_id, after.tenant_id);
-
     return this.tasks[idx];
   }
 
-  public createTask(taskData: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'total_float' | 'free_float' | 'is_critical' | 'early_start' | 'early_finish' | 'late_start' | 'late_finish'>, actorId: string, correlationId: string): Task {
+  public createTask(
+    taskData: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'total_float' | 'is_critical' | 'early_start' | 'early_finish' | 'late_start' | 'late_finish'>,
+    actorId: string,
+    correlationId: string
+  ): Task {
     const newTask: Task = {
       ...taskData,
       id: `task-${Date.now()}`,
@@ -633,8 +705,9 @@ class DatabaseStore {
       late_start: null,
       late_finish: null,
       total_float: 0,
-      free_float: 0,
       is_critical: false,
+      sort_order: taskData.sort_order ?? this.tasks.length + 1,
+      progress: taskData.progress ?? 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -669,11 +742,9 @@ class DatabaseStore {
 
     this.dependencies.push(newDep);
 
-    // Recalculate CPM (will throw DependencyCycleException if a loop is created)
     try {
       this.recalculateProjectCPM(newDep.project_id, newDep.tenant_id);
     } catch (err) {
-      // Revert if cycle detected
       this.dependencies = this.dependencies.filter(d => d.id !== newDep.id);
       throw err;
     }
@@ -722,5 +793,4 @@ class DatabaseStore {
   }
 }
 
-// Global Singleton instance for application runtime
 export const db = new DatabaseStore();

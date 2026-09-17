@@ -91,7 +91,7 @@ export function Header() {
                       <div className="flex items-center gap-2.5">
                         <div
                           className="h-7 w-7 rounded-md flex items-center justify-center text-xs font-bold text-white shadow-xs"
-                          style={{ backgroundColor: tenant.branding_json.primary_color || '#3b82f6' }}
+                          style={{ backgroundColor: tenant.branding_json?.primary_color || '#3b82f6' }}
                         >
                           {tenant.name.substring(0, 2).toUpperCase()}
                         </div>

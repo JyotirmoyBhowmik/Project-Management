@@ -42,7 +42,7 @@ export default function ProjectsPortfolioPage() {
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.code.toLowerCase().includes(searchQuery.toLowerCase());
+      (p.code && p.code.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesStatus && matchesSearch;
   });
 

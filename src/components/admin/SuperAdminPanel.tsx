@@ -37,8 +37,13 @@ export function SuperAdminPanel() {
       id: `tenant-${Date.now()}`,
       name,
       code: code.toUpperCase(),
+      tenant_code: code.toUpperCase(),
       slug: slug.toLowerCase(),
       domain: domain || null,
+      logo_url: null,
+      is_active: true,
+      week_starts_on: 1,
+      weekend_days: [0, 6],
       status: 'active' as const,
       branding_json: {
         primary_color: '#3b82f6',
@@ -64,6 +69,9 @@ export function SuperAdminPanel() {
   const toggleFeatureFlag = (tenantId: string, flag: string) => {
     const target = db.tenants.find(t => t.id === tenantId);
     if (target) {
+      if (!target.feature_flags) {
+        target.feature_flags = { cpm_enabled: true, export_enabled: true, audit_enabled: true };
+      }
       target.feature_flags[flag] = !target.feature_flags[flag];
       setTenants([...db.tenants]);
     }
@@ -123,7 +131,7 @@ export function SuperAdminPanel() {
                     </span>
                     <span className="flex items-center gap-1">
                       <HardDrive className="h-3 w-3" />
-                      {tenant.storage_quota_mb / 1024} GB Quota
+                      {(tenant.storage_quota_mb || 10240) / 1024} GB Quota
                     </span>
                   </div>
                 </div>
@@ -136,12 +144,12 @@ export function SuperAdminPanel() {
                   <button
                     onClick={() => toggleFeatureFlag(tenant.id, 'cpm_enabled')}
                     className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer border ${
-                      tenant.feature_flags.cpm_enabled
+                      tenant.feature_flags?.cpm_enabled
                         ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/40'
                         : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/40'
                     }`}
                   >
-                    {tenant.feature_flags.cpm_enabled ? 'ENABLED' : 'DISABLED'}
+                    {tenant.feature_flags?.cpm_enabled ? 'ENABLED' : 'DISABLED'}
                   </button>
                 </div>
 
@@ -150,12 +158,12 @@ export function SuperAdminPanel() {
                   <button
                     onClick={() => toggleFeatureFlag(tenant.id, 'audit_enabled')}
                     className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer border ${
-                      tenant.feature_flags.audit_enabled
+                      tenant.feature_flags?.audit_enabled
                         ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/40'
                         : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/40'
                     }`}
                   >
-                    {tenant.feature_flags.audit_enabled ? 'ENABLED' : 'DISABLED'}
+                    {tenant.feature_flags?.audit_enabled ? 'ENABLED' : 'DISABLED'}
                   </button>
                 </div>
               </div>

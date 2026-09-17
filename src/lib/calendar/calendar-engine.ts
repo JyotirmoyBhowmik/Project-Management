@@ -1,9 +1,9 @@
 // ==============================================================================
 // src/lib/calendar/calendar-engine.ts
-// Enterprise Working Calendar & Non-Working Day Exclusion Engine
+// Enterprise Working Calendar Engine & calculate_working_end_date Implementation
 // ==============================================================================
 
-import { WorkingCalendar, CalendarHoliday } from '@/types/database';
+import { CalendarHoliday, Tenant } from '@/types/database';
 
 export interface CalendarDayInfo {
   date: Date;
@@ -33,23 +33,36 @@ export function normalizeHolidays(holidays: (string | CalendarHoliday)[]): Map<s
     if (typeof h === 'string') {
       map.set(h, 'Holiday');
     } else {
-      map.set(h.date, h.name);
+      const d = h.holiday_date || h.date;
+      if (d) map.set(d, h.name);
     }
   }
   return map;
 }
 
 /**
- * Checks if a specific date is a working day based on calendar working_days and holiday set.
+ * Checks if a specific date is a working day based on configured weekend_days or working_days.
  */
 export function isWorkingDay(
   date: Date,
-  calendar: Pick<WorkingCalendar, 'working_days'>,
+  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
   holidays: (string | CalendarHoliday)[] = []
 ): boolean {
   const dayOfWeek = date.getUTCDay();
-  const isCalendarWorking = calendar.working_days.includes(dayOfWeek);
-  if (!isCalendarWorking) return false;
+
+  let isWeekend = false;
+  if (Array.isArray(calendarOrConfig)) {
+    // Array of weekend days
+    isWeekend = calendarOrConfig.includes(dayOfWeek);
+  } else if (calendarOrConfig.weekend_days) {
+    isWeekend = calendarOrConfig.weekend_days.includes(dayOfWeek);
+  } else if (calendarOrConfig.working_days) {
+    isWeekend = !calendarOrConfig.working_days.includes(dayOfWeek);
+  } else {
+    isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // default Sat/Sun
+  }
+
+  if (isWeekend) return false;
 
   const iso = formatDateToISO(date);
   const holidayMap = normalizeHolidays(holidays);
@@ -61,37 +74,63 @@ export function isWorkingDay(
  */
 export function getNextWorkingDay(
   date: Date,
-  calendar: Pick<WorkingCalendar, 'working_days'>,
+  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
   holidays: (string | CalendarHoliday)[] = []
 ): Date {
   const cursor = new Date(date.getTime());
-  while (!isWorkingDay(cursor, calendar, holidays)) {
+  while (!isWorkingDay(cursor, calendarOrConfig, holidays)) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return cursor;
 }
 
 /**
+ * TypeScript implementation matching PL/pgSQL calculate_working_end_date(tenant_id, start_date, duration_days)
+ */
+export function calculate_working_end_date(
+  tenantId: string,
+  startDate: Date | string,
+  durationDays: number,
+  weekendDays: number[] = [0, 6],
+  holidays: (string | CalendarHoliday)[] = []
+): string {
+  const start = typeof startDate === 'string' ? parseISODate(startDate) : startDate;
+  if (durationDays <= 0) {
+    return formatDateToISO(start);
+  }
+
+  let cursor = getNextWorkingDay(start, weekendDays, holidays);
+  let daysRemaining = durationDays - 1; // Start day counts as Day 1
+
+  while (daysRemaining > 0) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    if (isWorkingDay(cursor, weekendDays, holidays)) {
+      daysRemaining--;
+    }
+  }
+
+  return formatDateToISO(cursor);
+}
+
+/**
  * Adds working days to a start date, skipping non-working days and holidays.
- * If durationDays is 0 or 1, end date is the start date (or next working day if start was non-working).
  */
 export function addWorkingDays(
   startDate: Date,
   durationDays: number,
-  calendar: Pick<WorkingCalendar, 'working_days'>,
+  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
   holidays: (string | CalendarHoliday)[] = []
 ): Date {
   if (durationDays <= 0) {
     return new Date(startDate.getTime());
   }
 
-  // Ensure start date is on a working day
-  let cursor = getNextWorkingDay(startDate, calendar, holidays);
-  let daysRemaining = durationDays - 1; // Day 1 is the starting day itself
+  let cursor = getNextWorkingDay(startDate, calendarOrConfig, holidays);
+  let daysRemaining = durationDays - 1;
 
   while (daysRemaining > 0) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
-    if (isWorkingDay(cursor, calendar, holidays)) {
+    if (isWorkingDay(cursor, calendarOrConfig, holidays)) {
       daysRemaining--;
     }
   }
@@ -105,7 +144,7 @@ export function addWorkingDays(
 export function calculateWorkingDays(
   startDate: Date,
   endDate: Date,
-  calendar: Pick<WorkingCalendar, 'working_days'>,
+  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
   holidays: (string | CalendarHoliday)[] = []
 ): number {
   if (startDate > endDate) {
@@ -116,7 +155,7 @@ export function calculateWorkingDays(
   const cursor = new Date(startDate.getTime());
 
   while (cursor <= endDate) {
-    if (isWorkingDay(cursor, calendar, holidays)) {
+    if (isWorkingDay(cursor, calendarOrConfig, holidays)) {
       count++;
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -131,7 +170,7 @@ export function calculateWorkingDays(
 export function generateDayGrid(
   startDate: Date,
   endDate: Date,
-  calendar: Pick<WorkingCalendar, 'working_days'>,
+  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
   holidays: (string | CalendarHoliday)[] = []
 ): CalendarDayInfo[] {
   const grid: CalendarDayInfo[] = [];
@@ -140,10 +179,21 @@ export function generateDayGrid(
 
   while (cursor <= endDate) {
     const dayOfWeek = cursor.getUTCDay();
-    const isWeekend = !calendar.working_days.includes(dayOfWeek);
+    const working = isWorkingDay(cursor, calendarOrConfig, holidays);
     const iso = formatDateToISO(cursor);
     const isHoliday = holidayMap.has(iso);
     const holidayName = holidayMap.get(iso);
+
+    let isWeekend = false;
+    if (Array.isArray(calendarOrConfig)) {
+      isWeekend = calendarOrConfig.includes(dayOfWeek);
+    } else if (calendarOrConfig.weekend_days) {
+      isWeekend = calendarOrConfig.weekend_days.includes(dayOfWeek);
+    } else if (calendarOrConfig.working_days) {
+      isWeekend = !calendarOrConfig.working_days.includes(dayOfWeek);
+    } else {
+      isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    }
 
     grid.push({
       date: new Date(cursor.getTime()),
@@ -151,7 +201,7 @@ export function generateDayGrid(
       dayOfWeek,
       isWeekend,
       isHoliday,
-      isWorkingDay: !isWeekend && !isHoliday,
+      isWorkingDay: working,
       holidayName,
     });
 

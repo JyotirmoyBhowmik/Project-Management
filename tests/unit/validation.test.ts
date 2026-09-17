@@ -69,4 +69,34 @@ describe('Input Validation & Boundary Enforcement', () => {
     const parsed = DependencyCreateSchema.safeParse(invalidDep);
     expect(parsed.success).toBe(false);
   });
+
+  it('should validate standard import rows conforming to user specification', () => {
+    const validRow = {
+      phase: 'Sprint 1 - Foundation',
+      task_id: 'T-102',
+      title: 'Interactive Gantt Viewport Implementation',
+      description: 'Render SVG bars, dependency lines, and zoom controls',
+      start_date: '2026-10-07',
+      duration_days: 6,
+      priority: 'urgent',
+      status: 'todo',
+      progress: 0,
+      assignee_emails: ['contractor@partner.com'],
+      predecessors: [{ id: 'T-101', type: 'FS', lag_days: 0 }],
+    };
+
+    const parsed = TaskCreateSchema.safeParse({
+      tenant_id: 'a0000000-0000-0000-0000-000000000001',
+      project_id: 'd0000000-0000-0000-0000-000000000001',
+      title: validRow.title,
+      start_date: validRow.start_date,
+      end_date: '2026-10-14',
+      duration_days: validRow.duration_days,
+      progress: validRow.progress,
+      priority: validRow.priority,
+      status: validRow.status,
+    });
+
+    expect(parsed.success).toBe(true);
+  });
 });

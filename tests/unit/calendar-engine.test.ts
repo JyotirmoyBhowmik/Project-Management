@@ -8,6 +8,7 @@ import {
   isWorkingDay,
   addWorkingDays,
   calculateWorkingDays,
+  calculate_working_end_date,
   parseISODate,
   formatDateToISO,
 } from '@/lib/calendar/calendar-engine';
@@ -61,5 +62,29 @@ describe('Working Calendar & Holiday Engine', () => {
     // Monday Oct 05 to Monday Oct 12 spans a weekend (Oct 10-11) => 6 working days
     const nextMon = parseISODate('2026-10-12');
     expect(calculateWorkingDays(start, nextMon, usCalendar, [])).toBe(6);
+  });
+
+  it('should correctly calculate working end date matching PL/pgSQL calculate_working_end_date', () => {
+    // Starting Thursday Oct 01 for 4 working days with Sat/Sun weekends ([0, 6]):
+    // Thu Oct 01 (1), Fri Oct 02 (2), Sat/Sun skipped, Mon Oct 05 (3), Tue Oct 06 (4)
+    const endDate = calculate_working_end_date(
+      'tenant-1',
+      '2026-10-01',
+      4,
+      [0, 6],
+      []
+    );
+    expect(endDate).toBe('2026-10-06');
+
+    // With a holiday on Monday Oct 05:
+    // Should advance to Wednesday Oct 07
+    const holidayEndDate = calculate_working_end_date(
+      'tenant-1',
+      '2026-10-01',
+      4,
+      [0, 6],
+      [{ id: 'h1', tenant_id: 'tenant-1', name: 'Oct 5 Holiday', holiday_date: '2026-10-05', is_recurring: false, created_at: '' }]
+    );
+    expect(holidayEndDate).toBe('2026-10-07');
   });
 });

@@ -55,6 +55,7 @@ export function TenantAdminPanel() {
       tenant_id: activeTenant!.id,
       calendar_id: tenantCalendar.id,
       name: newHolidayName,
+      holiday_date: newHolidayDate,
       date: newHolidayDate,
       is_recurring: true,
       created_at: new Date().toISOString(),
@@ -74,6 +75,10 @@ export function TenantAdminPanel() {
     if (tenantCalendar) {
       tenantCalendar.week_start_day = weekStart;
       tenantCalendar.working_days = workingDays;
+      if (activeTenant) {
+        activeTenant.week_starts_on = weekStart;
+        activeTenant.weekend_days = [0, 1, 2, 3, 4, 5, 6].filter(d => !workingDays.includes(d));
+      }
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
     }
