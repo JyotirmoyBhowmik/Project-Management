@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEnterpriseTheme } from '@/lib/stores/theme-store';
+import { TenantMetadataProvider } from '@/lib/context/tenant-metadata-context';
+import { DynamicThemeProvider } from '@/lib/theme/dynamic-theme-provider';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(
@@ -17,12 +18,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
-  const { currentTheme, setTheme } = useEnterpriseTheme();
-
-  // Initialize theme classes on HTML element
-  React.useEffect(() => {
-    setTheme(currentTheme);
-  }, [currentTheme, setTheme]);
-
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TenantMetadataProvider>
+        <DynamicThemeProvider>
+          {children}
+        </DynamicThemeProvider>
+      </TenantMetadataProvider>
+    </QueryClientProvider>
+  );
 }

@@ -19,6 +19,18 @@ import {
   AuditLog,
   TenantTeam,
   TeamMember,
+  TenantTaskStatus,
+  TenantTaskPriority,
+  TenantTaskType,
+  SystemTheme,
+  TenantThemeOverride,
+  TenantCustomField,
+  EntityCustomFieldValue,
+  ProjectBaseline,
+  TaskBaselineSnapshot,
+  UserNotification,
+  TenantRolePermission,
+  ThemeTokens,
 } from '@/types/database';
 import { calculateCPM, CPMResult } from '../cpm/cpm-engine';
 import { calculate_working_end_date } from '../calendar/calendar-engine';
@@ -39,6 +51,17 @@ class DatabaseStore {
   public assignees: TaskAssignee[] = [];
   public dependencies: TaskDependency[] = [];
   public auditLogs: AuditLog[] = [];
+  public taskStatuses: TenantTaskStatus[] = [];
+  public taskPriorities: TenantTaskPriority[] = [];
+  public taskTypes: TenantTaskType[] = [];
+  public systemThemes: SystemTheme[] = [];
+  public tenantThemeOverrides: TenantThemeOverride[] = [];
+  public customFields: TenantCustomField[] = [];
+  public customFieldValues: EntityCustomFieldValue[] = [];
+  public baselines: ProjectBaseline[] = [];
+  public baselineSnapshots: TaskBaselineSnapshot[] = [];
+  public notifications: UserNotification[] = [];
+  public rolePermissions: TenantRolePermission[] = [];
 
   constructor() {
     this.seed();
@@ -538,6 +561,323 @@ class DatabaseStore {
         created_at: '2026-01-01T00:00:00Z',
       },
     ];
+
+    // 13. System Themes (Database-Stored Design Tokens)
+    const NAVY_TOKENS: ThemeTokens = {
+      background: '#0a1128',
+      foreground: '#f1f5f9',
+      card: '#101f42',
+      card_foreground: '#ffffff',
+      popover: '#101f42',
+      popover_foreground: '#ffffff',
+      primary: '#38bdf8',
+      primary_foreground: '#0a1128',
+      secondary: '#1e3a6d',
+      secondary_foreground: '#f1f5f9',
+      muted: '#1e3a6d',
+      muted_foreground: '#94a3b8',
+      accent: '#254a85',
+      accent_foreground: '#ffffff',
+      destructive: '#ff5555',
+      destructive_foreground: '#ffffff',
+      border: '#1e3a6d',
+      input: '#1e3a6d',
+      ring: '#38bdf8',
+      radius: '0.5rem',
+      critical_path: '#f43f5e',
+      non_working_day: 'rgba(30, 58, 109, 0.45)',
+      holiday_day: 'rgba(136, 19, 55, 0.35)',
+    };
+
+    const DARK_TOKENS: ThemeTokens = {
+      background: '#090d16',
+      foreground: '#f8fafc',
+      card: '#111827',
+      card_foreground: '#f8fafc',
+      popover: '#111827',
+      popover_foreground: '#f8fafc',
+      primary: '#3b82f6',
+      primary_foreground: '#ffffff',
+      secondary: '#1f2937',
+      secondary_foreground: '#f8fafc',
+      muted: '#1f2937',
+      muted_foreground: '#9ca3af',
+      accent: '#374151',
+      accent_foreground: '#f8fafc',
+      destructive: '#f87171',
+      destructive_foreground: '#ffffff',
+      border: '#1f2937',
+      input: '#1f2937',
+      ring: '#3b82f6',
+      radius: '0.5rem',
+      critical_path: '#f87171',
+      non_working_day: 'rgba(31, 41, 55, 0.4)',
+      holiday_day: 'rgba(127, 29, 29, 0.25)',
+    };
+
+    const MONOKAI_TOKENS: ThemeTokens = {
+      background: '#0d0e0f',
+      foreground: '#f8f8f2',
+      card: '#191a1c',
+      card_foreground: '#f8f8f2',
+      popover: '#191a1c',
+      popover_foreground: '#f8f8f2',
+      primary: '#a6e22e',
+      primary_foreground: '#0d0e0f',
+      secondary: '#272822',
+      secondary_foreground: '#f8f8f2',
+      muted: '#272822',
+      muted_foreground: '#75715e',
+      accent: '#3e3d32',
+      accent_foreground: '#fd971f',
+      destructive: '#f92672',
+      destructive_foreground: '#ffffff',
+      border: '#272822',
+      input: '#272822',
+      ring: '#a6e22e',
+      radius: '0.375rem',
+      critical_path: '#f92672',
+      non_working_day: 'rgba(39, 40, 34, 0.45)',
+      holiday_day: 'rgba(249, 38, 114, 0.25)',
+    };
+
+    const HIGH_CONTRAST_TOKENS: ThemeTokens = {
+      background: '#000000',
+      foreground: '#ffffff',
+      card: '#0a0a0a',
+      card_foreground: '#ffffff',
+      popover: '#0a0a0a',
+      popover_foreground: '#ffffff',
+      primary: '#ffff00',
+      primary_foreground: '#000000',
+      secondary: '#1c1c1c',
+      secondary_foreground: '#ffffff',
+      muted: '#1c1c1c',
+      muted_foreground: '#e0e0e0',
+      accent: '#2d2d2d',
+      accent_foreground: '#ffffff',
+      destructive: '#ff0055',
+      destructive_foreground: '#ffffff',
+      border: '#ffffff',
+      input: '#2d2d2d',
+      ring: '#ffff00',
+      radius: '0px',
+      critical_path: '#ff0055',
+      non_working_day: 'rgba(255, 255, 255, 0.15)',
+      holiday_day: 'rgba(255, 0, 85, 0.3)',
+    };
+
+    const LIGHT_TOKENS: ThemeTokens = {
+      background: '#f8fafc',
+      foreground: '#0f172a',
+      card: '#ffffff',
+      card_foreground: '#0f172a',
+      popover: '#ffffff',
+      popover_foreground: '#0f172a',
+      primary: '#2563eb',
+      primary_foreground: '#ffffff',
+      secondary: '#f1f5f9',
+      secondary_foreground: '#1e293b',
+      muted: '#f1f5f9',
+      muted_foreground: '#64748b',
+      accent: '#e2e8f0',
+      accent_foreground: '#0f172a',
+      destructive: '#ef4444',
+      destructive_foreground: '#ffffff',
+      border: '#e2e8f0',
+      input: '#e2e8f0',
+      ring: '#2563eb',
+      radius: '0.5rem',
+      critical_path: '#ef4444',
+      non_working_day: 'rgba(226, 232, 240, 0.5)',
+      holiday_day: 'rgba(254, 226, 226, 0.6)',
+    };
+
+    this.systemThemes = [
+      { id: 'navy', name: 'Enterprise Navy', description: 'Deep tech enterprise navy blue theme', tokens_json: NAVY_TOKENS, is_system_default: true, created_at: '2026-01-01T00:00:00Z' },
+      { id: 'dark', name: 'Dark Charcoal', description: 'Modern dark mode with balanced contrast', tokens_json: DARK_TOKENS, is_system_default: false, created_at: '2026-01-01T00:00:00Z' },
+      { id: 'monokai', name: 'Monokai OLED', description: 'High-energy developer palette with neon green accents', tokens_json: MONOKAI_TOKENS, is_system_default: false, created_at: '2026-01-01T00:00:00Z' },
+      { id: 'high-contrast', name: 'High Contrast (AAA)', description: 'WCAG AAA compliance with stark black and yellow', tokens_json: HIGH_CONTRAST_TOKENS, is_system_default: false, created_at: '2026-01-01T00:00:00Z' },
+      { id: 'light', name: 'Clean Enterprise Light', description: 'Crisp, high-productivity daylight aesthetic', tokens_json: LIGHT_TOKENS, is_system_default: false, created_at: '2026-01-01T00:00:00Z' },
+    ];
+
+    this.tenantThemeOverrides = [
+      { id: 't-theme-1', tenant_id: acmeId, active_theme_id: 'navy', custom_tokens_json: {}, created_at: '2026-01-01T00:00:00Z' },
+      { id: 't-theme-2', tenant_id: globexId, active_theme_id: 'dark', custom_tokens_json: {}, created_at: '2026-01-01T00:00:00Z' },
+    ];
+
+    // 14. Tenant Dynamic Task Statuses
+    const seedStatusesForTenant = (tId: string) => [
+      { id: `st-backlog-${tId}`, tenant_id: tId, name: 'Backlog', slug: 'backlog', color_hex: '#64748b', badge_variant: 'secondary', position: 0, is_closed_state: false, is_default: false },
+      { id: `st-todo-${tId}`, tenant_id: tId, name: 'To Do', slug: 'todo', color_hex: '#3b82f6', badge_variant: 'default', position: 1, is_closed_state: false, is_default: true },
+      { id: `st-progress-${tId}`, tenant_id: tId, name: 'In Progress', slug: 'in_progress', color_hex: '#f59e0b', badge_variant: 'warning', position: 2, is_closed_state: false, is_default: false },
+      { id: `st-review-${tId}`, tenant_id: tId, name: 'In Review', slug: 'review', color_hex: '#8b5cf6', badge_variant: 'secondary', position: 3, is_closed_state: false, is_default: false },
+      { id: `st-done-${tId}`, tenant_id: tId, name: 'Done', slug: 'done', color_hex: '#10b981', badge_variant: 'success', position: 4, is_closed_state: true, is_default: false },
+      { id: `st-blocked-${tId}`, tenant_id: tId, name: 'Blocked', slug: 'blocked', color_hex: '#ef4444', badge_variant: 'destructive', position: 5, is_closed_state: false, is_default: false },
+    ];
+    this.taskStatuses = [
+      ...seedStatusesForTenant(acmeId),
+      ...seedStatusesForTenant(globexId),
+    ];
+
+    // 15. Tenant Dynamic Task Priorities
+    const seedPrioritiesForTenant = (tId: string) => [
+      { id: `pr-low-${tId}`, tenant_id: tId, name: 'Low', slug: 'low', color_hex: '#64748b', urgency_weight: 1, icon_key: 'arrow-down', is_default: false },
+      { id: `pr-medium-${tId}`, tenant_id: tId, name: 'Medium', slug: 'medium', color_hex: '#3b82f6', urgency_weight: 2, icon_key: 'minus', is_default: true },
+      { id: `pr-high-${tId}`, tenant_id: tId, name: 'High', slug: 'high', color_hex: '#f59e0b', urgency_weight: 3, icon_key: 'arrow-up', is_default: false },
+      { id: `pr-urgent-${tId}`, tenant_id: tId, name: 'Urgent', slug: 'urgent', color_hex: '#ef4444', urgency_weight: 4, icon_key: 'alert-triangle', is_default: false },
+    ];
+    this.taskPriorities = [
+      ...seedPrioritiesForTenant(acmeId),
+      ...seedPrioritiesForTenant(globexId),
+    ];
+
+    // 16. Tenant Dynamic Task Types
+    const seedTypesForTenant = (tId: string) => [
+      { id: `tt-task-${tId}`, tenant_id: tId, name: 'Task', slug: 'task', icon_key: 'check-square', is_default: true },
+      { id: `tt-milestone-${tId}`, tenant_id: tId, name: 'Milestone', slug: 'milestone', icon_key: 'flag', is_default: false },
+      { id: `tt-feature-${tId}`, tenant_id: tId, name: 'Feature', slug: 'feature', icon_key: 'sparkles', is_default: false },
+      { id: `tt-bug-${tId}`, tenant_id: tId, name: 'Bug', slug: 'bug', icon_key: 'bug', is_default: false },
+      { id: `tt-phase-${tId}`, tenant_id: tId, name: 'Phase', slug: 'phase', icon_key: 'folder', is_default: false },
+    ];
+    this.taskTypes = [
+      ...seedTypesForTenant(acmeId),
+      ...seedTypesForTenant(globexId),
+    ];
+
+    // 17. Custom Fields
+    this.customFields = [
+      { id: 'cf1', tenant_id: acmeId, entity_type: 'project', field_name: 'Approved Budget ($)', field_key: 'budget_cost', field_type: 'number', is_required: false, sort_order: 1 },
+      { id: 'cf2', tenant_id: acmeId, entity_type: 'project', field_name: 'Client Billing Code', field_key: 'client_code', field_type: 'text', is_required: true, sort_order: 2 },
+      { id: 'cf3', tenant_id: acmeId, entity_type: 'task', field_name: 'Risk Level', field_key: 'risk_level', field_type: 'dropdown', options_json: ['Low', 'Medium', 'High', 'Critical'], is_required: false, sort_order: 1 },
+      { id: 'cf4', tenant_id: acmeId, entity_type: 'task', field_name: 'External Jira ID', field_key: 'jira_key', field_type: 'text', is_required: false, sort_order: 2 },
+      { id: 'cf5', tenant_id: acmeId, entity_type: 'task', field_name: 'QA Sign-off Required', field_key: 'qa_signoff', field_type: 'checkbox', is_required: false, sort_order: 3 },
+    ];
+
+    this.customFieldValues = [
+      { id: 'cfv1', tenant_id: acmeId, entity_id: prjId, field_id: 'cf1', value_json: 750000 },
+      { id: 'cfv2', tenant_id: acmeId, entity_id: prjId, field_id: 'cf2', value_json: 'ACME-ENT-2026' },
+      { id: 'cfv3', tenant_id: acmeId, entity_id: t1, field_id: 'cf3', value_json: 'High' },
+      { id: 'cfv4', tenant_id: acmeId, entity_id: t1, field_id: 'cf4', value_json: 'JIRA-8901' },
+      { id: 'cfv5', tenant_id: acmeId, entity_id: t5, field_id: 'cf3', value_json: 'Critical' },
+      { id: 'cfv6', tenant_id: acmeId, entity_id: t6, field_id: 'cf5', value_json: true },
+    ];
+
+    // 18. Project Baselines & Snapshots (Earned Value & Variance Tracking)
+    const baseId = `base-init-${acmeId}`;
+    this.baselines = [
+      {
+        id: baseId,
+        project_id: prjId,
+        tenant_id: acmeId,
+        name: 'Initial Approved Schedule Baseline',
+        description: 'Baseline locked after Steering Committee approval on 2026-09-01',
+        created_by: this.users[1].id,
+        created_at: '2026-09-01T00:00:00Z',
+      },
+    ];
+
+    this.baselineSnapshots = [
+      { id: `bs1-${baseId}`, baseline_id: baseId, task_id: t1, start_date: '2026-10-01', end_date: '2026-10-02', duration_days: 2, progress: 100 },
+      { id: `bs2-${baseId}`, baseline_id: baseId, task_id: t2, start_date: '2026-10-05', end_date: '2026-10-08', duration_days: 4, progress: 40 },
+      { id: `bs3-${baseId}`, baseline_id: baseId, task_id: t3, start_date: '2026-10-09', end_date: '2026-10-14', duration_days: 4, progress: 0 },
+      { id: `bs4-${baseId}`, baseline_id: baseId, task_id: t4, start_date: '2026-10-06', end_date: '2026-10-07', duration_days: 2, progress: 10 },
+      { id: `bs5-${baseId}`, baseline_id: baseId, task_id: t5, start_date: '2026-10-15', end_date: '2026-10-21', duration_days: 5, progress: 0 },
+      { id: `bs6-${baseId}`, baseline_id: baseId, task_id: t6, start_date: '2026-10-22', end_date: '2026-10-27', duration_days: 4, progress: 0 },
+      { id: `bs7-${baseId}`, baseline_id: baseId, task_id: t7, start_date: '2026-10-19', end_date: '2026-10-22', duration_days: 4, progress: 0 },
+      { id: `bs8-${baseId}`, baseline_id: baseId, task_id: t8, start_date: '2026-10-28', end_date: '2026-10-28', duration_days: 1, progress: 0 },
+    ];
+
+    // 19. Notifications
+    this.notifications = [
+      {
+        id: 'notif-1',
+        tenant_id: acmeId,
+        recipient_id: this.users[3].id,
+        actor_id: this.users[1].id,
+        event_type: 'task_assigned',
+        title: 'New Task Assignment',
+        message: 'You have been assigned as lead engineer for "Core Database Architecture".',
+        entity_type: 'task',
+        entity_id: t2,
+        is_read: false,
+        created_at: '2026-09-15T10:00:00Z',
+      },
+      {
+        id: 'notif-2',
+        tenant_id: acmeId,
+        recipient_id: this.users[3].id,
+        actor_id: this.users[2].id,
+        event_type: 'dependency_blocked',
+        title: 'Schedule Predecessor Completed',
+        message: 'Task "Technical Architecture Blueprint" is now complete; you can proceed with DB architecture.',
+        entity_type: 'task',
+        entity_id: t1,
+        is_read: true,
+        created_at: '2026-09-14T08:30:00Z',
+      },
+      {
+        id: 'notif-3',
+        tenant_id: acmeId,
+        recipient_id: this.users[1].id,
+        actor_id: this.users[0].id,
+        event_type: 'due_soon',
+        title: 'Project Milestone Approaching',
+        message: 'Sprint 1 Alpha Release is scheduled for delivery in 3 working days.',
+        entity_type: 'project',
+        entity_id: prjId,
+        is_read: false,
+        created_at: '2026-09-16T14:15:00Z',
+      },
+    ];
+
+    // 20. Role Permissions
+    const seedPermissionsForTenant = (tId: string) => [
+      // Owner
+      { id: `p-ow-1-${tId}`, tenant_id: tId, role: 'owner', permission_key: 'tasks.create', is_granted: true },
+      { id: `p-ow-2-${tId}`, tenant_id: tId, role: 'owner', permission_key: 'tasks.edit', is_granted: true },
+      { id: `p-ow-3-${tId}`, tenant_id: tId, role: 'owner', permission_key: 'tasks.delete', is_granted: true },
+      { id: `p-ow-4-${tId}`, tenant_id: tId, role: 'owner', permission_key: 'cpm.recalculate', is_granted: true },
+      { id: `p-ow-5-${tId}`, tenant_id: tId, role: 'owner', permission_key: 'baselines.create', is_granted: true },
+      { id: `p-ow-6-${tId}`, tenant_id: tId, role: 'owner', permission_key: 'settings.manage', is_granted: true },
+      { id: `p-ow-7-${tId}`, tenant_id: tId, role: 'owner', permission_key: 'roles.manage', is_granted: true },
+      // Admin
+      { id: `p-ad-1-${tId}`, tenant_id: tId, role: 'admin', permission_key: 'tasks.create', is_granted: true },
+      { id: `p-ad-2-${tId}`, tenant_id: tId, role: 'admin', permission_key: 'tasks.edit', is_granted: true },
+      { id: `p-ad-3-${tId}`, tenant_id: tId, role: 'admin', permission_key: 'tasks.delete', is_granted: true },
+      { id: `p-ad-4-${tId}`, tenant_id: tId, role: 'admin', permission_key: 'cpm.recalculate', is_granted: true },
+      { id: `p-ad-5-${tId}`, tenant_id: tId, role: 'admin', permission_key: 'baselines.create', is_granted: true },
+      { id: `p-ad-6-${tId}`, tenant_id: tId, role: 'admin', permission_key: 'settings.manage', is_granted: true },
+      { id: `p-ad-7-${tId}`, tenant_id: tId, role: 'admin', permission_key: 'roles.manage', is_granted: false },
+      // Project Manager
+      { id: `p-pm-1-${tId}`, tenant_id: tId, role: 'project_manager', permission_key: 'tasks.create', is_granted: true },
+      { id: `p-pm-2-${tId}`, tenant_id: tId, role: 'project_manager', permission_key: 'tasks.edit', is_granted: true },
+      { id: `p-pm-3-${tId}`, tenant_id: tId, role: 'project_manager', permission_key: 'tasks.delete', is_granted: true },
+      { id: `p-pm-4-${tId}`, tenant_id: tId, role: 'project_manager', permission_key: 'cpm.recalculate', is_granted: true },
+      { id: `p-pm-5-${tId}`, tenant_id: tId, role: 'project_manager', permission_key: 'baselines.create', is_granted: true },
+      { id: `p-pm-6-${tId}`, tenant_id: tId, role: 'project_manager', permission_key: 'settings.manage', is_granted: false },
+      { id: `p-pm-7-${tId}`, tenant_id: tId, role: 'project_manager', permission_key: 'roles.manage', is_granted: false },
+      // Member
+      { id: `p-mb-1-${tId}`, tenant_id: tId, role: 'member', permission_key: 'tasks.create', is_granted: true },
+      { id: `p-mb-2-${tId}`, tenant_id: tId, role: 'member', permission_key: 'tasks.edit', is_granted: true },
+      { id: `p-mb-3-${tId}`, tenant_id: tId, role: 'member', permission_key: 'tasks.delete', is_granted: false },
+      { id: `p-mb-4-${tId}`, tenant_id: tId, role: 'member', permission_key: 'cpm.recalculate', is_granted: false },
+      { id: `p-mb-5-${tId}`, tenant_id: tId, role: 'member', permission_key: 'baselines.create', is_granted: false },
+      { id: `p-mb-6-${tId}`, tenant_id: tId, role: 'member', permission_key: 'settings.manage', is_granted: false },
+      { id: `p-mb-7-${tId}`, tenant_id: tId, role: 'member', permission_key: 'roles.manage', is_granted: false },
+      // Guest
+      { id: `p-gt-1-${tId}`, tenant_id: tId, role: 'guest', permission_key: 'tasks.create', is_granted: false },
+      { id: `p-gt-2-${tId}`, tenant_id: tId, role: 'guest', permission_key: 'tasks.edit', is_granted: false },
+      { id: `p-gt-3-${tId}`, tenant_id: tId, role: 'guest', permission_key: 'tasks.delete', is_granted: false },
+      { id: `p-gt-4-${tId}`, tenant_id: tId, role: 'guest', permission_key: 'cpm.recalculate', is_granted: false },
+      { id: `p-gt-5-${tId}`, tenant_id: tId, role: 'guest', permission_key: 'baselines.create', is_granted: false },
+      { id: `p-gt-6-${tId}`, tenant_id: tId, role: 'guest', permission_key: 'settings.manage', is_granted: false },
+      { id: `p-gt-7-${tId}`, tenant_id: tId, role: 'guest', permission_key: 'roles.manage', is_granted: false },
+    ];
+    this.rolePermissions = [
+      ...seedPermissionsForTenant(acmeId),
+      ...seedPermissionsForTenant(globexId),
+    ];
   }
 
   // --- SECURITY DEFINER SIMULATION METHODS ---
@@ -790,6 +1130,307 @@ class DatabaseStore {
 
     this.recalculateProjectCPM(dep.project_id, dep.tenant_id);
     return true;
+  }
+
+  // --- PHASE 2 DYNAMIC METADATA REPOSITORY METHODS ---
+
+  public seedTenantMetadata(tId: string): void {
+    this.taskStatuses.push(
+      { id: `st-backlog-${tId}`, tenant_id: tId, name: 'Backlog', slug: 'backlog', color_hex: '#64748b', badge_variant: 'secondary', position: 0, is_closed_state: false, is_default: false },
+      { id: `st-todo-${tId}`, tenant_id: tId, name: 'To Do', slug: 'todo', color_hex: '#3b82f6', badge_variant: 'default', position: 1, is_closed_state: false, is_default: true },
+      { id: `st-progress-${tId}`, tenant_id: tId, name: 'In Progress', slug: 'in_progress', color_hex: '#f59e0b', badge_variant: 'warning', position: 2, is_closed_state: false, is_default: false },
+      { id: `st-review-${tId}`, tenant_id: tId, name: 'In Review', slug: 'review', color_hex: '#8b5cf6', badge_variant: 'secondary', position: 3, is_closed_state: false, is_default: false },
+      { id: `st-done-${tId}`, tenant_id: tId, name: 'Done', slug: 'done', color_hex: '#10b981', badge_variant: 'success', position: 4, is_closed_state: true, is_default: false },
+      { id: `st-blocked-${tId}`, tenant_id: tId, name: 'Blocked', slug: 'blocked', color_hex: '#ef4444', badge_variant: 'destructive', position: 5, is_closed_state: false, is_default: false }
+    );
+    this.taskPriorities.push(
+      { id: `pr-low-${tId}`, tenant_id: tId, name: 'Low', slug: 'low', color_hex: '#64748b', urgency_weight: 1, icon_key: 'arrow-down', is_default: false },
+      { id: `pr-medium-${tId}`, tenant_id: tId, name: 'Medium', slug: 'medium', color_hex: '#3b82f6', urgency_weight: 2, icon_key: 'minus', is_default: true },
+      { id: `pr-high-${tId}`, tenant_id: tId, name: 'High', slug: 'high', color_hex: '#f59e0b', urgency_weight: 3, icon_key: 'arrow-up', is_default: false },
+      { id: `pr-urgent-${tId}`, tenant_id: tId, name: 'Urgent', slug: 'urgent', color_hex: '#ef4444', urgency_weight: 4, icon_key: 'alert-triangle', is_default: false }
+    );
+    this.taskTypes.push(
+      { id: `tt-task-${tId}`, tenant_id: tId, name: 'Task', slug: 'task', icon_key: 'check-square', is_default: true },
+      { id: `tt-milestone-${tId}`, tenant_id: tId, name: 'Milestone', slug: 'milestone', icon_key: 'flag', is_default: false },
+      { id: `tt-feature-${tId}`, tenant_id: tId, name: 'Feature', slug: 'feature', icon_key: 'sparkles', is_default: false }
+    );
+  }
+
+  public getTenantTaskStatuses(tenantId: string): TenantTaskStatus[] {
+    return this.taskStatuses
+      .filter(s => s.tenant_id === tenantId)
+      .sort((a, b) => a.position - b.position);
+  }
+
+  public createTenantTaskStatus(data: Omit<TenantTaskStatus, 'id' | 'created_at'>): TenantTaskStatus {
+    const newStatus: TenantTaskStatus = {
+      ...data,
+      id: `stat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+    this.taskStatuses.push(newStatus);
+    return newStatus;
+  }
+
+  public updateTenantTaskStatus(statusId: string, updates: Partial<TenantTaskStatus>): TenantTaskStatus {
+    const idx = this.taskStatuses.findIndex(s => s.id === statusId);
+    if (idx === -1) throw new EntityNotFoundException('TaskStatus', statusId);
+    this.taskStatuses[idx] = { ...this.taskStatuses[idx], ...updates };
+    return this.taskStatuses[idx];
+  }
+
+  public deleteTenantTaskStatus(statusId: string): boolean {
+    const beforeLen = this.taskStatuses.length;
+    this.taskStatuses = this.taskStatuses.filter(s => s.id !== statusId);
+    return this.taskStatuses.length < beforeLen;
+  }
+
+  public getTenantTaskPriorities(tenantId: string): TenantTaskPriority[] {
+    return this.taskPriorities
+      .filter(p => p.tenant_id === tenantId)
+      .sort((a, b) => a.urgency_weight - b.urgency_weight);
+  }
+
+  public createTenantTaskPriority(data: Omit<TenantTaskPriority, 'id' | 'created_at'>): TenantTaskPriority {
+    const newPriority: TenantTaskPriority = {
+      ...data,
+      id: `prio-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+    this.taskPriorities.push(newPriority);
+    return newPriority;
+  }
+
+  public updateTenantTaskPriority(priorityId: string, updates: Partial<TenantTaskPriority>): TenantTaskPriority {
+    const idx = this.taskPriorities.findIndex(p => p.id === priorityId);
+    if (idx === -1) throw new EntityNotFoundException('TaskPriority', priorityId);
+    this.taskPriorities[idx] = { ...this.taskPriorities[idx], ...updates };
+    return this.taskPriorities[idx];
+  }
+
+  public deleteTenantTaskPriority(priorityId: string): boolean {
+    const beforeLen = this.taskPriorities.length;
+    this.taskPriorities = this.taskPriorities.filter(p => p.id !== priorityId);
+    return this.taskPriorities.length < beforeLen;
+  }
+
+  public getTenantTaskTypes(tenantId: string): TenantTaskType[] {
+    return this.taskTypes.filter(t => t.tenant_id === tenantId);
+  }
+
+  public createTenantTaskType(data: Omit<TenantTaskType, 'id' | 'created_at'>): TenantTaskType {
+    const newType: TenantTaskType = {
+      ...data,
+      id: `type-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+    this.taskTypes.push(newType);
+    return newType;
+  }
+
+  // --- DYNAMIC THEMING METHODS ---
+
+  public getSystemThemes(): SystemTheme[] {
+    return this.systemThemes;
+  }
+
+  public updateSystemTheme(themeId: string, updates: Partial<SystemTheme>): SystemTheme {
+    const idx = this.systemThemes.findIndex(t => t.id === themeId);
+    if (idx === -1) throw new EntityNotFoundException('SystemTheme', themeId);
+    this.systemThemes[idx] = { ...this.systemThemes[idx], ...updates };
+    return this.systemThemes[idx];
+  }
+
+  public getTenantTheme(tenantId: string): ThemeTokens {
+    const override = this.tenantThemeOverrides.find(o => o.tenant_id === tenantId);
+    const activeThemeId = override?.active_theme_id || 'navy';
+    const baseTheme = this.systemThemes.find(t => t.id === activeThemeId) || this.systemThemes[0];
+    return {
+      ...baseTheme.tokens_json,
+      ...(override?.custom_tokens_json || {}),
+    };
+  }
+
+  public setTenantTheme(tenantId: string, themeId: string, customTokens: Partial<ThemeTokens> = {}): TenantThemeOverride {
+    const idx = this.tenantThemeOverrides.findIndex(o => o.tenant_id === tenantId);
+    const updated: TenantThemeOverride = {
+      id: idx !== -1 ? this.tenantThemeOverrides[idx].id : `theme-ovr-${Date.now()}`,
+      tenant_id: tenantId,
+      active_theme_id: themeId,
+      custom_tokens_json: customTokens,
+      updated_at: new Date().toISOString(),
+    };
+    if (idx !== -1) {
+      this.tenantThemeOverrides[idx] = updated;
+    } else {
+      this.tenantThemeOverrides.push(updated);
+    }
+    return updated;
+  }
+
+  public createSystemTheme(theme: SystemTheme): SystemTheme {
+    this.systemThemes.push(theme);
+    return theme;
+  }
+
+  // --- CUSTOM FIELDS METHODS ---
+
+  public getTenantCustomFields(tenantId: string, entityType?: 'project' | 'task'): TenantCustomField[] {
+    return this.customFields
+      .filter(f => f.tenant_id === tenantId && (!entityType || f.entity_type === entityType))
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  public createTenantCustomField(data: Omit<TenantCustomField, 'id' | 'created_at'>): TenantCustomField {
+    const newField: TenantCustomField = {
+      ...data,
+      id: `cf-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+    this.customFields.push(newField);
+    return newField;
+  }
+
+  public deleteTenantCustomField(fieldId: string): boolean {
+    const beforeLen = this.customFields.length;
+    this.customFields = this.customFields.filter(f => f.id !== fieldId);
+    this.customFieldValues = this.customFieldValues.filter(v => v.field_id !== fieldId);
+    return this.customFields.length < beforeLen;
+  }
+
+
+  public getEntityCustomFieldValues(entityId: string): Record<string, unknown> {
+    const values = this.customFieldValues.filter(v => v.entity_id === entityId);
+    const result: Record<string, unknown> = {};
+    for (const val of values) {
+      const field = this.customFields.find(f => f.id === val.field_id);
+      if (field) {
+        result[field.field_key] = val.value_json;
+      }
+    }
+    return result;
+  }
+
+  public setEntityCustomFieldValue(entityId: string, fieldId: string, value: unknown, tenantId: string): EntityCustomFieldValue {
+    const idx = this.customFieldValues.findIndex(v => v.entity_id === entityId && v.field_id === fieldId);
+    const record: EntityCustomFieldValue = {
+      id: idx !== -1 ? this.customFieldValues[idx].id : `cfv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      tenant_id: tenantId,
+      entity_id: entityId,
+      field_id: fieldId,
+      value_json: value,
+      updated_at: new Date().toISOString(),
+    };
+    if (idx !== -1) {
+      this.customFieldValues[idx] = record;
+    } else {
+      this.customFieldValues.push(record);
+    }
+    return record;
+  }
+
+  // --- BASELINES & EARNED VALUE ---
+
+  public createProjectBaseline(projectId: string, name: string, tenantId: string, createdBy: string, description?: string): ProjectBaseline {
+    const newBaseline: ProjectBaseline = {
+      id: `base-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      project_id: projectId,
+      tenant_id: tenantId,
+      name,
+      description: description || null,
+      created_by: createdBy,
+      created_at: new Date().toISOString(),
+    };
+    this.baselines.push(newBaseline);
+
+    // Snapshot all current tasks in project
+    const projectTasks = this.tasks.filter(t => t.project_id === projectId && t.tenant_id === tenantId);
+    for (const t of projectTasks) {
+      this.baselineSnapshots.push({
+        id: `snap-${Date.now()}-${t.id}`,
+        baseline_id: newBaseline.id,
+        task_id: t.id,
+        start_date: t.start_date,
+        end_date: t.end_date,
+        duration_days: t.duration_days,
+        progress: t.progress ?? t.progress_percent ?? 0,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    return newBaseline;
+  }
+
+  public getProjectBaselines(projectId: string, tenantId: string): ProjectBaseline[] {
+    return this.baselines.filter(b => b.project_id === projectId && b.tenant_id === tenantId);
+  }
+
+  public getBaselineSnapshots(baselineId: string): TaskBaselineSnapshot[] {
+    return this.baselineSnapshots.filter(s => s.baseline_id === baselineId);
+  }
+
+  // --- NOTIFICATIONS METHODS ---
+
+  public getUserNotifications(userId: string, tenantId: string): UserNotification[] {
+    return this.notifications
+      .filter(n => n.recipient_id === userId && n.tenant_id === tenantId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  public markNotificationRead(notificationId: string): boolean {
+    const notif = this.notifications.find(n => n.id === notificationId);
+    if (notif) {
+      notif.is_read = true;
+      return true;
+    }
+    return false;
+  }
+
+  public markAllNotificationsRead(userId: string, tenantId: string): void {
+    this.notifications
+      .filter(n => n.recipient_id === userId && n.tenant_id === tenantId)
+      .forEach(n => { n.is_read = true; });
+  }
+
+  public createNotification(data: Omit<UserNotification, 'id' | 'created_at' | 'is_read'>): UserNotification {
+    const notif: UserNotification = {
+      ...data,
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    };
+    this.notifications.unshift(notif);
+    return notif;
+  }
+
+  // --- ROLE PERMISSIONS METHODS ---
+
+  public getTenantRolePermissions(tenantId: string): TenantRolePermission[] {
+    return this.rolePermissions.filter(p => p.tenant_id === tenantId);
+  }
+
+  public updateRolePermission(tenantId: string, role: string, permissionKey: string, isGranted: boolean): TenantRolePermission {
+    const idx = this.rolePermissions.findIndex(p => p.tenant_id === tenantId && p.role === role && p.permission_key === permissionKey);
+    if (idx !== -1) {
+      this.rolePermissions[idx].is_granted = isGranted;
+      return this.rolePermissions[idx];
+    } else {
+      const newPerm: TenantRolePermission = {
+        id: `perm-${Date.now()}`,
+        tenant_id: tenantId,
+        role,
+        permission_key: permissionKey,
+        is_granted: isGranted,
+      };
+      this.rolePermissions.push(newPerm);
+      return newPerm;
+    }
+  }
+
+  public hasPermission(tenantId: string, role: string, permissionKey: string): boolean {
+    if (role === 'owner' || role === 'superadmin') return true;
+    const perm = this.rolePermissions.find(p => p.tenant_id === tenantId && p.role === role && p.permission_key === permissionKey);
+    return perm ? perm.is_granted : false;
   }
 }
 

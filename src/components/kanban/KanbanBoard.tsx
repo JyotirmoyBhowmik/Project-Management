@@ -1,36 +1,36 @@
+// ==============================================================================
+// src/components/kanban/KanbanBoard.tsx
+// Dynamic Kanban Board Engine (Zero Hardcoded Values Mandate)
+// Workflow statuses and priority levels are fetched dynamically from the database.
+// ==============================================================================
+
 'use client';
 
 import * as React from 'react';
 import {
-  MoreHorizontal,
   Flame,
-  Clock,
   Calendar,
   ChevronRight,
   ChevronLeft,
-  CheckCircle2,
-  AlertCircle,
-  Plus,
 } from 'lucide-react';
-import { Task, TaskStatus } from '@/types/database';
+import { Task } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
 
 interface KanbanBoardProps {
   tasks: Task[];
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
 }
 
-const LANES: { id: TaskStatus; label: string; color: string }[] = [
-  { id: 'backlog', label: 'Backlog', color: '#64748b' },
-  { id: 'todo', label: 'To Do', color: '#3b82f6' },
-  { id: 'in_progress', label: 'In Progress', color: '#f59e0b' },
-  { id: 'review', label: 'In Review', color: '#8b5cf6' },
-  { id: 'completed', label: 'Completed', color: '#10b981' },
-];
-
 export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
-  const laneOrder: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'review', 'completed'];
+  const { statuses, priorities } = useTenantMetadata();
+
+  // Dynamic lane order derived from database positions
+  const lanes = React.useMemo(() => {
+    return [...statuses].sort((a, b) => a.position - b.position);
+  }, [statuses]);
+
+  const laneOrder = React.useMemo(() => lanes.map((l) => l.slug), [lanes]);
 
   const moveLane = (task: Task, direction: 'prev' | 'next') => {
     const currentIndex = laneOrder.indexOf(task.status);
@@ -40,37 +40,53 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
     }
   };
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return <Badge variant="critical">Urgent</Badge>;
-      case 'high':
-        return <Badge variant="warning">High</Badge>;
-      case 'medium':
-        return <Badge variant="secondary">Medium</Badge>;
-      default:
-        return <Badge variant="outline">Low</Badge>;
+  const renderPriorityBadge = (prioritySlug: string) => {
+    const p = priorities.find((item) => item.slug === prioritySlug);
+    if (!p) {
+      return (
+        <Badge variant="outline" className="capitalize text-[10px]">
+          {prioritySlug}
+        </Badge>
+      );
     }
+
+    return (
+      <span
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border"
+        style={{
+          backgroundColor: `${p.color_hex}15`,
+          color: p.color_hex,
+          borderColor: `${p.color_hex}40`,
+        }}
+      >
+        {p.name}
+      </span>
+    );
   };
 
   return (
     <div className="flex h-full gap-4 overflow-x-auto p-4 bg-[var(--background)]">
-      {LANES.map((lane) => {
-        const laneTasks = tasks.filter((t) => t.status === lane.id);
+      {lanes.map((lane) => {
+        const laneTasks = tasks.filter((t) => t.status === lane.slug);
 
         return (
           <div
             key={lane.id}
             className="flex flex-col w-80 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xs"
           >
-            {/* Lane Header */}
+            {/* Dynamic Lane Header */}
             <div className="flex items-center justify-between p-3.5 border-b border-[var(--border)] bg-[var(--secondary)]/40">
               <div className="flex items-center gap-2">
                 <div
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: lane.color }}
+                  className="h-2.5 w-2.5 rounded-full shadow-xs"
+                  style={{ backgroundColor: lane.color_hex }}
                 />
-                <h3 className="text-xs font-bold text-[var(--foreground)]">{lane.label}</h3>
+                <h3 className="text-xs font-bold text-[var(--foreground)]">{lane.name}</h3>
+                {lane.is_closed_state && (
+                  <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.2 bg-emerald-500/10 text-emerald-500 rounded border border-emerald-500/20">
+                    Closed
+                  </span>
+                )}
                 <span className="text-[11px] font-mono text-[var(--muted-foreground)] bg-[var(--secondary)] px-2 py-0.5 rounded-full border border-[var(--border)]">
                   {laneTasks.length}
                 </span>
@@ -81,7 +97,7 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
               {laneTasks.length === 0 ? (
                 <div className="flex items-center justify-center h-28 border border-dashed border-[var(--border)] rounded-lg text-xs text-[var(--muted-foreground)]">
-                  No tasks in this lane
+                  No tasks in {lane.name}
                 </div>
               ) : (
                 laneTasks.map((task) => {
@@ -101,7 +117,7 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
                       {/* Top Badges */}
                       <div className="flex items-center justify-between gap-1 mb-2">
                         <div className="flex items-center gap-1.5">
-                          {getPriorityBadge(task.priority)}
+                          {renderPriorityBadge(task.priority)}
                           {task.is_critical && (
                             <Badge variant="critical" className="gap-1 text-[10px] py-0 px-1.5">
                               <Flame className="h-2.5 w-2.5" />

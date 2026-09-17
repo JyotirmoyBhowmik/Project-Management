@@ -11,16 +11,29 @@ import {
   HardDrive,
   Globe,
   Lock,
+  Palette,
+  Eye,
+  Save,
+  Copy,
+  Power,
+  Activity,
+  Sparkles,
 } from 'lucide-react';
 import { db } from '@/lib/supabase/mock-db';
+import { SystemTheme, ThemeTokens, Tenant } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/dialog';
+import { Tabs } from '@/components/ui/tabs';
 
 export function SuperAdminPanel() {
-  const [tenants, setTenants] = React.useState([...db.tenants]);
+  const [activeTab, setActiveTab] = React.useState<'tenants' | 'themes' | 'features' | 'audit'>('tenants');
+  const [tenants, setTenants] = React.useState<Tenant[]>([...db.tenants]);
+  const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>([...db.getSystemThemes()]);
+  const [auditLogs, setAuditLogs] = React.useState([...db.auditLogs]);
   const [isProvisionModalOpen, setIsProvisionModalOpen] = React.useState(false);
+  const [notificationMsg, setNotificationMsg] = React.useState<string | null>(null);
 
   // New Tenant Form State
   const [name, setName] = React.useState('');
@@ -29,11 +42,46 @@ export function SuperAdminPanel() {
   const [domain, setDomain] = React.useState('');
   const [storageQuota, setStorageQuota] = React.useState(5120);
 
+  // Theme Customizer State
+  const [selectedThemeId, setSelectedThemeId] = React.useState<string>('navy');
+  const [editingTokens, setEditingTokens] = React.useState<ThemeTokens>(() => {
+    const th = db.systemThemes.find(t => t.id === 'navy') || db.systemThemes[0];
+    return { ...th.tokens_json };
+  });
+
+  const showNotification = (msg: string) => {
+    setNotificationMsg(msg);
+    setTimeout(() => setNotificationMsg(null), 3500);
+  };
+
+  const handleSelectThemeToEdit = (themeId: string) => {
+    setSelectedThemeId(themeId);
+    const th = systemThemes.find(t => t.id === themeId);
+    if (th) {
+      setEditingTokens({ ...th.tokens_json });
+    }
+  };
+
+  const handleUpdateToken = (tokenKey: keyof ThemeTokens, value: string) => {
+    setEditingTokens(prev => ({
+      ...prev,
+      [tokenKey]: value,
+    }));
+  };
+
+  const handleSaveTheme = () => {
+    const updated = db.updateSystemTheme(selectedThemeId, {
+      tokens_json: editingTokens,
+    });
+    setSystemThemes([...db.getSystemThemes()]);
+    showNotification(`System Theme "${updated.name}" updated successfully across all tenants.`);
+  };
+
   const handleProvisionTenant = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !code || !slug) return;
 
-    const newTenant = {
+    const newTenant: Tenant = {
       id: `tenant-${Date.now()}`,
       name,
       code: code.toUpperCase(),
@@ -44,19 +92,26 @@ export function SuperAdminPanel() {
       is_active: true,
       week_starts_on: 1,
       weekend_days: [0, 6],
-      status: 'active' as const,
+      status: 'active',
       branding_json: {
-        primary_color: '#3b82f6',
-        theme_preset: 'navy' as const,
+        primary_color: editingTokens.primary || '#3b82f6',
+        theme_preset: selectedThemeId as any,
         company_tagline: 'Enterprise Provisioned Tenant',
       },
-      feature_flags: { cpm_enabled: true, export_enabled: true, audit_enabled: true },
+      feature_flags: {
+        cpm_enabled: true,
+        export_enabled: true,
+        audit_enabled: true,
+        custom_fields_enabled: true,
+        resource_heatmap_enabled: true,
+      },
       storage_quota_mb: storageQuota,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     db.tenants.push(newTenant);
+    db.seedTenantMetadata(newTenant.id);
     setTenants([...db.tenants]);
     setIsProvisionModalOpen(false);
 
@@ -64,120 +119,476 @@ export function SuperAdminPanel() {
     setCode('');
     setSlug('');
     setDomain('');
+    showNotification(`Tenant "${newTenant.name}" provisioned with isolated database boundary.`);
+  };
+
+  const toggleTenantStatus = (tenantId: string) => {
+    const target = db.tenants.find(t => t.id === tenantId);
+    if (target) {
+      target.status = target.status === 'active' ? 'suspended' : 'active';
+      target.is_active = target.status === 'active';
+      setTenants([...db.tenants]);
+      showNotification(`Tenant ${target.code} status changed to ${target.status.toUpperCase()}.`);
+    }
   };
 
   const toggleFeatureFlag = (tenantId: string, flag: string) => {
     const target = db.tenants.find(t => t.id === tenantId);
     if (target) {
       if (!target.feature_flags) {
-        target.feature_flags = { cpm_enabled: true, export_enabled: true, audit_enabled: true };
+        target.feature_flags = {
+          cpm_enabled: true,
+          export_enabled: true,
+          audit_enabled: true,
+          custom_fields_enabled: true,
+          resource_heatmap_enabled: true,
+        };
       }
       target.feature_flags[flag] = !target.feature_flags[flag];
       setTenants([...db.tenants]);
+      showNotification(`Updated feature flag [${flag}] for ${target.code}.`);
     }
+  };
+
+  const handleCloneTenant = (sourceTenant: Tenant) => {
+    const clonedCode = `${sourceTenant.code}-COPY`;
+    const clonedSlug = `${sourceTenant.slug}-copy`;
+    const clonedTenant: Tenant = {
+      ...sourceTenant,
+      id: `tenant-${Date.now()}`,
+      name: `${sourceTenant.name} (Clone)`,
+      code: clonedCode,
+      tenant_code: clonedCode,
+      slug: clonedSlug,
+      domain: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    db.tenants.push(clonedTenant);
+    db.seedTenantMetadata(clonedTenant.id);
+    setTenants([...db.tenants]);
+    showNotification(`Cloned tenant ${sourceTenant.name} -> ${clonedTenant.name}.`);
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
             <Server className="h-5 w-5 text-[var(--primary)]" />
-            Global Multisite Network Administration
+            Global Multi-Site Platform Administration
           </h1>
           <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-            System SuperAdmin governance: tenant provisioning, cross-tenant isolation, storage quotas, and feature flags.
+            SuperAdmin governance: tenant provisioning, master theme customizer, tier feature flags, and immutable audit logs.
           </p>
         </div>
 
-        <Button onClick={() => setIsProvisionModalOpen(true)} className="gap-1.5 text-xs">
-          <Plus className="h-4 w-4" />
-          Provision New Tenant
-        </Button>
+        <div className="flex items-center gap-2">
+          {notificationMsg && (
+            <div className="text-xs text-emerald-500 font-semibold flex items-center gap-1.5 animate-in fade-in">
+              <CheckCircle2 className="h-4 w-4" />
+              {notificationMsg}
+            </div>
+          )}
+          <Button onClick={() => setIsProvisionModalOpen(true)} className="gap-1.5 text-xs">
+            <Plus className="h-4 w-4" />
+            Provision New Tenant
+          </Button>
+        </div>
       </div>
 
-      {/* Tenants Table */}
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-xs">
-        <div className="p-4 border-b border-[var(--border)] bg-[var(--secondary)]/30 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[var(--foreground)]">Active Tenant Organizations ({tenants.length})</h2>
-          <Badge variant="outline" className="font-mono">Global Multisite Root</Badge>
-        </div>
+      {/* Tabs */}
+      <Tabs
+        activeTab={activeTab}
+        onChange={(tab) => setActiveTab(tab as any)}
+        items={[
+          { id: 'tenants', label: 'Tenants & Lifecycle', icon: <Building2 className="h-4 w-4" />, count: tenants.length },
+          { id: 'themes', label: 'Master Theme Engine', icon: <Palette className="h-4 w-4" />, count: systemThemes.length },
+          { id: 'features', label: 'Feature Tiers & Flags', icon: <Sliders className="h-4 w-4" /> },
+          { id: 'audit', label: 'Global Audit Trail', icon: <Activity className="h-4 w-4" />, count: auditLogs.length },
+        ]}
+      />
 
-        <div className="divide-y divide-[var(--border)]">
-          {tenants.map((tenant) => (
-            <div key={tenant.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="h-10 w-10 rounded-xl flex items-center justify-center font-bold text-white shadow-xs"
-                  style={{ backgroundColor: tenant.branding_json?.primary_color || '#3b82f6' }}
-                >
-                  {tenant.name.substring(0, 2).toUpperCase()}
+      {/* Tab: Tenants */}
+      {activeTab === 'tenants' && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-[var(--border)] bg-[var(--secondary)]/30 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-[var(--foreground)]">Provisioned Organizations ({tenants.length})</h2>
+            <Badge variant="outline" className="font-mono text-[10px]">Global Isolation Root</Badge>
+          </div>
+
+          <div className="divide-y divide-[var(--border)]">
+            {tenants.map((tenant) => (
+              <div key={tenant.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="h-10 w-10 rounded-xl flex items-center justify-center font-bold text-white shadow-xs"
+                    style={{ backgroundColor: tenant.branding_json?.primary_color || '#3b82f6' }}
+                  >
+                    {tenant.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-[var(--foreground)]">{tenant.name}</span>
+                      <Badge variant="outline" className="font-mono text-[10px]">
+                        {tenant.code}
+                      </Badge>
+                      <Badge
+                        variant={tenant.status === 'active' ? 'success' : 'secondary'}
+                        className="text-[10px] py-0 uppercase"
+                      >
+                        {tenant.status}
+                      </Badge>
+                    </div>
+                    <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-3 mt-1 font-mono">
+                      <span className="flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {tenant.domain || `${tenant.slug}.pms.internal`}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <HardDrive className="h-3 w-3" />
+                        {(tenant.storage_quota_mb || 10240) / 1024} GB Quota
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-[var(--foreground)]">{tenant.name}</span>
-                    <Badge variant="outline" className="font-mono text-[10px]">
-                      {tenant.code}
-                    </Badge>
-                    <Badge variant="success" className="text-[10px] py-0">
-                      {tenant.status}
-                    </Badge>
-                  </div>
-                  <div className="text-[11px] text-[var(--muted-foreground)] flex items-center gap-3 mt-1 font-mono">
-                    <span className="flex items-center gap-1">
-                      <Globe className="h-3 w-3" />
-                      {tenant.domain || `${tenant.slug}.pms.internal`}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <HardDrive className="h-3 w-3" />
-                      {(tenant.storage_quota_mb || 10240) / 1024} GB Quota
-                    </span>
-                  </div>
+
+                {/* Tenant Controls */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCloneTenant(tenant)}
+                    className="gap-1 text-xs"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Clone
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={tenant.status === 'active' ? 'destructive' : 'outline'}
+                    onClick={() => toggleTenantStatus(tenant.id)}
+                    className="gap-1 text-xs"
+                  >
+                    <Power className="h-3.5 w-3.5" />
+                    {tenant.status === 'active' ? 'Suspend' : 'Activate'}
+                  </Button>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              {/* Global Feature Flags Toggle */}
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[var(--muted-foreground)]">CPM Engine:</span>
+      {/* Tab: Master Theme Customizer */}
+      {activeTab === 'themes' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* System Themes List */}
+            <div className="lg:col-span-1 rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-3 shadow-xs">
+              <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                <Palette className="h-4 w-4 text-[var(--primary)]" />
+                System Themes ({systemThemes.length})
+              </h3>
+              <p className="text-[11px] text-[var(--muted-foreground)]">
+                Database-driven CSS variable definitions with zero hardcoded stylesheet values.
+              </p>
+
+              <div className="space-y-2 pt-2">
+                {systemThemes.map((th) => (
                   <button
-                    onClick={() => toggleFeatureFlag(tenant.id, 'cpm_enabled')}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer border ${
-                      tenant.feature_flags?.cpm_enabled
-                        ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/40'
-                        : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/40'
+                    key={th.id}
+                    onClick={() => handleSelectThemeToEdit(th.id)}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg border text-xs text-left transition-all cursor-pointer ${
+                      selectedThemeId === th.id
+                        ? 'border-[var(--primary)] bg-[var(--secondary)]/60 font-semibold'
+                        : 'border-[var(--border)] hover:bg-[var(--secondary)]/30'
                     }`}
                   >
-                    {tenant.feature_flags?.cpm_enabled ? 'ENABLED' : 'DISABLED'}
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-5 h-5 rounded-full border border-black/20 shadow-xs"
+                        style={{ backgroundColor: th.tokens_json.primary || '#3b82f6' }}
+                      />
+                      <div>
+                        <div className="text-[var(--foreground)]">{th.name}</div>
+                        <div className="text-[10px] text-[var(--muted-foreground)] font-mono">{th.id}</div>
+                      </div>
+                    </div>
+                    {th.is_system_default && (
+                      <Badge variant="outline" className="text-[9px]">DEFAULT</Badge>
+                    )}
                   </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Live Token Editor & Live Canvas */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">
+                    Theme Token Customizer: <span className="text-[var(--primary)] capitalize">{selectedThemeId}</span>
+                  </h3>
+                  <Button size="sm" onClick={handleSaveTheme} className="gap-1 text-xs">
+                    <Save className="h-3.5 w-3.5" />
+                    Save Tokens to Database
+                  </Button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[var(--muted-foreground)]">Auditing:</span>
-                  <button
-                    onClick={() => toggleFeatureFlag(tenant.id, 'audit_enabled')}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer border ${
-                      tenant.feature_flags?.audit_enabled
-                        ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/40'
-                        : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/40'
-                    }`}
+                {/* Token Form */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--muted-foreground)] block mb-1">
+                      Primary Brand Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingTokens.primary || '#3b82f6'}
+                        onChange={(e) => handleUpdateToken('primary', e.target.value)}
+                        className="w-8 h-8 rounded-md cursor-pointer border border-[var(--border)]"
+                      />
+                      <Input
+                        value={editingTokens.primary || ''}
+                        onChange={(e) => handleUpdateToken('primary', e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--muted-foreground)] block mb-1">
+                      Background Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingTokens.background?.startsWith('#') ? editingTokens.background : '#0b0f19'}
+                        onChange={(e) => handleUpdateToken('background', e.target.value)}
+                        className="w-8 h-8 rounded-md cursor-pointer border border-[var(--border)]"
+                      />
+                      <Input
+                        value={editingTokens.background || ''}
+                        onChange={(e) => handleUpdateToken('background', e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--muted-foreground)] block mb-1">
+                      Surface / Card
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingTokens.card?.startsWith('#') ? editingTokens.card : '#111827'}
+                        onChange={(e) => handleUpdateToken('card', e.target.value)}
+                        className="w-8 h-8 rounded-md cursor-pointer border border-[var(--border)]"
+                      />
+                      <Input
+                        value={editingTokens.card || ''}
+                        onChange={(e) => handleUpdateToken('card', e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--muted-foreground)] block mb-1">
+                      Border Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingTokens.border?.startsWith('#') ? editingTokens.border : '#1f2937'}
+                        onChange={(e) => handleUpdateToken('border', e.target.value)}
+                        className="w-8 h-8 rounded-md cursor-pointer border border-[var(--border)]"
+                      />
+                      <Input
+                        value={editingTokens.border || ''}
+                        onChange={(e) => handleUpdateToken('border', e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--muted-foreground)] block mb-1">
+                      Foreground Text
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingTokens.foreground?.startsWith('#') ? editingTokens.foreground : '#f9fafb'}
+                        onChange={(e) => handleUpdateToken('foreground', e.target.value)}
+                        className="w-8 h-8 rounded-md cursor-pointer border border-[var(--border)]"
+                      />
+                      <Input
+                        value={editingTokens.foreground || ''}
+                        onChange={(e) => handleUpdateToken('foreground', e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-[var(--muted-foreground)] block mb-1">
+                      Accent Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editingTokens.accent?.startsWith('#') ? editingTokens.accent : '#3b82f6'}
+                        onChange={(e) => handleUpdateToken('accent', e.target.value)}
+                        className="w-8 h-8 rounded-md cursor-pointer border border-[var(--border)]"
+                      />
+                      <Input
+                        value={editingTokens.accent || ''}
+                        onChange={(e) => handleUpdateToken('accent', e.target.value)}
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Real-Time Preview Sandbox */}
+                <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                      <Eye className="h-3.5 w-3.5" />
+                      Live Theme Canvas Preview
+                    </span>
+                    <span className="text-[10px] text-[var(--muted-foreground)]">Rendered with active editor tokens</span>
+                  </div>
+
+                  <div
+                    className="p-4 rounded-lg border transition-all space-y-3"
+                    style={{
+                      backgroundColor: editingTokens.background,
+                      color: editingTokens.foreground,
+                      borderColor: editingTokens.border,
+                    }}
                   >
-                    {tenant.feature_flags?.audit_enabled ? 'ENABLED' : 'DISABLED'}
-                  </button>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm">Interactive Sandbox Component</span>
+                      <button
+                        className="px-2 py-1 rounded text-xs font-bold shadow-xs cursor-pointer"
+                        style={{
+                          backgroundColor: editingTokens.primary,
+                          color: editingTokens.primary_foreground || '#ffffff',
+                        }}
+                      >
+                        Action Button
+                      </button>
+                    </div>
+
+                    <div
+                      className="p-3 rounded-md border text-xs"
+                      style={{
+                        backgroundColor: editingTokens.card,
+                        borderColor: editingTokens.border,
+                      }}
+                    >
+                      <div className="font-semibold mb-1">Task Card Item #418</div>
+                      <div className="text-[11px]" style={{ color: editingTokens.muted_foreground }}>
+                        Database architecture design & CPM schedule propagation.
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Tab: Feature Tiers & Flags */}
+      {activeTab === 'features' && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4 shadow-xs">
+          <h2 className="text-sm font-bold text-[var(--foreground)]">Enterprise Feature Tiers & Module Activation</h2>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Granular feature toggles per tenant organization with zero hardcoded feature flags.
+          </p>
+
+          <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden">
+            {tenants.map((t) => (
+              <div key={t.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="font-bold text-sm text-[var(--foreground)]">{t.name}</div>
+                  <div className="text-[11px] text-[var(--muted-foreground)] font-mono">{t.code}</div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 text-xs">
+                  {['cpm_enabled', 'export_enabled', 'audit_enabled', 'custom_fields_enabled', 'resource_heatmap_enabled'].map((flag) => (
+                    <div key={flag} className="flex items-center gap-1.5 bg-[var(--secondary)]/40 px-2 py-1 rounded border border-[var(--border)]">
+                      <span className="text-[10px] uppercase font-mono text-[var(--muted-foreground)]">
+                        {flag.replace('_enabled', '')}:
+                      </span>
+                      <button
+                        onClick={() => toggleFeatureFlag(t.id, flag)}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                          t.feature_flags?.[flag]
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-zinc-700 text-zinc-300'
+                        }`}
+                      >
+                        {t.feature_flags?.[flag] ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Global Audit */}
+      {activeTab === 'audit' && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--foreground)]">Cross-Tenant Global Compliance Audit Stream</h2>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Unified audit event ledger across all tenant boundaries.
+              </p>
+            </div>
+            <Badge variant="outline" className="font-mono">{auditLogs.length} Events</Badge>
+          </div>
+
+          <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden text-xs">
+            {auditLogs.slice(0, 15).map((log) => (
+              <div key={log.id} className="p-3 bg-[var(--card)] space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={log.action === 'DELETE' ? 'destructive' : log.action === 'INSERT' ? 'success' : 'secondary'}>
+                      {log.action}
+                    </Badge>
+                    <span className="font-semibold text-[var(--foreground)] capitalize">{log.entity_type}</span>
+                    <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{log.entity_id}</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{log.created_at}</span>
+                </div>
+                <div className="text-[11px] text-[var(--muted-foreground)] font-mono flex items-center justify-between">
+                  <span>Tenant: {log.tenant_id}</span>
+                  <span>Trace: {log.correlation_id}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Provisioning Modal */}
       <Modal
         isOpen={isProvisionModalOpen}
         onClose={() => setIsProvisionModalOpen(false)}
         title="Provision New Tenant Organization"
-        description="Creates isolated database boundary, schema partitions, and administrator"
+        description="Creates isolated database boundary, schema partitions, and dynamic metadata seeds."
       >
         <form onSubmit={handleProvisionTenant} className="space-y-4 text-xs">
           <div>

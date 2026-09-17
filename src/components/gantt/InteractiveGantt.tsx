@@ -17,7 +17,7 @@ import {
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
-import { Task, TaskDependency, WorkingCalendar, CalendarHoliday } from '@/types/database';
+import { Task, TaskDependency, WorkingCalendar, CalendarHoliday, TaskBaselineSnapshot } from '@/types/database';
 import { useGanttStore, GanttZoomLevel } from '@/lib/stores/gantt-store';
 import {
   parseISODate,
@@ -29,15 +29,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
+import { CollaboratorPresence } from '@/lib/realtime/presence-service';
 
 interface InteractiveGanttProps {
   tasks: Task[];
   dependencies: TaskDependency[];
   calendar: WorkingCalendar;
   holidays: CalendarHoliday[];
+  baselineSnapshots?: TaskBaselineSnapshot[];
+  activeTaskMap?: Record<string, CollaboratorPresence[]>;
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
   onAddDependency: (dep: { predecessor_id: string; successor_id: string; type: 'FS' | 'SS' | 'FF' | 'SF'; lag_days: number }) => void;
-  onAddTask: (task: { title: string; start_date: string; duration_days: number; priority: 'low' | 'medium' | 'high' | 'urgent'; is_milestone: boolean }) => void;
+  onAddTask: (task: { title: string; start_date: string; duration_days: number; priority: string; is_milestone: boolean }) => void;
   onRecalculateCPM: () => void;
   onOpenExportModal: () => void;
   onOpenImportModal: () => void;
@@ -48,6 +52,8 @@ export function InteractiveGantt({
   dependencies,
   calendar,
   holidays,
+  baselineSnapshots = [],
+  activeTaskMap = {},
   onTaskUpdate,
   onAddDependency,
   onAddTask,
@@ -81,11 +87,13 @@ export function InteractiveGantt({
     origDuration: number;
   } | null>(null);
 
+  const { priorities } = useTenantMetadata();
+
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = React.useState(false);
   const [newTaskTitle, setNewTaskTitle] = React.useState('');
   const [newTaskStartDate, setNewTaskStartDate] = React.useState('2026-10-01');
   const [newTaskDuration, setNewTaskDuration] = React.useState(5);
-  const [newTaskPriority, setNewTaskPriority] = React.useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [newTaskPriority, setNewTaskPriority] = React.useState<string>('medium');
   const [newTaskIsMilestone, setNewTaskIsMilestone] = React.useState(false);
 
   const svgRef = React.useRef<SVGSVGElement | null>(null);
@@ -579,6 +587,18 @@ export function InteractiveGantt({
                 const isCritical = task.is_critical && highlightCriticalPath;
                 const isSelected = selectedTaskId === task.id;
 
+                // Baseline Variance calculation
+                const baselineSnapshot = baselineSnapshots.find((s) => s.task_id === task.id);
+                const baseStartX = baselineSnapshot ? dateToX(baselineSnapshot.start_date) : 0;
+                const baseEndX = baselineSnapshot ? dateToX(baselineSnapshot.end_date) + columnWidth : 0;
+                const baseWidth = baselineSnapshot ? Math.max(columnWidth, baseEndX - baseStartX) : 0;
+                const varianceDays = baselineSnapshot
+                  ? Math.round(
+                      (parseISODate(task.end_date).getTime() - parseISODate(baselineSnapshot.end_date).getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    )
+                  : 0;
+
                 // Milestone Rendering (Rotated Diamond)
                 if (task.is_milestone) {
                   const centerX = startX + columnWidth / 2;
@@ -608,6 +628,34 @@ export function InteractiveGantt({
                 // Standard Task Bar
                 return (
                   <g key={task.id} className="group">
+                    {/* Dual-Bar Ghost Baseline Rendering */}
+                    {baselineSnapshot && (
+                      <g className="pointer-events-none opacity-70">
+                        <rect
+                          x={baseStartX}
+                          y={y + 26}
+                          width={baseWidth}
+                          height="5"
+                          rx="2.5"
+                          fill="rgba(148, 163, 184, 0.4)"
+                          stroke="#94a3b8"
+                          strokeWidth="1"
+                          strokeDasharray="3 2"
+                        />
+                        {varianceDays !== 0 && (
+                          <text
+                            x={Math.max(startX + width, baseStartX + baseWidth) + 8}
+                            y={y + 20}
+                            className={`text-[9px] font-mono font-bold ${
+                              varianceDays > 0 ? 'fill-rose-400' : 'fill-emerald-400'
+                            }`}
+                          >
+                            {varianceDays > 0 ? `+${varianceDays}d slip` : `${varianceDays}d`}
+                          </text>
+                        )}
+                      </g>
+                    )}
+
                     {/* Main Bar Background & Critical Glow */}
                     <rect
                       x={startX}
@@ -622,6 +670,20 @@ export function InteractiveGantt({
                       onMouseDown={(e) => handleMouseDown(e, task.id, 'move')}
                       onClick={() => setSelectedTaskId(task.id)}
                     />
+
+                    {/* Active Collaborator Presence Markers */}
+                    {activeTaskMap[task.id] && activeTaskMap[task.id].length > 0 && (
+                      <g transform={`translate(${startX + width + 6}, ${y + 4})`}>
+                        {activeTaskMap[task.id].map((c, cIdx) => (
+                          <g key={c.userId} transform={`translate(${cIdx * 18}, 0)`}>
+                            <circle cx="8" cy="8" r="8" fill={c.color} stroke="white" strokeWidth="1.5" />
+                            <text x="8" y="11" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold">
+                              {c.userName.substring(0, 1).toUpperCase()}
+                            </text>
+                          </g>
+                        ))}
+                      </g>
+                    )}
 
                     {/* Progress Fill Bar */}
                     {(task.progress ?? task.progress_percent ?? 0) > 0 && (
@@ -787,13 +849,14 @@ export function InteractiveGantt({
               <label className="font-semibold block mb-1">Priority</label>
               <select
                 value={newTaskPriority}
-                onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                className="w-full h-9 rounded-md border border-[var(--input)] bg-[var(--card)] px-3 text-xs"
+                onChange={(e) => setNewTaskPriority(e.target.value)}
+                className="w-full h-9 rounded-md border border-[var(--input)] bg-[var(--card)] px-3 text-xs cursor-pointer"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
+                {priorities.map((p) => (
+                  <option key={p.slug} value={p.slug}>
+                    {p.name}
+                  </option>
+                ))}
               </select>
             </div>
 

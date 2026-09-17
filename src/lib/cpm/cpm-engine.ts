@@ -203,13 +203,30 @@ export function calculateCPM(
       }
     }
 
-    // End date calculation using duration in working days
-    const computedEarliestFinish = addWorkingDays(
-      computedEarliestStart,
-      task.duration_days,
-      calendar,
-      holidays
-    );
+    // Constraint Modes: ASAP, Must Start On, Start No Earlier Than, Must Finish On
+    if (task.constraint_type === 'must_start_on' && task.constraint_date) {
+      computedEarliestStart = parseISODate(task.constraint_date);
+    } else if (task.constraint_type === 'start_no_earlier_than' && task.constraint_date) {
+      const constraintDate = parseISODate(task.constraint_date);
+      if (constraintDate > computedEarliestStart) {
+        computedEarliestStart = constraintDate;
+      }
+    }
+
+    computedEarliestStart = getNextWorkingDay(computedEarliestStart, calendar, holidays);
+
+    let computedEarliestFinish: Date;
+    if (task.constraint_type === 'must_finish_on' && task.constraint_date) {
+      computedEarliestFinish = parseISODate(task.constraint_date);
+      computedEarliestStart = subtractWorkingDays(computedEarliestFinish, task.duration_days, calendar, holidays);
+    } else {
+      computedEarliestFinish = addWorkingDays(
+        computedEarliestStart,
+        task.duration_days,
+        calendar,
+        holidays
+      );
+    }
 
     task.early_start = formatDateToISO(computedEarliestStart);
     task.early_finish = formatDateToISO(computedEarliestFinish);
@@ -332,3 +349,29 @@ export function calculateCPM(
     hasCycle: false,
   };
 }
+
+/**
+ * Auto-Schedules downstream tasks when a task's start date or duration shifts.
+ * Cascades forward adjustments through the dependency DAG respecting non-working days and holidays.
+ */
+export function autoScheduleCascading(
+  tasks: Task[],
+  dependencies: TaskDependency[],
+  changedTaskId: string,
+  newStartDate: string,
+  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
+  holidays: (string | CalendarHoliday)[] = []
+): Task[] {
+  const clonedTasks = tasks.map(t => ({ ...t }));
+  const target = clonedTasks.find(t => t.id === changedTaskId);
+  if (!target) return tasks;
+
+  target.start_date = newStartDate;
+  const workingDays = Array.isArray(calendarOrConfig)
+    ? calendarOrConfig
+    : (calendarOrConfig.working_days || [1, 2, 3, 4, 5]);
+  const cal: Pick<WorkingCalendar, 'working_days'> = { working_days: workingDays };
+  const cpmResult = calculateCPM(clonedTasks, dependencies, cal, holidays);
+  return cpmResult.tasks;
+}
+
