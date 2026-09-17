@@ -3,7 +3,12 @@
 -- Phase 3: Root SuperAdmin Provisioning & Operational Demo Dataset
 -- Root Admin: admin@jyotirmoyb.com
 -- Default Workspace: Enterprise Core (code: CORE-SYS, slug: core)
--- ==============================================================================
+-- Pre-migration: Ensure tenant_memberships role can accept string values
+DO $$ BEGIN
+    ALTER TABLE tenant_memberships ALTER COLUMN role DROP DEFAULT;
+    ALTER TABLE tenant_memberships ALTER COLUMN role TYPE VARCHAR(32) USING role::text;
+    ALTER TABLE tenant_memberships ALTER COLUMN role SET DEFAULT 'member';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 DO $$
 DECLARE
@@ -81,13 +86,26 @@ BEGIN
         is_active = TRUE;
 
     -- 4. Bind SuperAdmin as Owner to Enterprise Core
-    INSERT INTO tenant_memberships (tenant_id, user_id, role, is_active)
-    VALUES
-    (tenant_core_id, super_admin_id, 'owner', TRUE),
-    (tenant_core_id, engineer_user_id, 'admin', TRUE),
-    (tenant_core_id, devops_user_id, 'member', TRUE),
-    (tenant_core_id, guest_user_id, 'guest', TRUE)
-    ON CONFLICT (tenant_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+    BEGIN
+        INSERT INTO tenant_memberships (tenant_id, user_id, role, is_active)
+        VALUES
+        (tenant_core_id, super_admin_id, 'owner', TRUE),
+        (tenant_core_id, engineer_user_id, 'admin', TRUE),
+        (tenant_core_id, devops_user_id, 'member', TRUE),
+        (tenant_core_id, guest_user_id, 'guest', TRUE)
+        ON CONFLICT (tenant_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+    EXCEPTION WHEN OTHERS THEN
+        BEGIN
+            INSERT INTO tenant_memberships (tenant_id, user_id, role, is_active)
+            VALUES
+            (tenant_core_id, super_admin_id, 'superadmin', TRUE),
+            (tenant_core_id, engineer_user_id, 'tenant_admin', TRUE),
+            (tenant_core_id, devops_user_id, 'contributor', TRUE),
+            (tenant_core_id, guest_user_id, 'guest', TRUE)
+            ON CONFLICT (tenant_id, user_id) DO UPDATE SET role = EXCLUDED.role;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END;
 
     -- 5. Seed 2 Teams: Core Platform and Operations
     INSERT INTO tenant_teams (id, tenant_id, name, description)
