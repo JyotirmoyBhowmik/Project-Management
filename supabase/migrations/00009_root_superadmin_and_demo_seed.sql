@@ -195,7 +195,26 @@ BEGIN
                 recovery_token = COALESCE(recovery_token, ''),
                 email_change = COALESCE(email_change, ''),
                 email_change_token_new = COALESCE(email_change_token_new, '')
-            WHERE id IN (super_admin_id, guest_user_id, engineer_user_id, devops_user_id);
+            WHERE confirmation_token IS NULL 
+               OR recovery_token IS NULL 
+               OR email_change IS NULL 
+               OR email_change_token_new IS NULL;
+
+            BEGIN
+                UPDATE auth.users
+                SET email_change_token_current = COALESCE(email_change_token_current, '')
+                WHERE email_change_token_current IS NULL;
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END;
+
+            BEGIN
+                UPDATE auth.users
+                SET phone_change = COALESCE(phone_change, ''),
+                    phone_change_token = COALESCE(phone_change_token, ''),
+                    reauthentication_token = COALESCE(reauthentication_token, '')
+                WHERE phone_change IS NULL OR phone_change_token IS NULL OR reauthentication_token IS NULL;
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END;
         END IF;
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Notice: auth.users provisioning: %', SQLERRM;
