@@ -145,7 +145,8 @@ BEGIN
             INSERT INTO auth.users (
                 id, instance_id, email, encrypted_password, email_confirmed_at,
                 raw_app_meta_data, raw_user_meta_data, role, aud,
-                confirmation_token, recovery_token, email_change, email_change_token_new
+                confirmation_token, recovery_token, email_change, email_change_token_new,
+                created_at, updated_at
             )
             VALUES
             (
@@ -154,7 +155,8 @@ BEGIN
                 '{"provider":"email","providers":["email"]}'::jsonb,
                 '{"full_name":"System Administrator"}'::jsonb,
                 'authenticated', 'authenticated',
-                '', '', '', ''
+                '', '', '', '',
+                NOW(), NOW()
             ),
             (
                 guest_user_id, '00000000-0000-0000-0000-000000000000', 'guest@external-partner.com',
@@ -162,7 +164,8 @@ BEGIN
                 '{"provider":"email","providers":["email"]}'::jsonb,
                 '{"full_name":"Guest Auditor (Partner Org)"}'::jsonb,
                 'authenticated', 'authenticated',
-                '', '', '', ''
+                '', '', '', '',
+                NOW(), NOW()
             ),
             (
                 engineer_user_id, '00000000-0000-0000-0000-000000000000', 'lead.engineer@core.internal',
@@ -170,7 +173,8 @@ BEGIN
                 '{"provider":"email","providers":["email"]}'::jsonb,
                 '{"full_name":"Sarah Lin"}'::jsonb,
                 'authenticated', 'authenticated',
-                '', '', '', ''
+                '', '', '', '',
+                NOW(), NOW()
             ),
             (
                 devops_user_id, '00000000-0000-0000-0000-000000000000', 'devops@core.internal',
@@ -178,7 +182,8 @@ BEGIN
                 '{"provider":"email","providers":["email"]}'::jsonb,
                 '{"full_name":"Kenji Sato"}'::jsonb,
                 'authenticated', 'authenticated',
-                '', '', '', ''
+                '', '', '', '',
+                NOW(), NOW()
             )
             ON CONFLICT (id) DO UPDATE SET
                 encrypted_password = EXCLUDED.encrypted_password,
@@ -188,17 +193,23 @@ BEGIN
                 confirmation_token = '',
                 recovery_token = '',
                 email_change = '',
-                email_change_token_new = '';
+                email_change_token_new = '',
+                created_at = COALESCE(auth.users.created_at, NOW()),
+                updated_at = NOW();
 
             UPDATE auth.users
             SET confirmation_token = COALESCE(confirmation_token, ''),
                 recovery_token = COALESCE(recovery_token, ''),
                 email_change = COALESCE(email_change, ''),
-                email_change_token_new = COALESCE(email_change_token_new, '')
+                email_change_token_new = COALESCE(email_change_token_new, ''),
+                created_at = COALESCE(created_at, NOW()),
+                updated_at = COALESCE(updated_at, NOW())
             WHERE confirmation_token IS NULL 
                OR recovery_token IS NULL 
                OR email_change IS NULL 
-               OR email_change_token_new IS NULL;
+               OR email_change_token_new IS NULL
+               OR created_at IS NULL
+               OR updated_at IS NULL;
 
             BEGIN
                 UPDATE auth.users
