@@ -114,10 +114,70 @@ class DatabaseStore {
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       },
+      {
+        id: 'a0000000-0000-0000-0000-000000000003',
+        name: 'Enterprise Core',
+        slug: 'core',
+        tenant_code: 'CORE-SYS',
+        code: 'CORE-SYS',
+        domain: 'core.pms.internal',
+        logo_url: null,
+        is_active: true,
+        week_starts_on: 1,
+        weekend_days: [0, 6],
+        status: 'active',
+        branding_json: {
+          primary_color: '#2563eb',
+          theme_preset: 'navy',
+          company_tagline: 'Next-Generation Cloud & Infrastructure Operations',
+        },
+        feature_flags: {
+          cpm_enabled: true,
+          export_enabled: true,
+          audit_enabled: true,
+          custom_fields_enabled: true,
+          resource_heatmap_enabled: true,
+        },
+        storage_quota_mb: 20480,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
     ];
 
     // 2. Profiles (Users)
     this.users = [
+      {
+        id: 'b0000000-0000-0000-0000-000000000099',
+        email: 'admin@jyotirmoyb.com',
+        full_name: 'System Administrator',
+        avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop',
+        is_superadmin: true,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'b0000000-0000-0000-0000-000000000098',
+        email: 'guest@external-partner.com',
+        full_name: 'Guest Auditor (Partner Org)',
+        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop',
+        is_superadmin: false,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'b0000000-0000-0000-0000-000000000097',
+        email: 'lead.engineer@core.internal',
+        full_name: 'Sarah Lin (Lead Architect)',
+        avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+        is_superadmin: false,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'b0000000-0000-0000-0000-000000000096',
+        email: 'devops@core.internal',
+        full_name: 'Kenji Sato (Site Reliability)',
+        avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
+        is_superadmin: false,
+        created_at: '2026-01-01T00:00:00Z',
+      },
       {
         id: 'b0000000-0000-0000-0000-000000000001',
         email: 'superadmin@system.global',
@@ -170,6 +230,7 @@ class DatabaseStore {
 
     const acmeId = this.tenants[0].id;
     const globexId = this.tenants[1].id;
+    const coreId = this.tenants[2].id;
 
     // 3. Tenant Memberships
     this.memberships = [
@@ -877,7 +938,247 @@ class DatabaseStore {
     this.rolePermissions = [
       ...seedPermissionsForTenant(acmeId),
       ...seedPermissionsForTenant(globexId),
+      ...seedPermissionsForTenant(coreId),
     ];
+
+    // Seed Complete Phase 3 Operational Demo Dataset for Enterprise Core
+    this.seedCoreDemoDataset(
+      coreId,
+      'b0000000-0000-0000-0000-000000000099',
+      'b0000000-0000-0000-0000-000000000098',
+      'b0000000-0000-0000-0000-000000000097',
+      'b0000000-0000-0000-0000-000000000096'
+    );
+  }
+
+  private seedCoreDemoDataset(
+    coreId: string,
+    superAdminId: string,
+    guestUserId: string,
+    engineerId: string,
+    devopsId: string
+  ): void {
+    // 1. Memberships
+    this.memberships.push(
+      { id: 'm-core-1', tenant_id: coreId, user_id: superAdminId, role: 'owner', is_active: true, created_at: '2026-01-01' },
+      { id: 'm-core-2', tenant_id: coreId, user_id: engineerId, role: 'admin', is_active: true, created_at: '2026-01-01' },
+      { id: 'm-core-3', tenant_id: coreId, user_id: devopsId, role: 'member', is_active: true, created_at: '2026-01-01' },
+      { id: 'm-core-4', tenant_id: coreId, user_id: guestUserId, role: 'guest', is_active: true, created_at: '2026-01-01' }
+    );
+
+    // 2. Teams
+    const teamPlatId = 'a0000000-0000-0000-0000-000000000011';
+    const teamOpsId = 'a0000000-0000-0000-0000-000000000012';
+    this.teams.push(
+      { id: teamPlatId, tenant_id: coreId, name: 'Core Platform', description: 'Platform Architecture & Cloud Infrastructure', created_at: '2026-01-01' },
+      { id: teamOpsId, tenant_id: coreId, name: 'Operations', description: 'Site Reliability & CI/CD Automation', created_at: '2026-01-01' }
+    );
+    this.teamMembers.push(
+      { team_id: teamPlatId, user_id: superAdminId, created_at: '2026-01-01' },
+      { team_id: teamPlatId, user_id: engineerId, created_at: '2026-01-01' },
+      { team_id: teamOpsId, user_id: devopsId, created_at: '2026-01-01' }
+    );
+
+    // 3. Calendar & Holidays
+    const calCoreId = 'c0000000-0000-0000-0000-000000000003';
+    this.calendars.push({
+      id: calCoreId,
+      tenant_id: coreId,
+      name: 'Standard Corporate Calendar (Mon-Fri)',
+      description: 'Monday to Friday corporate schedule with statutory holidays',
+      is_default: true,
+      week_start_day: 1,
+      working_days: [1, 2, 3, 4, 5],
+      daily_working_hours: 8.0,
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+    });
+    this.holidays.push(
+      { id: 'h-core-1', tenant_id: coreId, calendar_id: calCoreId, name: "New Year's Day", holiday_date: '2026-01-01', date: '2026-01-01', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h-core-2', tenant_id: coreId, calendar_id: calCoreId, name: 'Memorial Day', holiday_date: '2026-05-25', date: '2026-05-25', is_recurring: true, created_at: '2026-01-01' },
+      { id: 'h-core-3', tenant_id: coreId, calendar_id: calCoreId, name: 'Labor Day', holiday_date: '2026-09-07', date: '2026-09-07', is_recurring: true, created_at: '2026-01-01' }
+    );
+
+    // 4. Demonstration Project
+    const prjCoreId = 'd0000000-0000-0000-0000-000000000003';
+    this.projects.push({
+      id: prjCoreId,
+      tenant_id: coreId,
+      name: 'Global Infrastructure Modernization',
+      code: 'PRJ-CORE',
+      description: 'Multi-region migration to modern container orchestration, Zero-Trust network security, and autonomous CI/CD pipelines.',
+      status: 'active',
+      start_date: '2026-10-01',
+      target_end_date: '2026-12-15',
+      calendar_id: calCoreId,
+      is_archived: false,
+      created_by: superAdminId,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    });
+
+    // 5. Phases
+    const ph1 = 'e0000000-0000-0000-0000-000000000011';
+    const ph2 = 'e0000000-0000-0000-0000-000000000012';
+    const ph3 = 'e0000000-0000-0000-0000-000000000013';
+    this.phases.push(
+      { id: ph1, tenant_id: coreId, project_id: prjCoreId, name: 'Phase 1: Architecture & Security Baseline', sort_order: 1, order_index: 1, start_date: '2026-10-01', end_date: '2026-10-15', created_at: '2026-01-01' },
+      { id: ph2, tenant_id: coreId, project_id: prjCoreId, name: 'Phase 2: Core Implementation & Workloads', sort_order: 2, order_index: 2, start_date: '2026-10-16', end_date: '2026-11-20', created_at: '2026-01-01' },
+      { id: ph3, tenant_id: coreId, project_id: prjCoreId, name: 'Phase 3: UAT, Penetration Testing & Deployment', sort_order: 3, order_index: 3, start_date: '2026-11-23', end_date: '2026-12-15', created_at: '2026-01-01' }
+    );
+
+    // 6. Tasks
+    const t1 = 'f0000000-0000-0000-0000-000000000011';
+    const t2 = 'f0000000-0000-0000-0000-000000000012';
+    const t3 = 'f0000000-0000-0000-0000-000000000013';
+    const t4 = 'f0000000-0000-0000-0000-000000000014';
+    const t5 = 'f0000000-0000-0000-0000-000000000015';
+    const t6 = 'f0000000-0000-0000-0000-000000000016';
+    const t7 = 'f0000000-0000-0000-0000-000000000017';
+    const t8 = 'f0000000-0000-0000-0000-000000000018';
+
+    this.tasks.push(
+      {
+        id: t1, tenant_id: coreId, project_id: prjCoreId, phase_id: ph1, parent_id: null,
+        title: 'Zero-Trust Architecture & Threat Modeling', code: 'TASK-101',
+        description: 'Define SPIFFE/SPIRE workload identities and mutual TLS topology.',
+        status: 'done', priority: 'high', start_date: '2026-10-01', end_date: '2026-10-05',
+        duration_days: 3, progress: 100, progress_percent: 100, is_milestone: false,
+        early_start: '2026-10-01', early_finish: '2026-10-05', late_start: '2026-10-01', late_finish: '2026-10-05',
+        total_float: 0, free_float: 0, is_critical: true, order_index: 1, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: t2, tenant_id: coreId, project_id: prjCoreId, phase_id: ph1, parent_id: null,
+        title: 'Multi-Cluster Kubernetes Platform Setup', code: 'TASK-102',
+        description: 'Provision Terraform infrastructure for multi-region EKS clusters.',
+        status: 'in_progress', priority: 'urgent', start_date: '2026-10-06', end_date: '2026-10-14',
+        duration_days: 7, progress: 60, progress_percent: 60, is_milestone: false,
+        early_start: '2026-10-06', early_finish: '2026-10-14', late_start: '2026-10-06', late_finish: '2026-10-14',
+        total_float: 0, free_float: 0, is_critical: true, order_index: 2, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: t3, tenant_id: coreId, project_id: prjCoreId, phase_id: ph1, parent_id: t2,
+        title: 'VPC Peering & Transit Gateway Routing', code: 'TASK-102-A',
+        description: 'Configure cross-region routing and peering mesh.',
+        status: 'done', priority: 'high', start_date: '2026-10-06', end_date: '2026-10-08',
+        duration_days: 3, progress: 100, progress_percent: 100, is_milestone: false,
+        early_start: '2026-10-06', early_finish: '2026-10-08', late_start: '2026-10-06', late_finish: '2026-10-08',
+        total_float: 0, free_float: 0, is_critical: false, order_index: 3, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: t4, tenant_id: coreId, project_id: prjCoreId, phase_id: ph1, parent_id: t2,
+        title: 'GitOps ArgoCD Cluster Synchronizers', code: 'TASK-102-B',
+        description: 'Setup declarative state synchronization with encrypted SOPS secrets.',
+        status: 'in_progress', priority: 'medium', start_date: '2026-10-09', end_date: '2026-10-14',
+        duration_days: 4, progress: 30, progress_percent: 30, is_milestone: false,
+        early_start: '2026-10-09', early_finish: '2026-10-14', late_start: '2026-10-09', late_finish: '2026-10-14',
+        total_float: 0, free_float: 0, is_critical: false, order_index: 4, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: t5, tenant_id: coreId, project_id: prjCoreId, phase_id: ph2, parent_id: null,
+        title: 'PostgreSQL Database Zero-Downtime Replication', code: 'TASK-201',
+        description: 'Establish logical replication streams with failover verification.',
+        status: 'todo', priority: 'urgent', start_date: '2026-10-15', end_date: '2026-10-23',
+        duration_days: 7, progress: 0, progress_percent: 0, is_milestone: false,
+        early_start: '2026-10-15', early_finish: '2026-10-23', late_start: '2026-10-15', late_finish: '2026-10-23',
+        total_float: 0, free_float: 0, is_critical: true, order_index: 5, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: t6, tenant_id: coreId, project_id: prjCoreId, phase_id: ph2, parent_id: null,
+        title: 'Envoy Proxy Service Mesh & Rate Limiting', code: 'TASK-202',
+        description: 'Implement adaptive rate limiting with Redis-backed token buckets.',
+        status: 'todo', priority: 'high', start_date: '2026-10-26', end_date: '2026-11-04',
+        duration_days: 8, progress: 0, progress_percent: 0, is_milestone: false,
+        early_start: '2026-10-26', early_finish: '2026-11-04', late_start: '2026-10-26', late_finish: '2026-11-04',
+        total_float: 0, free_float: 0, is_critical: true, order_index: 6, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: t7, tenant_id: coreId, project_id: prjCoreId, phase_id: ph3, parent_id: null,
+        title: 'Third-Party SOC 2 Penetration Testing', code: 'TASK-301',
+        description: 'External audit firm evaluation of perimeter isolation and data encryption.',
+        status: 'todo', priority: 'high', start_date: '2026-11-05', end_date: '2026-11-13',
+        duration_days: 7, progress: 0, progress_percent: 0, is_milestone: false,
+        early_start: '2026-11-05', early_finish: '2026-11-13', late_start: '2026-11-05', late_finish: '2026-11-13',
+        total_float: 0, free_float: 0, is_critical: true, order_index: 7, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: t8, tenant_id: coreId, project_id: prjCoreId, phase_id: ph3, parent_id: null,
+        title: 'Cutover & Global Traffic Switchover Milestone', code: 'MILE-401',
+        description: 'Promote staging mesh to primary DNS traffic routing.',
+        status: 'todo', priority: 'urgent', start_date: '2026-11-16', end_date: '2026-11-16',
+        duration_days: 0, progress: 0, progress_percent: 0, is_milestone: true,
+        early_start: '2026-11-16', early_finish: '2026-11-16', late_start: '2026-11-16', late_finish: '2026-11-16',
+        total_float: 0, free_float: 0, is_critical: true, order_index: 8, created_by: superAdminId,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      }
+    );
+
+    // 7. Assignees
+    this.assignees.push(
+      { task_id: t1, user_id: superAdminId, allocation_percent: 100 },
+      { task_id: t2, user_id: engineerId, allocation_percent: 80 },
+      { task_id: t2, user_id: devopsId, allocation_percent: 80 },
+      { task_id: t3, user_id: devopsId, allocation_percent: 100 },
+      { task_id: t4, user_id: engineerId, allocation_percent: 100 },
+      { task_id: t5, user_id: engineerId, allocation_percent: 50 },
+      { task_id: t6, user_id: devopsId, allocation_percent: 50 },
+      { task_id: t7, user_id: guestUserId, allocation_percent: 100 },
+      { task_id: t8, user_id: superAdminId, allocation_percent: 100 }
+    );
+
+    // 8. Dependencies
+    this.dependencies.push(
+      { id: 'dep-core-1', tenant_id: coreId, project_id: prjCoreId, predecessor_id: t1, successor_id: t2, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep-core-2', tenant_id: coreId, project_id: prjCoreId, predecessor_id: t3, successor_id: t4, type: 'SS', lag_days: 1, created_at: '2026-01-01' },
+      { id: 'dep-core-3', tenant_id: coreId, project_id: prjCoreId, predecessor_id: t2, successor_id: t5, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep-core-4', tenant_id: coreId, project_id: prjCoreId, predecessor_id: t5, successor_id: t6, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep-core-5', tenant_id: coreId, project_id: prjCoreId, predecessor_id: t6, successor_id: t7, type: 'FS', lag_days: 0, created_at: '2026-01-01' },
+      { id: 'dep-core-6', tenant_id: coreId, project_id: prjCoreId, predecessor_id: t7, successor_id: t8, type: 'FS', lag_days: 0, created_at: '2026-01-01' }
+    );
+
+    // 9. Baseline
+    const baseCoreId = 'base-core-2026';
+    this.baselines.push({
+      id: baseCoreId,
+      project_id: prjCoreId,
+      tenant_id: coreId,
+      name: 'Executive Baseline v1.0 (Q4 Approved)',
+      description: 'Approved by the Technical Steering Committee prior to infrastructure sprint kickoff.',
+      created_by: superAdminId,
+      created_at: '2026-09-25T00:00:00Z',
+    });
+
+    this.baselineSnapshots.push(
+      { id: `bcs-1`, baseline_id: baseCoreId, task_id: t1, start_date: '2026-10-01', end_date: '2026-10-05', duration_days: 3, progress: 100 },
+      { id: `bcs-2`, baseline_id: baseCoreId, task_id: t2, start_date: '2026-10-06', end_date: '2026-10-12', duration_days: 5, progress: 40 },
+      { id: `bcs-3`, baseline_id: baseCoreId, task_id: t3, start_date: '2026-10-06', end_date: '2026-10-08', duration_days: 3, progress: 100 },
+      { id: `bcs-4`, baseline_id: baseCoreId, task_id: t4, start_date: '2026-10-09', end_date: '2026-10-13', duration_days: 3, progress: 20 },
+      { id: `bcs-5`, baseline_id: baseCoreId, task_id: t5, start_date: '2026-10-13', end_date: '2026-10-21', duration_days: 7, progress: 0 },
+      { id: `bcs-6`, baseline_id: baseCoreId, task_id: t6, start_date: '2026-10-22', end_date: '2026-10-30', duration_days: 7, progress: 0 },
+      { id: `bcs-7`, baseline_id: baseCoreId, task_id: t7, start_date: '2026-10-31', end_date: '2026-11-10', duration_days: 7, progress: 0 },
+      { id: `bcs-8`, baseline_id: baseCoreId, task_id: t8, start_date: '2026-11-12', end_date: '2026-11-12', duration_days: 0, progress: 0 }
+    );
+
+    // 10. Project Guest Scoped Access
+    this.projectGuestAccess.push({
+      id: 'pga-core-1',
+      project_id: prjCoreId,
+      tenant_id: coreId,
+      email: 'guest@external-partner.com',
+      user_id: guestUserId,
+      access_level: 'view',
+      created_at: '2026-12-31T23:59:59Z',
+    });
+
+    // 11. Metadata seeds
+    this.seedTenantMetadata(coreId);
   }
 
   // --- SECURITY DEFINER SIMULATION METHODS ---

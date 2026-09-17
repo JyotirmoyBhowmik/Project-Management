@@ -18,7 +18,10 @@ import {
   Bell,
   CheckCheck,
   ExternalLink,
+  HelpCircle,
+  BookOpen,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { useDynamicTheme } from '@/lib/theme/dynamic-theme-provider';
 import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
@@ -35,6 +38,7 @@ export function Header() {
   const [themeMenuOpen, setThemeMenuOpen] = React.useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = React.useState(false);
   const [notifMenuOpen, setNotifMenuOpen] = React.useState(false);
+  const [helpMenuOpen, setHelpMenuOpen] = React.useState(false);
 
   const availableTenants = db.tenants;
   const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
@@ -299,6 +303,68 @@ export function Header() {
                   ))
                 )}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Documentation & Manuals Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setHelpMenuOpen(!helpMenuOpen);
+              setNotifMenuOpen(false);
+              setTenantMenuOpen(false);
+              setThemeMenuOpen(false);
+              setRoleMenuOpen(false);
+            }}
+            className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] p-1.5 text-xs text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
+            title="Help & Documentation"
+          >
+            <HelpCircle className="h-4 w-4 text-[var(--foreground)]" />
+          </button>
+
+          {helpMenuOpen && (
+            <div className="absolute right-0 mt-2 w-64 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 overflow-hidden py-1">
+              <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--secondary)]/40">
+                <span className="text-xs font-bold text-[var(--foreground)]">Documentation</span>
+                <p className="text-[10px] text-[var(--muted-foreground)]">Enterprise PMS User & Admin Guides</p>
+              </div>
+
+              <Link
+                href="/help"
+                onClick={() => setHelpMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors"
+              >
+                <BookOpen className="h-4 w-4 text-[var(--primary)]" />
+                <div>
+                  <div className="font-semibold">User Manual</div>
+                  <div className="text-[10px] text-[var(--muted-foreground)]">Gantt, CPM, & shortcuts</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/admin/tenant/help"
+                onClick={() => setHelpMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors"
+              >
+                <ShieldAlert className="h-4 w-4 text-purple-400" />
+                <div>
+                  <div className="font-semibold">Tenant Admin Guide</div>
+                  <div className="text-[10px] text-[var(--muted-foreground)]">Calendars, roles & statuses</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/admin/superadmin/help"
+                onClick={() => setHelpMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors"
+              >
+                <Activity className="h-4 w-4 text-red-400" />
+                <div>
+                  <div className="font-semibold">SuperAdmin Manual</div>
+                  <div className="text-[10px] text-[var(--muted-foreground)]">Multi-site & root admin</div>
+                </div>
+              </Link>
             </div>
           )}
         </div>

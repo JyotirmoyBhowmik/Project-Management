@@ -14,7 +14,7 @@ describe('Resource Workload & Capacity Engine', () => {
     name: 'Standard Western Calendar',
     week_start_day: 1, // Monday
     working_days: [1, 2, 3, 4, 5], // Mon-Fri
-    default_hours_per_day: 8,
+    daily_working_hours: 8,
     is_default: true,
     created_at: '',
     updated_at: '',
@@ -26,6 +26,7 @@ describe('Resource Workload & Capacity Engine', () => {
     email: 'engineer@acme.com',
     full_name: 'Lead Engineer',
     avatar_url: null,
+    is_superadmin: false,
     created_at: '',
     updated_at: '',
   };
@@ -35,6 +36,7 @@ describe('Resource Workload & Capacity Engine', () => {
     email: 'developer@acme.com',
     full_name: 'Junior Developer',
     avatar_url: null,
+    is_superadmin: false,
     created_at: '',
     updated_at: '',
   };

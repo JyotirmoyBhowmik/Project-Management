@@ -58,6 +58,7 @@ describe('CPM Constraints & Auto-Scheduling Engine', () => {
         successor_id: 't2',
         type: 'FS',
         lag_days: 0,
+        created_at: '',
       };
 
       const result = calculateCPM([t1, t2], [dep], calendar, holidays);
@@ -82,6 +83,7 @@ describe('CPM Constraints & Auto-Scheduling Engine', () => {
         successor_id: 't2',
         type: 'FS',
         lag_days: 0,
+        created_at: '',
       };
 
       const result = calculateCPM([t1, t2], [dep], calendar, holidays);
@@ -106,6 +108,7 @@ describe('CPM Constraints & Auto-Scheduling Engine', () => {
         successor_id: 't2',
         type: 'FS',
         lag_days: 0,
+        created_at: '',
       };
 
       const result = calculateCPM([t1, t2], [dep], calendar, holidays);
@@ -122,8 +125,8 @@ describe('CPM Constraints & Auto-Scheduling Engine', () => {
       const t3 = baseTask('t3', '2026-10-07', 2); // 2026-10-07 to 2026-10-08
 
       const deps: TaskDependency[] = [
-        { id: 'd1', tenant_id: 'tenant-1', project_id: 'prj-1', predecessor_id: 't1', successor_id: 't2', type: 'FS', lag_days: 0 },
-        { id: 'd2', tenant_id: 'tenant-1', project_id: 'prj-1', predecessor_id: 't2', successor_id: 't3', type: 'FS', lag_days: 0 },
+        { id: 'd1', tenant_id: 'tenant-1', project_id: 'prj-1', predecessor_id: 't1', successor_id: 't2', type: 'FS', lag_days: 0, created_at: '' },
+        { id: 'd2', tenant_id: 'tenant-1', project_id: 'prj-1', predecessor_id: 't2', successor_id: 't3', type: 'FS', lag_days: 0, created_at: '' },
       ];
 
       // Delay t1 to start on 2026-10-06 (Tue) -> finishes 2026-10-07 (Wed)
