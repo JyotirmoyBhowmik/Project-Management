@@ -102,15 +102,20 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 -- ------------------------------------------------------------------------------
 -- RLS Policies: tenants
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "tenants_select_policy" ON tenants;
+DROP POLICY IF EXISTS "tenants_public_lookup" ON tenants;
 CREATE POLICY "tenants_select_policy" ON tenants
     FOR SELECT USING (
-        is_superadmin(current_app_user_id())
+        is_active = TRUE
+        OR status = 'active'
+        OR is_superadmin(current_app_user_id())
         OR id IN (
             SELECT tenant_id FROM tenant_memberships
             WHERE user_id = current_app_user_id() AND is_active = TRUE
         )
     );
 
+DROP POLICY IF EXISTS "tenants_admin_mutation_policy" ON tenants;
 CREATE POLICY "tenants_admin_mutation_policy" ON tenants
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -120,6 +125,7 @@ CREATE POLICY "tenants_admin_mutation_policy" ON tenants
 -- ------------------------------------------------------------------------------
 -- RLS Policies: tenant_memberships
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "memberships_select_policy" ON tenant_memberships;
 CREATE POLICY "memberships_select_policy" ON tenant_memberships
     FOR SELECT USING (
         is_superadmin(current_app_user_id())
@@ -129,6 +135,7 @@ CREATE POLICY "memberships_select_policy" ON tenant_memberships
         )
     );
 
+DROP POLICY IF EXISTS "memberships_admin_manage_policy" ON tenant_memberships;
 CREATE POLICY "memberships_admin_manage_policy" ON tenant_memberships
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -138,6 +145,7 @@ CREATE POLICY "memberships_admin_manage_policy" ON tenant_memberships
 -- ------------------------------------------------------------------------------
 -- RLS Policies: user_profiles
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "profiles_read_colleagues" ON user_profiles;
 CREATE POLICY "profiles_read_colleagues" ON user_profiles
     FOR SELECT USING (
         id = current_app_user_id()
@@ -151,17 +159,20 @@ CREATE POLICY "profiles_read_colleagues" ON user_profiles
         )
     );
 
+DROP POLICY IF EXISTS "profiles_update_self" ON user_profiles;
 CREATE POLICY "profiles_update_self" ON user_profiles
     FOR UPDATE USING (id = current_app_user_id() OR is_superadmin(current_app_user_id()));
 
 -- ------------------------------------------------------------------------------
 -- RLS Policies: projects
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "projects_select_policy" ON projects;
 CREATE POLICY "projects_select_policy" ON projects
     FOR SELECT USING (
         can_user_access_project(current_app_user_id(), id)
     );
 
+DROP POLICY IF EXISTS "projects_mutation_policy" ON projects;
 CREATE POLICY "projects_mutation_policy" ON projects
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -171,11 +182,13 @@ CREATE POLICY "projects_mutation_policy" ON projects
 -- ------------------------------------------------------------------------------
 -- RLS Policies: project_members
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "project_members_select_policy" ON project_members;
 CREATE POLICY "project_members_select_policy" ON project_members
     FOR SELECT USING (
         can_user_access_project(current_app_user_id(), project_id)
     );
 
+DROP POLICY IF EXISTS "project_members_manage_policy" ON project_members;
 CREATE POLICY "project_members_manage_policy" ON project_members
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -185,11 +198,13 @@ CREATE POLICY "project_members_manage_policy" ON project_members
 -- ------------------------------------------------------------------------------
 -- RLS Policies: phases
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "phases_select_policy" ON phases;
 CREATE POLICY "phases_select_policy" ON phases
     FOR SELECT USING (
         can_user_access_project(current_app_user_id(), project_id)
     );
 
+DROP POLICY IF EXISTS "phases_modify_policy" ON phases;
 CREATE POLICY "phases_modify_policy" ON phases
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -199,11 +214,13 @@ CREATE POLICY "phases_modify_policy" ON phases
 -- ------------------------------------------------------------------------------
 -- RLS Policies: tasks
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "tasks_select_policy" ON tasks;
 CREATE POLICY "tasks_select_policy" ON tasks
     FOR SELECT USING (
         can_user_access_project(current_app_user_id(), project_id)
     );
 
+DROP POLICY IF EXISTS "tasks_modify_policy" ON tasks;
 CREATE POLICY "tasks_modify_policy" ON tasks
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -213,6 +230,7 @@ CREATE POLICY "tasks_modify_policy" ON tasks
 -- ------------------------------------------------------------------------------
 -- RLS Policies: task_assignments
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "assignments_select_policy" ON task_assignments;
 CREATE POLICY "assignments_select_policy" ON task_assignments
     FOR SELECT USING (
         EXISTS (
@@ -222,6 +240,7 @@ CREATE POLICY "assignments_select_policy" ON task_assignments
         )
     );
 
+DROP POLICY IF EXISTS "assignments_modify_policy" ON task_assignments;
 CREATE POLICY "assignments_modify_policy" ON task_assignments
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -231,11 +250,13 @@ CREATE POLICY "assignments_modify_policy" ON task_assignments
 -- ------------------------------------------------------------------------------
 -- RLS Policies: task_dependencies
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "dependencies_select_policy" ON task_dependencies;
 CREATE POLICY "dependencies_select_policy" ON task_dependencies
     FOR SELECT USING (
         can_user_access_project(current_app_user_id(), project_id)
     );
 
+DROP POLICY IF EXISTS "dependencies_modify_policy" ON task_dependencies;
 CREATE POLICY "dependencies_modify_policy" ON task_dependencies
     FOR ALL USING (
         is_superadmin(current_app_user_id())
@@ -245,6 +266,7 @@ CREATE POLICY "dependencies_modify_policy" ON task_dependencies
 -- ------------------------------------------------------------------------------
 -- RLS Policies: working_calendars & calendar_holidays
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "calendars_select_policy" ON working_calendars;
 CREATE POLICY "calendars_select_policy" ON working_calendars
     FOR SELECT USING (
         is_superadmin(current_app_user_id())
@@ -254,12 +276,14 @@ CREATE POLICY "calendars_select_policy" ON working_calendars
         )
     );
 
+DROP POLICY IF EXISTS "calendars_modify_policy" ON working_calendars;
 CREATE POLICY "calendars_modify_policy" ON working_calendars
     FOR ALL USING (
         is_superadmin(current_app_user_id())
         OR get_user_tenant_role(current_app_user_id(), tenant_id) = 'tenant_admin'
     );
 
+DROP POLICY IF EXISTS "holidays_select_policy" ON calendar_holidays;
 CREATE POLICY "holidays_select_policy" ON calendar_holidays
     FOR SELECT USING (
         is_superadmin(current_app_user_id())
@@ -269,6 +293,7 @@ CREATE POLICY "holidays_select_policy" ON calendar_holidays
         )
     );
 
+DROP POLICY IF EXISTS "holidays_modify_policy" ON calendar_holidays;
 CREATE POLICY "holidays_modify_policy" ON calendar_holidays
     FOR ALL USING (
         is_superadmin(current_app_user_id())

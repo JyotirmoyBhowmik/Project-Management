@@ -3,7 +3,9 @@
 -- Solves:
 --   1. ERROR 42710 (policy already exists)
 --   2. ERROR 22P02 (invalid input value for enum tenant_role_enum: "owner")
---   3. Foreign key constraints across legacy schema variations
+--   3. ERROR 42883 (function is_member_of(uuid, unknown) does not exist)
+--   4. ERROR 42703 (column tenant_code of relation tenants does not exist)
+--   5. ERROR 42703 (column role of relation team_members does not exist)
 -- Enables: Anonymous workspace code lookup at /login for active tenants
 -- Provisions: Enterprise Core (slug: core, code: CORE-SYS) & admin@jyotirmoyb.com
 -- ==============================================================================
@@ -38,8 +40,7 @@ DO $$ BEGIN
     CREATE TYPE dependency_type_enum AS ENUM ('FS', 'SS', 'FF', 'SF');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
--- 3. Harmonize Existing Tables (Safe Alterations for Legacy Schemas)
--- Tenants
+-- 3. Core Tables
 CREATE TABLE IF NOT EXISTS tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -58,13 +59,6 @@ CREATE TABLE IF NOT EXISTS tenants (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_code VARCHAR(32);
-ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-ALTER TABLE tenants ADD COLUMN IF NOT EXISTS week_starts_on SMALLINT DEFAULT 1;
-ALTER TABLE tenants ADD COLUMN IF NOT EXISTS weekend_days INTEGER[] DEFAULT '{0, 6}';
-UPDATE tenants SET tenant_code = code WHERE tenant_code IS NULL;
-UPDATE tenants SET is_active = (status = 'active') WHERE is_active IS NULL;
-
 CREATE TABLE IF NOT EXISTS tenants_v2 (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -78,7 +72,6 @@ CREATE TABLE IF NOT EXISTS tenants_v2 (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- User Profiles
 CREATE TABLE IF NOT EXISTS user_profiles (
     id UUID PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -88,7 +81,6 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY,
@@ -99,9 +91,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE;
 
--- Tenant Memberships (Ensure role is VARCHAR(32) so any role string is accepted)
 CREATE TABLE IF NOT EXISTS tenant_memberships (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -113,14 +103,6 @@ CREATE TABLE IF NOT EXISTS tenant_memberships (
     CONSTRAINT uq_tenant_user UNIQUE (tenant_id, user_id)
 );
 
-DO $$ BEGIN
-    ALTER TABLE tenant_memberships ALTER COLUMN role DROP DEFAULT;
-    ALTER TABLE tenant_memberships ALTER COLUMN role TYPE VARCHAR(32) USING role::text;
-    ALTER TABLE tenant_memberships ALTER COLUMN role SET DEFAULT 'member';
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
-ALTER TABLE tenant_memberships ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
-
--- Working Calendars & Holidays
 CREATE TABLE IF NOT EXISTS working_calendars (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -132,8 +114,6 @@ CREATE TABLE IF NOT EXISTS working_calendars (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE working_calendars ADD COLUMN IF NOT EXISTS weekend_days INTEGER[] DEFAULT '{0,6}';
-ALTER TABLE working_calendars ADD COLUMN IF NOT EXISTS daily_working_hours NUMERIC(4, 2) DEFAULT 8.00;
 
 CREATE TABLE IF NOT EXISTS calendar_holidays (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -145,12 +125,7 @@ CREATE TABLE IF NOT EXISTS calendar_holidays (
     is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE calendar_holidays ADD COLUMN IF NOT EXISTS holiday_date DATE;
-ALTER TABLE calendar_holidays ADD COLUMN IF NOT EXISTS date DATE;
-UPDATE calendar_holidays SET date = holiday_date WHERE date IS NULL AND holiday_date IS NOT NULL;
-UPDATE calendar_holidays SET holiday_date = date WHERE holiday_date IS NULL AND date IS NOT NULL;
 
--- Projects
 CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -167,7 +142,16 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Phases / Project Phases (harmonize both)
+CREATE TABLE IF NOT EXISTS project_guest_access (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    user_id UUID,
+    access_level VARCHAR(32) NOT NULL DEFAULT 'view',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS phases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -192,7 +176,6 @@ CREATE TABLE IF NOT EXISTS project_phases (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Tasks
 CREATE TABLE IF NOT EXISTS tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -222,10 +205,15 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INT DEFAULT 0;
-ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress_percent INT DEFAULT 0;
 
--- Task Dependencies
+CREATE TABLE IF NOT EXISTS task_assignees (
+    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
+    allocation_percent INT NOT NULL DEFAULT 100,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (task_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS task_dependencies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -238,13 +226,7 @@ CREATE TABLE IF NOT EXISTS task_dependencies (
     lag_days INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-DO $$ BEGIN
-    ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS dependency_type VARCHAR(16) DEFAULT 'FS';
-    ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS dep_type VARCHAR(16) DEFAULT 'FS';
-    ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS type VARCHAR(16) DEFAULT 'FS';
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
--- Dynamic Metadata & Lookups (Phase 2)
 CREATE TABLE IF NOT EXISTS tenant_task_statuses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -296,7 +278,7 @@ CREATE TABLE IF NOT EXISTS tenant_theme_overrides (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE UNIQUE,
     active_theme_id VARCHAR(64),
-    custom_tokens_json JSONB DEFAULT '{}'::jsonb,
+    custom_tokens_json JSONB DEFAULT '{{}}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -374,6 +356,7 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_dependencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE working_calendars ENABLE ROW LEVEL SECURITY;
 ALTER TABLE calendar_holidays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Helper functions
 CREATE OR REPLACE FUNCTION current_app_user_id() RETURNS UUID AS $$
@@ -389,7 +372,44 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
--- Safe Dropping of Existing Policies
+CREATE OR REPLACE FUNCTION is_member_of(_tenant_id UUID, _required_role TEXT DEFAULT NULL)
+RETURNS BOOLEAN AS $$
+DECLARE
+    current_uid UUID;
+BEGIN
+    current_uid := auth.uid();
+    IF current_uid IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM profiles WHERE id = current_uid AND is_superadmin = TRUE)
+       OR EXISTS (SELECT 1 FROM user_profiles WHERE id = current_uid AND is_superadmin = TRUE) THEN
+        RETURN TRUE;
+    END IF;
+
+    IF _required_role IS NULL THEN
+        RETURN EXISTS (
+            SELECT 1 FROM tenant_memberships
+            WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        ) OR EXISTS (
+            SELECT 1 FROM tenant_memberships_v2
+            WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        );
+    END IF;
+
+    RETURN EXISTS (
+        SELECT 1 FROM tenant_memberships
+        WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        AND role::text IN (_required_role, 'owner', 'admin', 'superadmin', 'tenant_admin')
+    ) OR EXISTS (
+        SELECT 1 FROM tenant_memberships_v2
+        WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        AND role::text IN (_required_role, 'owner', 'admin', 'superadmin', 'tenant_admin')
+    );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Safe Dropping & Creation of Existing Policies
 DROP POLICY IF EXISTS "tenants_select_policy" ON tenants;
 DROP POLICY IF EXISTS "tenants_admin_mutation_policy" ON tenants;
 DROP POLICY IF EXISTS "tenants_public_lookup" ON tenants;
@@ -441,52 +461,166 @@ DROP POLICY IF EXISTS "holidays_modify_policy" ON calendar_holidays;
 CREATE POLICY "holidays_select_policy" ON calendar_holidays FOR SELECT USING (TRUE);
 CREATE POLICY "holidays_modify_policy" ON calendar_holidays FOR ALL USING (TRUE);
 
--- 5. Seed Enterprise Core Tenant & Root SuperAdmin (Resilient Execution)
+DROP POLICY IF EXISTS "audit_logs_tenant_admin_read" ON audit_logs;
+CREATE POLICY "audit_logs_tenant_admin_read" ON audit_logs
+    FOR SELECT USING (TRUE);
+
+
+-- ==============================================================================
+-- Enterprise Core & SuperAdmin Master Seed & Harmonization Block
+-- 100% Idempotent, Handles Legacy Schema Variations & Missing Columns Safely
+-- ==============================================================================
+
+-- Pre-migration: Harmonize Table Columns
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tenant_code VARCHAR(32);
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS week_starts_on SMALLINT DEFAULT 1;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS weekend_days INTEGER[] DEFAULT '{0, 6}';
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS storage_quota_mb INTEGER DEFAULT 5120;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS branding_json JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS feature_flags JSONB DEFAULT '{}'::jsonb;
+UPDATE tenants SET tenant_code = code WHERE tenant_code IS NULL;
+UPDATE tenants SET is_active = (status = 'active') WHERE is_active IS NULL;
+
+CREATE TABLE IF NOT EXISTS tenants_v2 (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    tenant_code TEXT NOT NULL UNIQUE,
+    logo_url TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    week_starts_on SMALLINT NOT NULL DEFAULT 1,
+    weekend_days INTEGER[] NOT NULL DEFAULT '{0, 6}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id UUID PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    full_name VARCHAR(255) NOT NULL,
+    avatar_url VARCHAR(1024),
+    is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS profiles (
+    id UUID PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
+    avatar_url TEXT,
+    is_superadmin BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE;
+
+-- Ensure tenant_memberships.role is VARCHAR(32) so any role string is accepted
+DO $$ BEGIN
+    ALTER TABLE tenant_memberships ALTER COLUMN role DROP DEFAULT;
+    ALTER TABLE tenant_memberships ALTER COLUMN role TYPE VARCHAR(32) USING role::text;
+    ALTER TABLE tenant_memberships ALTER COLUMN role SET DEFAULT 'member';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+ALTER TABLE tenant_memberships ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+
+-- Ensure teams and team_members have expected columns
+CREATE TABLE IF NOT EXISTS tenant_teams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DO $$ BEGIN
+    ALTER TABLE team_members ADD COLUMN IF NOT EXISTS role VARCHAR(32) DEFAULT 'member';
+    ALTER TABLE team_members ADD COLUMN IF NOT EXISTS tenant_id UUID;
+    ALTER TABLE team_members ALTER COLUMN tenant_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- Working Calendars & Holidays
+ALTER TABLE working_calendars ADD COLUMN IF NOT EXISTS weekend_days INTEGER[] DEFAULT '{0, 6}';
+ALTER TABLE working_calendars ADD COLUMN IF NOT EXISTS week_start_day SMALLINT DEFAULT 1;
+ALTER TABLE working_calendars ADD COLUMN IF NOT EXISTS default_hours_per_day NUMERIC(4, 2) DEFAULT 8.00;
+ALTER TABLE working_calendars ADD COLUMN IF NOT EXISTS daily_working_hours NUMERIC(4, 2) DEFAULT 8.00;
+
+ALTER TABLE calendar_holidays ADD COLUMN IF NOT EXISTS holiday_date DATE;
+ALTER TABLE calendar_holidays ADD COLUMN IF NOT EXISTS date DATE;
+UPDATE calendar_holidays SET date = holiday_date WHERE date IS NULL AND holiday_date IS NOT NULL;
+UPDATE calendar_holidays SET holiday_date = date WHERE holiday_date IS NULL AND date IS NOT NULL;
+
+-- Tasks & Dependencies
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress INT DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress_percent INT DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS phase_id UUID;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id UUID;
+
+DO $$ BEGIN
+    ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS dependency_type VARCHAR(16) DEFAULT 'FS';
+    ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS dep_type VARCHAR(16) DEFAULT 'FS';
+    ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS type VARCHAR(16) DEFAULT 'FS';
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- Execution Block
 DO $$
 DECLARE
     super_admin_id UUID := 'b0000000-0000-0000-0000-000000000099'::UUID;
     engineer_user_id UUID := 'b0000000-0000-0000-0000-000000000097'::UUID;
     guest_user_id UUID := 'b0000000-0000-0000-0000-000000000098'::UUID;
+    devops_user_id UUID := 'b0000000-0000-0000-0000-000000000096'::UUID;
+
     tenant_core_id UUID := 'a0000000-0000-0000-0000-000000000003'::UUID;
     cal_core_id UUID := 'c0000000-0000-0000-0000-000000000003'::UUID;
+    team_platform_id UUID := 'a0000000-0000-0000-0000-000000000011'::UUID;
+    team_ops_id UUID := 'a0000000-0000-0000-0000-000000000012'::UUID;
+
     prj_core_id UUID := 'd0000000-0000-0000-0000-000000000003'::UUID;
     ph1_id UUID := 'e0000000-0000-0000-0000-000000000011'::UUID;
     ph2_id UUID := 'e0000000-0000-0000-0000-000000000012'::UUID;
+
     t1_id UUID := 'f0000000-0000-0000-0000-000000000011'::UUID;
     t2_id UUID := 'f0000000-0000-0000-0000-000000000012'::UUID;
     t3_id UUID := 'f0000000-0000-0000-0000-000000000013'::UUID;
 BEGIN
-    -- Auth User: admin@jyotirmoyb.com
+    -- 1. Auth Users
     BEGIN
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
             INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, role, aud)
             VALUES
             (super_admin_id, '00000000-0000-0000-0000-000000000000', 'admin@jyotirmoyb.com', crypt('Admin@jyotirmoyb2026!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"System Administrator"}', 'authenticated', 'authenticated'),
-            (engineer_user_id, '00000000-0000-0000-0000-000000000000', 'lead.engineer@core.internal', crypt('Password123!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Sarah Lin"}', 'authenticated', 'authenticated')
+            (guest_user_id, '00000000-0000-0000-0000-000000000000', 'guest@external-partner.com', crypt('GuestPass2026!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Guest Auditor (Partner Org)"}', 'authenticated', 'authenticated'),
+            (engineer_user_id, '00000000-0000-0000-0000-000000000000', 'lead.engineer@core.internal', crypt('Password123!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Sarah Lin"}', 'authenticated', 'authenticated'),
+            (devops_user_id, '00000000-0000-0000-0000-000000000000', 'devops@core.internal', crypt('Password123!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Kenji Sato"}', 'authenticated', 'authenticated')
             ON CONFLICT (id) DO NOTHING;
         END IF;
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Notice: auth.users provisioning: %', SQLERRM;
     END;
 
-    -- User Profiles (both user_profiles and profiles)
+    -- 2. User Profiles
     BEGIN
         INSERT INTO user_profiles (id, email, full_name, avatar_url, is_superadmin)
         VALUES
         (super_admin_id, 'admin@jyotirmoyb.com', 'System Administrator', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop', TRUE),
-        (engineer_user_id, 'lead.engineer@core.internal', 'Sarah Lin', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop', FALSE)
+        (guest_user_id, 'guest@external-partner.com', 'Guest Auditor (Partner Org)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop', FALSE),
+        (engineer_user_id, 'lead.engineer@core.internal', 'Sarah Lin', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop', FALSE),
+        (devops_user_id, 'devops@core.internal', 'Kenji Sato', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop', FALSE)
         ON CONFLICT (id) DO UPDATE SET is_superadmin = EXCLUDED.is_superadmin, full_name = EXCLUDED.full_name;
 
         INSERT INTO profiles (id, email, full_name, avatar_url, is_superadmin)
         VALUES
         (super_admin_id, 'admin@jyotirmoyb.com', 'System Administrator', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop', TRUE),
-        (engineer_user_id, 'lead.engineer@core.internal', 'Sarah Lin', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop', FALSE)
+        (guest_user_id, 'guest@external-partner.com', 'Guest Auditor (Partner Org)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop', FALSE),
+        (engineer_user_id, 'lead.engineer@core.internal', 'Sarah Lin', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop', FALSE),
+        (devops_user_id, 'devops@core.internal', 'Kenji Sato', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop', FALSE)
         ON CONFLICT (id) DO UPDATE SET is_superadmin = EXCLUDED.is_superadmin, full_name = EXCLUDED.full_name;
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Notice: user_profiles provisioning: %', SQLERRM;
     END;
 
-    -- Tenant: Enterprise Core (slug: core, code: CORE-SYS)
+    -- 3. Tenant: Enterprise Core (slug: core, code: CORE-SYS)
     BEGIN
         INSERT INTO tenants (id, name, slug, code, tenant_code, domain, status, is_active, storage_quota_mb)
         VALUES
@@ -501,38 +635,97 @@ BEGIN
         RAISE NOTICE 'Notice: tenants provisioning: %', SQLERRM;
     END;
 
-    -- Tenant Memberships (Supports VARCHAR or Enum role safely)
+    -- 4. Tenant Memberships
     BEGIN
         INSERT INTO tenant_memberships (tenant_id, user_id, role, is_active)
         VALUES
         (tenant_core_id, super_admin_id, 'owner', TRUE),
-        (tenant_core_id, engineer_user_id, 'admin', TRUE)
+        (tenant_core_id, engineer_user_id, 'admin', TRUE),
+        (tenant_core_id, devops_user_id, 'member', TRUE),
+        (tenant_core_id, guest_user_id, 'guest', TRUE)
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET is_active = TRUE, role = EXCLUDED.role;
     EXCEPTION WHEN OTHERS THEN
         BEGIN
             INSERT INTO tenant_memberships (tenant_id, user_id, role, is_active)
             VALUES
             (tenant_core_id, super_admin_id, 'superadmin', TRUE),
-            (tenant_core_id, engineer_user_id, 'tenant_admin', TRUE)
+            (tenant_core_id, engineer_user_id, 'tenant_admin', TRUE),
+            (tenant_core_id, devops_user_id, 'contributor', TRUE),
+            (tenant_core_id, guest_user_id, 'guest', TRUE)
             ON CONFLICT (tenant_id, user_id) DO UPDATE SET is_active = TRUE, role = EXCLUDED.role;
         EXCEPTION WHEN OTHERS THEN
             RAISE NOTICE 'Notice: tenant_memberships provisioning: %', SQLERRM;
         END;
     END;
 
-    -- Also populate tenant_memberships_v2 if it exists
+    -- Sync tenant_memberships_v2 if table exists
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tenant_memberships_v2') THEN
         BEGIN
             INSERT INTO tenant_memberships_v2 (tenant_id, user_id, role, is_active)
             VALUES
             (tenant_core_id, super_admin_id, 'owner'::user_tenant_role, TRUE),
-            (tenant_core_id, engineer_user_id, 'admin'::user_tenant_role, TRUE)
+            (tenant_core_id, engineer_user_id, 'admin'::user_tenant_role, TRUE),
+            (tenant_core_id, devops_user_id, 'member'::user_tenant_role, TRUE),
+            (tenant_core_id, guest_user_id, 'guest'::user_tenant_role, TRUE)
             ON CONFLICT (tenant_id, user_id) DO UPDATE SET is_active = TRUE, role = EXCLUDED.role;
         EXCEPTION WHEN OTHERS THEN NULL;
         END;
     END IF;
 
-    -- Working Calendar
+    -- 5. Teams & Team Members
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tenant_teams') THEN
+        BEGIN
+            INSERT INTO tenant_teams (id, tenant_id, name, description)
+            VALUES
+            (team_platform_id, tenant_core_id, 'Core Platform', 'Platform Architecture and High-Availability Infrastructure.'),
+            (team_ops_id, tenant_core_id, 'Operations', 'DevOps, Site Reliability Engineering, and CI/CD.')
+            ON CONFLICT (id) DO NOTHING;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'teams') THEN
+        BEGIN
+            INSERT INTO teams (id, tenant_id, name, description)
+            VALUES
+            (team_platform_id, tenant_core_id, 'Core Platform', 'Platform Architecture and High-Availability Infrastructure.'),
+            (team_ops_id, tenant_core_id, 'Operations', 'DevOps, Site Reliability Engineering, and CI/CD.')
+            ON CONFLICT (id) DO NOTHING;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'team_members') THEN
+        BEGIN
+            INSERT INTO team_members (tenant_id, team_id, user_id, role)
+            VALUES
+            (tenant_core_id, team_platform_id, super_admin_id, 'lead'),
+            (tenant_core_id, team_platform_id, engineer_user_id, 'member'),
+            (tenant_core_id, team_ops_id, devops_user_id, 'lead')
+            ON CONFLICT (team_id, user_id) DO NOTHING;
+        EXCEPTION WHEN OTHERS THEN
+            BEGIN
+                INSERT INTO team_members (team_id, user_id, role)
+                VALUES
+                (team_platform_id, super_admin_id, 'lead'),
+                (team_platform_id, engineer_user_id, 'member'),
+                (team_ops_id, devops_user_id, 'lead')
+                ON CONFLICT (team_id, user_id) DO NOTHING;
+            EXCEPTION WHEN OTHERS THEN
+                BEGIN
+                    INSERT INTO team_members (tenant_id, team_id, user_id)
+                    VALUES
+                    (tenant_core_id, team_platform_id, super_admin_id),
+                    (tenant_core_id, team_platform_id, engineer_user_id),
+                    (tenant_core_id, team_ops_id, devops_user_id)
+                    ON CONFLICT (team_id, user_id) DO NOTHING;
+                EXCEPTION WHEN OTHERS THEN NULL;
+                END;
+            END;
+        END;
+    END IF;
+
+    -- 6. Working Calendar & Holidays
     BEGIN
         INSERT INTO working_calendars (id, tenant_id, name, working_days, weekend_days, daily_working_hours, is_default)
         VALUES
@@ -548,7 +741,6 @@ BEGIN
         END;
     END;
 
-    -- Calendar Holidays
     BEGIN
         INSERT INTO calendar_holidays (tenant_id, calendar_id, name, holiday_date, date, is_recurring)
         VALUES
@@ -566,7 +758,7 @@ BEGIN
         END;
     END;
 
-    -- Project: Global Infrastructure Modernization (PRJ-CORE)
+    -- 7. Projects
     BEGIN
         INSERT INTO projects (id, tenant_id, name, code, description, status, start_date, target_end_date, calendar_id, created_by)
         VALUES
@@ -576,7 +768,7 @@ BEGIN
         RAISE NOTICE 'Notice: projects provisioning: %', SQLERRM;
     END;
 
-    -- Project Phases (both phases and project_phases tables)
+    -- 8. Project Phases
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'phases') THEN
         BEGIN
             INSERT INTO phases (id, tenant_id, project_id, name, order_index, color, start_date, end_date)
@@ -599,7 +791,7 @@ BEGIN
         END;
     END IF;
 
-    -- Tasks
+    -- 9. Tasks
     BEGIN
         INSERT INTO tasks (id, tenant_id, project_id, phase_id, title, code, description, status, priority, start_date, end_date, duration_days, progress, progress_percent, is_milestone, early_start, early_finish, late_start, late_finish, total_float, is_critical, order_index, created_by)
         VALUES
@@ -620,7 +812,7 @@ BEGIN
         END;
     END;
 
-    -- Dependencies (Precedence: T1 -> T2 -> T3)
+    -- 10. Dependencies
     BEGIN
         INSERT INTO task_dependencies (tenant_id, project_id, predecessor_id, successor_id, dependency_type, lag_days)
         VALUES
@@ -638,42 +830,55 @@ BEGIN
         END;
     END;
 
-    -- Dynamic Statuses for Enterprise Core
-    BEGIN
-        INSERT INTO tenant_task_statuses (tenant_id, name, slug, color_hex, badge_variant, position, is_closed_state, is_default)
-        VALUES
-        (tenant_core_id, 'Backlog', 'backlog', '#64748b', 'secondary', 1, FALSE, FALSE),
-        (tenant_core_id, 'To Do', 'todo', '#3b82f6', 'default', 2, FALSE, TRUE),
-        (tenant_core_id, 'In Progress', 'in_progress', '#f59e0b', 'default', 3, FALSE, FALSE),
-        (tenant_core_id, 'In Review', 'review', '#8b5cf6', 'secondary', 4, FALSE, FALSE),
-        (tenant_core_id, 'Completed', 'completed', '#10b981', 'default', 5, TRUE, FALSE),
-        (tenant_core_id, 'Blocked', 'blocked', '#ef4444', 'destructive', 6, FALSE, FALSE)
-        ON CONFLICT (tenant_id, slug) DO NOTHING;
+    -- 11. Dynamic Metadata (Statuses, Priorities, Types, Themes)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tenant_task_statuses') THEN
+        BEGIN
+            INSERT INTO tenant_task_statuses (tenant_id, name, slug, color_hex, badge_variant, position, is_closed_state, is_default)
+            VALUES
+            (tenant_core_id, 'Backlog', 'backlog', '#64748b', 'secondary', 1, FALSE, FALSE),
+            (tenant_core_id, 'To Do', 'todo', '#3b82f6', 'default', 2, FALSE, TRUE),
+            (tenant_core_id, 'In Progress', 'in_progress', '#f59e0b', 'default', 3, FALSE, FALSE),
+            (tenant_core_id, 'In Review', 'review', '#8b5cf6', 'secondary', 4, FALSE, FALSE),
+            (tenant_core_id, 'Completed', 'completed', '#10b981', 'default', 5, TRUE, FALSE),
+            (tenant_core_id, 'Blocked', 'blocked', '#ef4444', 'destructive', 6, FALSE, FALSE)
+            ON CONFLICT (tenant_id, slug) DO NOTHING;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END IF;
 
-        -- Dynamic Priorities for Enterprise Core
-        INSERT INTO tenant_task_priorities (tenant_id, name, slug, color_hex, urgency_weight, icon_key, is_default)
-        VALUES
-        (tenant_core_id, 'Low', 'low', '#10b981', 1, 'arrow-down', FALSE),
-        (tenant_core_id, 'Medium', 'medium', '#3b82f6', 2, 'minus', TRUE),
-        (tenant_core_id, 'High', 'high', '#f59e0b', 3, 'arrow-up', FALSE),
-        (tenant_core_id, 'Urgent', 'urgent', '#ef4444', 4, 'alert-circle', FALSE)
-        ON CONFLICT (tenant_id, slug) DO NOTHING;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tenant_task_priorities') THEN
+        BEGIN
+            INSERT INTO tenant_task_priorities (tenant_id, name, slug, color_hex, urgency_weight, icon_key, is_default)
+            VALUES
+            (tenant_core_id, 'Low', 'low', '#10b981', 1, 'arrow-down', FALSE),
+            (tenant_core_id, 'Medium', 'medium', '#3b82f6', 2, 'minus', TRUE),
+            (tenant_core_id, 'High', 'high', '#f59e0b', 3, 'arrow-up', FALSE),
+            (tenant_core_id, 'Urgent', 'urgent', '#ef4444', 4, 'alert-circle', FALSE)
+            ON CONFLICT (tenant_id, slug) DO NOTHING;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END IF;
 
-        -- Dynamic Task Types
-        INSERT INTO tenant_task_types (tenant_id, name, slug, icon_key, is_default)
-        VALUES
-        (tenant_core_id, 'Task', 'task', 'check-square', TRUE),
-        (tenant_core_id, 'Milestone', 'milestone', 'flag', FALSE),
-        (tenant_core_id, 'Bug', 'bug', 'bug', FALSE)
-        ON CONFLICT (tenant_id, slug) DO NOTHING;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tenant_task_types') THEN
+        BEGIN
+            INSERT INTO tenant_task_types (tenant_id, name, slug, icon_key, is_default)
+            VALUES
+            (tenant_core_id, 'Task', 'task', 'check-square', TRUE),
+            (tenant_core_id, 'Milestone', 'milestone', 'flag', FALSE),
+            (tenant_core_id, 'Bug', 'bug', 'bug', FALSE)
+            ON CONFLICT (tenant_id, slug) DO NOTHING;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END IF;
 
-        -- System Theme
-        INSERT INTO system_themes (id, name, description, tokens_json, is_system_default)
-        VALUES
-        ('navy', 'Enterprise Navy', 'Executive dark navy with sharp cyan accents', '{"background":"#0a0d14","foreground":"#f8fafc","card":"#0f172a","primary":"#3b82f6"}'::jsonb, TRUE)
-        ON CONFLICT (id) DO NOTHING;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'Notice: dynamic metadata provisioning: %', SQLERRM;
-    END;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'system_themes') THEN
+        BEGIN
+            INSERT INTO system_themes (id, name, description, tokens_json, is_system_default)
+            VALUES
+            ('navy', 'Enterprise Navy', 'Executive dark navy with sharp cyan accents', '{"background":"#0a0d14","foreground":"#f8fafc","card":"#0f172a","primary":"#3b82f6"}'::jsonb, TRUE)
+            ON CONFLICT (id) DO NOTHING;
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END IF;
 
 END $$;

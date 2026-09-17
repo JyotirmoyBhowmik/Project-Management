@@ -30,6 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_correlation ON audit_logs(correlation_
 
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "audit_logs_tenant_admin_read" ON audit_logs;
 CREATE POLICY "audit_logs_tenant_admin_read" ON audit_logs
     FOR SELECT USING (
         is_superadmin(current_app_user_id())

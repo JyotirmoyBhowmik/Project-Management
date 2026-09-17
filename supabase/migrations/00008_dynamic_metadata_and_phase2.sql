@@ -182,43 +182,92 @@ ALTER TABLE system_themes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_theme_overrides ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_custom_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_custom_field_values ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION is_member_of(_tenant_id UUID, _required_role TEXT DEFAULT NULL)
+RETURNS BOOLEAN AS $$
+DECLARE
+    current_uid UUID;
+BEGIN
+    current_uid := auth.uid();
+    IF current_uid IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    -- Platform superadmin
+    IF EXISTS (SELECT 1 FROM profiles WHERE id = current_uid AND is_superadmin = TRUE)
+       OR EXISTS (SELECT 1 FROM user_profiles WHERE id = current_uid AND is_superadmin = TRUE) THEN
+        RETURN TRUE;
+    END IF;
+
+    IF _required_role IS NULL THEN
+        RETURN EXISTS (
+            SELECT 1 FROM tenant_memberships
+            WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        ) OR EXISTS (
+            SELECT 1 FROM tenant_memberships_v2
+            WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        );
+    END IF;
+
+    RETURN EXISTS (
+        SELECT 1 FROM tenant_memberships
+        WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        AND role::text IN (_required_role, 'owner', 'admin', 'superadmin', 'tenant_admin')
+    ) OR EXISTS (
+        SELECT 1 FROM tenant_memberships_v2
+        WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        AND role::text IN (_required_role, 'owner', 'admin', 'superadmin', 'tenant_admin')
+    );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
 ALTER TABLE project_baselines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_baseline_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_role_permissions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "system_themes_readable_by_all" ON system_themes;
 CREATE POLICY "system_themes_readable_by_all" ON system_themes FOR SELECT USING (TRUE);
 
+DROP POLICY IF EXISTS "tenant_task_statuses_isolation" ON tenant_task_statuses;
 CREATE POLICY "tenant_task_statuses_isolation" ON tenant_task_statuses
     FOR ALL USING (is_member_of(tenant_id));
 
+DROP POLICY IF EXISTS "tenant_task_priorities_isolation" ON tenant_task_priorities;
 CREATE POLICY "tenant_task_priorities_isolation" ON tenant_task_priorities
     FOR ALL USING (is_member_of(tenant_id));
 
+DROP POLICY IF EXISTS "tenant_task_types_isolation" ON tenant_task_types;
 CREATE POLICY "tenant_task_types_isolation" ON tenant_task_types
     FOR ALL USING (is_member_of(tenant_id));
 
+DROP POLICY IF EXISTS "tenant_theme_overrides_isolation" ON tenant_theme_overrides;
 CREATE POLICY "tenant_theme_overrides_isolation" ON tenant_theme_overrides
     FOR ALL USING (is_member_of(tenant_id));
 
+DROP POLICY IF EXISTS "tenant_custom_fields_isolation" ON tenant_custom_fields;
 CREATE POLICY "tenant_custom_fields_isolation" ON tenant_custom_fields
     FOR ALL USING (is_member_of(tenant_id));
 
+DROP POLICY IF EXISTS "entity_custom_field_values_isolation" ON entity_custom_field_values;
 CREATE POLICY "entity_custom_field_values_isolation" ON entity_custom_field_values
     FOR ALL USING (is_member_of(tenant_id));
 
+DROP POLICY IF EXISTS "project_baselines_isolation" ON project_baselines;
 CREATE POLICY "project_baselines_isolation" ON project_baselines
     FOR ALL USING (is_member_of(tenant_id));
 
+DROP POLICY IF EXISTS "task_baseline_snapshots_isolation" ON task_baseline_snapshots;
 CREATE POLICY "task_baseline_snapshots_isolation" ON task_baseline_snapshots
     FOR ALL USING (EXISTS (
         SELECT 1 FROM project_baselines pb 
         WHERE pb.id = task_baseline_snapshots.baseline_id AND is_member_of(pb.tenant_id)
     ));
 
+DROP POLICY IF EXISTS "notification_events_recipient_only" ON notification_events;
 CREATE POLICY "notification_events_recipient_only" ON notification_events
     FOR ALL USING (recipient_id = auth.uid() OR is_member_of(tenant_id, 'admin'));
 
+DROP POLICY IF EXISTS "tenant_role_permissions_isolation" ON tenant_role_permissions;
 CREATE POLICY "tenant_role_permissions_isolation" ON tenant_role_permissions
     FOR ALL USING (is_member_of(tenant_id));
 

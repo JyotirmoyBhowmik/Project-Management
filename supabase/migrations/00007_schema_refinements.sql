@@ -225,8 +225,8 @@ CREATE INDEX IF NOT EXISTS idx_task_deps_v2_proj ON task_dependencies_v2(project
 
 -- 3. Security Definer Functions & Calendar Engine in PL/pgSQL
 
--- Helper: is_member_of(_tenant_id)
-CREATE OR REPLACE FUNCTION is_member_of(_tenant_id UUID)
+-- Helper: is_member_of(_tenant_id, _required_role)
+CREATE OR REPLACE FUNCTION is_member_of(_tenant_id UUID, _required_role TEXT DEFAULT NULL)
 RETURNS BOOLEAN AS $$
 DECLARE
     current_uid UUID;
@@ -237,14 +237,31 @@ BEGIN
     END IF;
 
     -- Check platform superadmin
-    IF EXISTS (SELECT 1 FROM profiles WHERE id = current_uid AND is_superadmin = TRUE) THEN
+    IF EXISTS (SELECT 1 FROM profiles WHERE id = current_uid AND is_superadmin = TRUE)
+       OR EXISTS (SELECT 1 FROM user_profiles WHERE id = current_uid AND is_superadmin = TRUE) THEN
         RETURN TRUE;
     END IF;
 
-    -- Check tenant membership
+    -- If no specific role required, check general active membership
+    IF _required_role IS NULL THEN
+        RETURN EXISTS (
+            SELECT 1 FROM tenant_memberships
+            WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        ) OR EXISTS (
+            SELECT 1 FROM tenant_memberships_v2
+            WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        );
+    END IF;
+
+    -- If specific role required (e.g. 'admin')
     RETURN EXISTS (
+        SELECT 1 FROM tenant_memberships
+        WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        AND role::text IN (_required_role, 'owner', 'admin', 'superadmin', 'tenant_admin')
+    ) OR EXISTS (
         SELECT 1 FROM tenant_memberships_v2
-        WHERE tenant_id = _tenant_id AND user_id = current_uid
+        WHERE tenant_id = _tenant_id AND user_id = current_uid AND is_active = TRUE
+        AND role::text IN (_required_role, 'owner', 'admin', 'superadmin', 'tenant_admin')
     );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
@@ -357,14 +374,18 @@ ALTER TABLE tasks_v2 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_assignees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_dependencies_v2 ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tenants_v2_select" ON tenants_v2;
 CREATE POLICY "tenants_v2_select" ON tenants_v2
     FOR SELECT USING (is_member_of(id));
 
+DROP POLICY IF EXISTS "projects_v2_select" ON projects_v2;
 CREATE POLICY "projects_v2_select" ON projects_v2
     FOR SELECT USING (has_guest_project_access(id));
 
+DROP POLICY IF EXISTS "tasks_v2_select" ON tasks_v2;
 CREATE POLICY "tasks_v2_select" ON tasks_v2
     FOR SELECT USING (has_guest_project_access(project_id));
 
+DROP POLICY IF EXISTS "task_dependencies_v2_select" ON task_dependencies_v2;
 CREATE POLICY "task_dependencies_v2_select" ON task_dependencies_v2
     FOR SELECT USING (has_guest_project_access(project_id));
