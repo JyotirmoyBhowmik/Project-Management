@@ -734,15 +734,24 @@ BEGIN
 
     -- 3. Tenant: Enterprise Core (slug: core, code: CORE-SYS)
     BEGIN
-        INSERT INTO tenants (id, name, slug, code, tenant_code, domain, status, is_active, storage_quota_mb)
-        VALUES
-        (tenant_core_id, 'Enterprise Core', 'core', 'CORE-SYS', 'CORE-SYS', 'core.pms.internal', 'active', TRUE, 20480)
-        ON CONFLICT (id) DO UPDATE SET is_active = TRUE, status = 'active', slug = 'core', code = 'CORE-SYS', tenant_code = 'CORE-SYS';
+        IF EXISTS (SELECT 1 FROM tenants WHERE slug = 'core') THEN
+            UPDATE tenants 
+            SET name = 'Enterprise Core', code = 'CORE-SYS', tenant_code = 'CORE-SYS', status = 'active', is_active = TRUE
+            WHERE slug = 'core';
+            SELECT id INTO tenant_core_id FROM tenants WHERE slug = 'core' LIMIT 1;
+        ELSE
+            INSERT INTO tenants (id, name, slug, code, tenant_code, domain, status, is_active, storage_quota_mb)
+            VALUES (tenant_core_id, 'Enterprise Core', 'core', 'CORE-SYS', 'CORE-SYS', 'core.pms.internal', 'active', TRUE, 20480);
+        END IF;
 
-        INSERT INTO tenants_v2 (id, name, slug, tenant_code, is_active)
-        VALUES
-        (tenant_core_id, 'Enterprise Core', 'core', 'CORE-SYS', TRUE)
-        ON CONFLICT (id) DO UPDATE SET is_active = TRUE, slug = 'core', tenant_code = 'CORE-SYS';
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tenants_v2') THEN
+            IF EXISTS (SELECT 1 FROM tenants_v2 WHERE slug = 'core') THEN
+                UPDATE tenants_v2 SET name = 'Enterprise Core', tenant_code = 'CORE-SYS', is_active = TRUE WHERE slug = 'core';
+            ELSE
+                INSERT INTO tenants_v2 (id, name, slug, tenant_code, is_active)
+                VALUES (tenant_core_id, 'Enterprise Core', 'core', 'CORE-SYS', TRUE);
+            END IF;
+        END IF;
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Notice: tenants provisioning: %', SQLERRM;
     END;
