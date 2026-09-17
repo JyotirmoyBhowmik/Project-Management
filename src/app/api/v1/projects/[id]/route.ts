@@ -5,7 +5,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, createSuccessResponse } from '@/lib/error/api-handler';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
 import { ProjectUpdateSchema } from '@/lib/validation/schemas';
 
 export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
@@ -13,16 +13,18 @@ export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
   const pathParts = url.pathname.split('/');
   const projectId = pathParts[pathParts.length - 1];
 
-  const tenantId = req.headers.get('x-tenant-id') || 'a0000000-0000-0000-0000-000000000001';
-  const userId = req.headers.get('x-user-id') || 'b0000000-0000-0000-0000-000000000002';
-  const role = req.headers.get('x-user-role') || 'tenant_admin';
+  const tenantId = req.headers.get('x-tenant-id') || req.nextUrl.searchParams.get('tenant_id');
+  if (!tenantId) {
+    return createSuccessResponse(null, correlationId);
+  }
 
-  const project = db.getProject(projectId, tenantId, userId, role);
-  const phases = db.phases.filter(p => p.project_id === projectId);
-  const calendar = db.calendars.find(c => c.id === project.calendar_id) || db.calendars[0];
-  const holidays = db.holidays.filter(h => h.tenant_id === tenantId);
+  const [project, calendar, holidays] = await Promise.all([
+    dbService.getProjectDetails(projectId, tenantId),
+    dbService.getWorkingCalendar(tenantId),
+    dbService.getCalendarHolidays(tenantId),
+  ]);
 
-  return createSuccessResponse({ project, phases, calendar, holidays }, correlationId);
+  return createSuccessResponse({ project, phases: [], calendar, holidays }, correlationId);
 });
 
 export const PUT = apiHandler(async (req: NextRequest, { correlationId }) => {
@@ -30,33 +32,33 @@ export const PUT = apiHandler(async (req: NextRequest, { correlationId }) => {
   const pathParts = url.pathname.split('/');
   const projectId = pathParts[pathParts.length - 1];
 
-  const tenantId = req.headers.get('x-tenant-id') || 'a0000000-0000-0000-0000-000000000001';
-  const userId = req.headers.get('x-user-id') || 'b0000000-0000-0000-0000-000000000002';
-  const role = req.headers.get('x-user-role') || 'tenant_admin';
+  const tenantId = req.headers.get('x-tenant-id') || req.nextUrl.searchParams.get('tenant_id');
+  const userId = req.headers.get('x-user-id');
 
-  const project = db.getProject(projectId, tenantId, userId, role);
+  if (!tenantId) {
+    throw new Error('Tenant ID is required for project update');
+  }
+
   const body = await req.json();
   const validated = ProjectUpdateSchema.parse(body);
 
-  const idx = db.projects.findIndex(p => p.id === projectId);
-  const before = { ...db.projects[idx] };
-  db.projects[idx] = { ...before, ...validated, updated_at: new Date().toISOString() };
-  const after = db.projects[idx];
+  const before = await dbService.getProjectDetails(projectId, tenantId);
+  const after = await dbService.updateProject(projectId, tenantId, validated);
 
-  db.auditLogs.unshift({
-    id: `aud-${Date.now()}`,
-    tenant_id: tenantId,
-    actor_id: userId,
-    action: 'UPDATE',
-    entity_type: 'project',
-    entity_id: projectId,
-    diff_before: before as unknown as Record<string, unknown>,
-    diff_after: after as unknown as Record<string, unknown>,
-    correlation_id: correlationId,
-    ip_address: '127.0.0.1',
-    user_agent: 'PMS Web Client',
-    created_at: new Date().toISOString(),
-  });
+  if (after) {
+    await dbService.createAuditLog({
+      tenant_id: tenantId,
+      actor_id: userId || null,
+      action: 'UPDATE',
+      entity_type: 'project',
+      entity_id: projectId,
+      diff_before: before as unknown as Record<string, unknown>,
+      diff_after: after as unknown as Record<string, unknown>,
+      correlation_id: correlationId,
+      ip_address: req.headers.get('x-forwarded-for') || '127.0.0.1',
+      user_agent: req.headers.get('user-agent') || 'PMS API Client',
+    });
+  }
 
   return createSuccessResponse(after, correlationId);
 });

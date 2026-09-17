@@ -1,3 +1,8 @@
+// ==============================================================================
+// src/components/layout/Sidebar.tsx
+// Dynamic Sidebar Navigation (Zero Hardcoded Mock IDs & Role Enforcement)
+// ==============================================================================
+
 'use client';
 
 import * as React from 'react';
@@ -18,10 +23,11 @@ import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { activeTenant, activeRole } = useTenantStore();
+  const { activeTenant, activeRole, currentUser } = useTenantStore();
 
   const isGuest = activeRole === 'guest';
-  const isSuperadmin = activeRole === 'superadmin';
+  const isSuperadmin = Boolean(currentUser?.is_superadmin);
+  const isAdmin = ['owner', 'admin', 'tenant_admin'].includes(activeRole) || isSuperadmin;
 
   const navItems = [
     {
@@ -34,12 +40,6 @@ export function Sidebar() {
       label: 'Projects Portfolio',
       href: '/projects',
       icon: FolderGit2,
-      disabled: false,
-    },
-    {
-      label: 'Active Workspace',
-      href: '/projects/d0000000-0000-0000-0000-000000000001',
-      icon: Layers,
       disabled: false,
     },
   ];
@@ -56,7 +56,7 @@ export function Sidebar() {
       label: 'SuperAdmin Network',
       href: '/admin/superadmin',
       icon: Server,
-      disabled: !isSuperadmin && !['tenant_admin'].includes(activeRole),
+      disabled: !isSuperadmin,
       restrictedMessage: 'Requires SuperAdmin role',
     },
   ];
@@ -70,11 +70,15 @@ export function Sidebar() {
             className="h-8 w-8 rounded-lg flex items-center justify-center font-bold text-white shadow-xs"
             style={{ backgroundColor: activeTenant?.branding_json?.primary_color || '#3b82f6' }}
           >
-            {activeTenant?.name?.substring(0, 1) || 'P'}
+            {activeTenant?.name?.substring(0, 1).toUpperCase() || 'W'}
           </div>
           <div className="overflow-hidden">
-            <h1 className="text-sm font-bold truncate leading-tight">{activeTenant?.name}</h1>
-            <p className="text-[11px] text-[var(--muted-foreground)] truncate">{activeTenant?.branding_json?.company_tagline || 'Enterprise Project System'}</p>
+            <h1 className="text-sm font-bold truncate leading-tight">
+              {activeTenant?.name || 'Workspace'}
+            </h1>
+            <p className="text-[11px] text-[var(--muted-foreground)] truncate">
+              {activeTenant?.branding_json?.company_tagline || activeTenant?.tenant_code || activeTenant?.code || 'Enterprise Project System'}
+            </p>
           </div>
         </div>
       </div>
@@ -88,7 +92,10 @@ export function Sidebar() {
           <nav className="space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href) && item.href !== '/projects');
+              const isActive =
+                item.href === '/'
+                  ? pathname === '/'
+                  : pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/');
               return (
                 <Link
                   key={item.href}
@@ -100,7 +107,7 @@ export function Sidebar() {
                       : 'text-[var(--muted-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]'
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
+                  <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -108,7 +115,7 @@ export function Sidebar() {
           </nav>
         </div>
 
-        {/* Administration Section */}
+        {/* Governance & Controls Section */}
         <div>
           <div className="px-3 mb-2 text-[10px] font-bold tracking-wider text-[var(--muted-foreground)] uppercase">
             Governance & Controls
@@ -122,14 +129,14 @@ export function Sidebar() {
                 return (
                   <div
                     key={item.href}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-[var(--muted-foreground)] opacity-50 cursor-not-allowed"
+                    className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-[var(--muted-foreground)]/50 cursor-not-allowed select-none"
                     title={item.restrictedMessage}
                   >
                     <div className="flex items-center gap-3">
-                      <Icon className="h-4 w-4 shrink-0" />
+                      <Icon className="h-4 w-4 opacity-50" />
                       <span>{item.label}</span>
                     </div>
-                    <Lock className="h-3 w-3" />
+                    <Lock className="h-3 w-3 opacity-50" />
                   </div>
                 );
               }
@@ -145,7 +152,7 @@ export function Sidebar() {
                       : 'text-[var(--muted-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]'
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
+                  <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
                 </Link>
               );
@@ -154,17 +161,19 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Storage Quota & Security Status */}
-      <div className="p-4 border-t border-[var(--border)] bg-[var(--secondary)]/40 text-xs">
-        <div className="flex items-center justify-between text-[11px] mb-1.5">
-          <span className="text-[var(--muted-foreground)]">Storage Quota</span>
-          <span className="font-semibold text-[var(--foreground)] font-mono">1.2 GB / 10 GB</span>
+      {/* Storage Quota & DB Indicator */}
+      <div className="p-4 border-t border-[var(--border)] bg-[var(--card)] space-y-2">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-[var(--muted-foreground)] font-medium">Storage Quota</span>
+          <span className="font-mono text-[var(--foreground)]">
+            {(activeTenant?.storage_quota_mb ? (activeTenant.storage_quota_mb / 1024).toFixed(1) : '10.0')} GB
+          </span>
         </div>
-        <div className="w-full bg-[var(--muted)] rounded-full h-1.5 overflow-hidden">
-          <div className="bg-[var(--primary)] h-1.5 rounded-full" style={{ width: '12%' }} />
+        <div className="w-full bg-[var(--secondary)] rounded-full h-1.5 overflow-hidden">
+          <div className="bg-[var(--primary)] h-1.5 rounded-full w-[12%]" />
         </div>
-        <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[var(--muted-foreground)]">
-          <Database className="h-3 w-3 text-emerald-500" />
+        <div className="flex items-center gap-1.5 text-[10px] text-emerald-500 font-medium pt-1">
+          <Database className="h-3 w-3" />
           <span>PostgreSQL 16 RLS Active</span>
         </div>
       </div>

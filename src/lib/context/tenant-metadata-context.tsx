@@ -16,7 +16,7 @@ import {
   SystemTheme,
 } from '@/types/database';
 import { useTenantStore } from '@/lib/stores/tenant-store';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
 
 interface TenantMetadataContextType {
   statuses: TenantTaskStatus[];
@@ -26,25 +26,25 @@ interface TenantMetadataContextType {
   rolePermissions: TenantRolePermission[];
   systemThemes: SystemTheme[];
   isLoading: boolean;
-  refreshMetadata: () => void;
+  refreshMetadata: () => Promise<void>;
   getStatus: (slug: string) => TenantTaskStatus | undefined;
   getPriority: (slug: string) => TenantTaskPriority | undefined;
   getTaskType: (slug: string) => TenantTaskType | undefined;
   hasPermission: (permissionKey: string) => boolean;
-  createStatus: (data: Omit<TenantTaskStatus, 'id' | 'created_at'>) => TenantTaskStatus;
-  updateStatus: (id: string, updates: Partial<TenantTaskStatus>) => TenantTaskStatus;
-  deleteStatus: (id: string) => boolean;
-  createPriority: (data: Omit<TenantTaskPriority, 'id' | 'created_at'>) => TenantTaskPriority;
-  updatePriority: (id: string, updates: Partial<TenantTaskPriority>) => TenantTaskPriority;
-  createCustomField: (data: Omit<TenantCustomField, 'id' | 'created_at'>) => TenantCustomField;
-  updatePermission: (role: string, key: string, granted: boolean) => void;
+  createStatus: (data: Omit<TenantTaskStatus, 'id' | 'created_at'>) => Promise<TenantTaskStatus>;
+  updateStatus: (id: string, updates: Partial<TenantTaskStatus>) => Promise<TenantTaskStatus | null>;
+  deleteStatus: (id: string) => Promise<boolean>;
+  createPriority: (data: Omit<TenantTaskPriority, 'id' | 'created_at'>) => Promise<TenantTaskPriority>;
+  updatePriority: (id: string, updates: Partial<TenantTaskPriority>) => Promise<TenantTaskPriority | null>;
+  createCustomField: (data: Omit<TenantCustomField, 'id' | 'created_at'>) => Promise<TenantCustomField>;
+  updatePermission: (role: string, key: string, granted: boolean) => Promise<void>;
 }
 
 const TenantMetadataContext = React.createContext<TenantMetadataContextType | null>(null);
 
 export function TenantMetadataProvider({ children }: { children: React.ReactNode }) {
   const { activeTenant, activeRole } = useTenantStore();
-  const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
+  const tenantId = activeTenant?.id;
 
   const [statuses, setStatuses] = React.useState<TenantTaskStatus[]>([]);
   const [priorities, setPriorities] = React.useState<TenantTaskPriority[]>([]);
@@ -54,15 +54,48 @@ export function TenantMetadataProvider({ children }: { children: React.ReactNode
   const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  const refreshMetadata = React.useCallback(() => {
+  const refreshMetadata = React.useCallback(async () => {
+    if (!tenantId) {
+      setStatuses([]);
+      setPriorities([]);
+      setTaskTypes([]);
+      setCustomFields([]);
+      setRolePermissions([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      setStatuses([...db.getTenantTaskStatuses(tenantId)]);
-      setPriorities([...db.getTenantTaskPriorities(tenantId)]);
-      setTaskTypes([...db.getTenantTaskTypes(tenantId)]);
-      setCustomFields([...db.getTenantCustomFields(tenantId)]);
-      setRolePermissions([...db.getTenantRolePermissions(tenantId)]);
-      setSystemThemes([...db.getSystemThemes()]);
+      const [
+        fetchedStatuses,
+        fetchedPriorities,
+        fetchedTaskTypes,
+        fetchedCustomFields,
+        fetchedRolePermissions,
+        fetchedSystemThemes,
+      ] = await Promise.all([
+        dbService.getTenantTaskStatuses(tenantId),
+        dbService.getTenantTaskPriorities(tenantId),
+        dbService.getTenantTaskTypes(tenantId),
+        dbService.getTenantCustomFields(tenantId),
+        dbService.getTenantRolePermissions(tenantId),
+        dbService.getSystemThemes(),
+      ]);
+
+      setStatuses(fetchedStatuses);
+      setPriorities(fetchedPriorities);
+      setTaskTypes(fetchedTaskTypes);
+      setCustomFields(fetchedCustomFields);
+      setRolePermissions(fetchedRolePermissions);
+      setSystemThemes(fetchedSystemThemes);
+    } catch (err) {
+      // Graceful error containment
+      setStatuses([]);
+      setPriorities([]);
+      setTaskTypes([]);
+      setCustomFields([]);
+      setRolePermissions([]);
     } finally {
       setIsLoading(false);
     }
@@ -88,68 +121,72 @@ export function TenantMetadataProvider({ children }: { children: React.ReactNode
   );
 
   const hasPermission = React.useCallback(
-    (permissionKey: string) => db.hasPermission(tenantId, activeRole, permissionKey),
+    (permissionKey: string) => {
+      if (!tenantId) return false;
+      return dbService.hasPermission(tenantId, activeRole, permissionKey);
+    },
     [tenantId, activeRole]
   );
 
   const createStatus = React.useCallback(
-    (data: Omit<TenantTaskStatus, 'id' | 'created_at'>) => {
-      const created = db.createTenantTaskStatus(data);
-      refreshMetadata();
+    async (data: Omit<TenantTaskStatus, 'id' | 'created_at'>) => {
+      const created = await dbService.createTenantTaskStatus(data);
+      await refreshMetadata();
       return created;
     },
     [refreshMetadata]
   );
 
   const updateStatus = React.useCallback(
-    (id: string, updates: Partial<TenantTaskStatus>) => {
-      const updated = db.updateTenantTaskStatus(id, updates);
-      refreshMetadata();
+    async (id: string, updates: Partial<TenantTaskStatus>) => {
+      const updated = await dbService.updateTenantTaskStatus(id, updates);
+      await refreshMetadata();
       return updated;
     },
     [refreshMetadata]
   );
 
   const deleteStatus = React.useCallback(
-    (id: string) => {
-      const deleted = db.deleteTenantTaskStatus(id);
-      refreshMetadata();
+    async (id: string) => {
+      const deleted = await dbService.deleteTenantTaskStatus(id);
+      await refreshMetadata();
       return deleted;
     },
     [refreshMetadata]
   );
 
   const createPriority = React.useCallback(
-    (data: Omit<TenantTaskPriority, 'id' | 'created_at'>) => {
-      const created = db.createTenantTaskPriority(data);
-      refreshMetadata();
+    async (data: Omit<TenantTaskPriority, 'id' | 'created_at'>) => {
+      const created = await dbService.createTenantTaskPriority(data);
+      await refreshMetadata();
       return created;
     },
     [refreshMetadata]
   );
 
   const updatePriority = React.useCallback(
-    (id: string, updates: Partial<TenantTaskPriority>) => {
-      const updated = db.updateTenantTaskPriority(id, updates);
-      refreshMetadata();
+    async (id: string, updates: Partial<TenantTaskPriority>) => {
+      const updated = await dbService.updateTenantTaskPriority(id, updates);
+      await refreshMetadata();
       return updated;
     },
     [refreshMetadata]
   );
 
   const createCustomField = React.useCallback(
-    (data: Omit<TenantCustomField, 'id' | 'created_at'>) => {
-      const created = db.createTenantCustomField(data);
-      refreshMetadata();
+    async (data: Omit<TenantCustomField, 'id' | 'created_at'>) => {
+      const created = await dbService.createTenantCustomField(data);
+      await refreshMetadata();
       return created;
     },
     [refreshMetadata]
   );
 
   const updatePermission = React.useCallback(
-    (role: string, key: string, granted: boolean) => {
-      db.updateRolePermission(tenantId, role, key, granted);
-      refreshMetadata();
+    async (role: string, key: string, granted: boolean) => {
+      if (!tenantId) return;
+      await dbService.updateRolePermission(tenantId, role, key, granted);
+      await refreshMetadata();
     },
     [tenantId, refreshMetadata]
   );
@@ -213,3 +250,4 @@ export function useTenantMetadata() {
   }
   return context;
 }
+

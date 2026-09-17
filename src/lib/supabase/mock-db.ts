@@ -64,7 +64,7 @@ class DatabaseStore {
   public rolePermissions: TenantRolePermission[] = [];
 
   constructor() {
-    this.seed();
+    // Pure empty store: zero hardcoded mock data seeded by default.
   }
 
   public seed() {

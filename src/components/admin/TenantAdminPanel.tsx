@@ -19,13 +19,16 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
 import {
   TenantTaskStatus,
   TenantTaskPriority,
   TenantCustomField,
   TenantRolePermission,
   CustomFieldType,
+  CalendarHoliday,
+  AuditLog,
+  TenantMembership,
 } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,10 +44,10 @@ export function TenantAdminPanel() {
   const [savedSuccess, setSavedSuccess] = React.useState(false);
   const [notificationMsg, setNotificationMsg] = React.useState<string | null>(null);
 
-  const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
+  const tenantId = activeTenant?.id;
 
   // State: Task Statuses
-  const [statuses, setStatuses] = React.useState<TenantTaskStatus[]>(() => db.getTenantTaskStatuses(tenantId));
+  const [statuses, setStatuses] = React.useState<TenantTaskStatus[]>([]);
   const [isAddStatusModalOpen, setIsAddStatusModalOpen] = React.useState(false);
   const [newStatusName, setNewStatusName] = React.useState('');
   const [newStatusSlug, setNewStatusSlug] = React.useState('');
@@ -52,7 +55,7 @@ export function TenantAdminPanel() {
   const [newStatusIsClosed, setNewStatusIsClosed] = React.useState(false);
 
   // State: Task Priorities
-  const [priorities, setPriorities] = React.useState<TenantTaskPriority[]>(() => db.getTenantTaskPriorities(tenantId));
+  const [priorities, setPriorities] = React.useState<TenantTaskPriority[]>([]);
   const [isAddPriorityModalOpen, setIsAddPriorityModalOpen] = React.useState(false);
   const [newPriorityName, setNewPriorityName] = React.useState('');
   const [newPrioritySlug, setNewPrioritySlug] = React.useState('');
@@ -61,7 +64,7 @@ export function TenantAdminPanel() {
   const [newPrioritySlaHours, setNewPrioritySlaHours] = React.useState(24);
 
   // State: Custom Fields
-  const [customFields, setCustomFields] = React.useState<TenantCustomField[]>(() => db.getTenantCustomFields(tenantId));
+  const [customFields, setCustomFields] = React.useState<TenantCustomField[]>([]);
   const [isAddFieldModalOpen, setIsAddFieldModalOpen] = React.useState(false);
   const [newFieldName, setNewFieldName] = React.useState('');
   const [newFieldKey, setNewFieldKey] = React.useState('');
@@ -70,20 +73,84 @@ export function TenantAdminPanel() {
   const [newFieldRequired, setNewFieldRequired] = React.useState(false);
 
   // State: Role Permissions
-  const [permissions, setPermissions] = React.useState<TenantRolePermission[]>(() => db.getTenantRolePermissions(tenantId));
+  const [permissions, setPermissions] = React.useState<TenantRolePermission[]>([]);
+
+  // State: Workspace Members
+  const [members, setMembers] = React.useState<TenantMembership[]>([]);
 
   // Tenant Calendar Settings
-  const tenantCalendar = db.calendars.find(c => c.tenant_id === tenantId) || db.calendars[0];
-  const [weekStart, setWeekStart] = React.useState(tenantCalendar?.week_start_day ?? 1);
-  const [workingDays, setWorkingDays] = React.useState<number[]>(tenantCalendar?.working_days || [1, 2, 3, 4, 5]);
+  const [weekStart, setWeekStart] = React.useState(activeTenant?.week_starts_on ?? 1);
+  const [workingDays, setWorkingDays] = React.useState<number[]>([1, 2, 3, 4, 5]);
 
   // Tenant Holidays
-  const [holidays, setHolidays] = React.useState(db.holidays.filter(h => h.tenant_id === tenantId));
+  const [holidays, setHolidays] = React.useState<CalendarHoliday[]>([]);
   const [newHolidayName, setNewHolidayName] = React.useState('');
   const [newHolidayDate, setNewHolidayDate] = React.useState('2026-12-31');
 
   // Audit Logs
-  const auditLogs = db.auditLogs.filter(l => l.tenant_id === tenantId);
+  const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  // Live Supabase Data Fetching
+  React.useEffect(() => {
+    if (!tenantId) {
+      setStatuses([]);
+      setPriorities([]);
+      setCustomFields([]);
+      setPermissions([]);
+      setHolidays([]);
+      setAuditLogs([]);
+      setMembers([]);
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    async function loadTenantAdminData() {
+      setIsLoading(true);
+      try {
+        const [
+          fetchedStatuses,
+          fetchedPriorities,
+          fetchedCustomFields,
+          fetchedPermissions,
+          fetchedCalendar,
+          fetchedHolidays,
+          fetchedAudit,
+          fetchedMembers,
+        ] = await Promise.all([
+          dbService.getTenantTaskStatuses(tenantId!),
+          dbService.getTenantTaskPriorities(tenantId!),
+          dbService.getTenantCustomFields(tenantId!),
+          dbService.getTenantRolePermissions(tenantId!),
+          dbService.getWorkingCalendar(tenantId!),
+          dbService.getCalendarHolidays(tenantId!),
+          dbService.getAuditLogs(tenantId!),
+          dbService.getTenantMembers(tenantId!),
+        ]);
+
+        if (!isMounted) return;
+        setStatuses(fetchedStatuses);
+        setPriorities(fetchedPriorities);
+        setCustomFields(fetchedCustomFields);
+        setPermissions(fetchedPermissions);
+        if (fetchedCalendar) {
+          setWeekStart(fetchedCalendar.week_start_day ?? 1);
+          setWorkingDays(fetchedCalendar.working_days || [1, 2, 3, 4, 5]);
+        }
+        setHolidays(fetchedHolidays);
+        setAuditLogs(fetchedAudit.logs);
+        setMembers(fetchedMembers);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    loadTenantAdminData();
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantId]);
 
   const showNotification = (msg: string) => {
     setNotificationMsg(msg);
@@ -91,11 +158,11 @@ export function TenantAdminPanel() {
   };
 
   // --- STATUS HANDLERS ---
-  const handleAddStatus = (e: React.FormEvent) => {
+  const handleAddStatus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStatusName.trim() || !newStatusSlug.trim()) return;
+    if (!tenantId || !newStatusName.trim() || !newStatusSlug.trim()) return;
 
-    db.createTenantTaskStatus({
+    await dbService.createTenantTaskStatus({
       tenant_id: tenantId,
       name: newStatusName.trim(),
       slug: newStatusSlug.trim().toLowerCase(),
@@ -106,27 +173,30 @@ export function TenantAdminPanel() {
       is_closed_state: newStatusIsClosed,
     });
 
-    setStatuses([...db.getTenantTaskStatuses(tenantId)]);
-    refreshMetadata();
+    const refreshed = await dbService.getTenantTaskStatuses(tenantId);
+    setStatuses(refreshed);
+    await refreshMetadata();
     setIsAddStatusModalOpen(false);
     setNewStatusName('');
     setNewStatusSlug('');
     showNotification(`Status "${newStatusName}" added to workflow pipeline.`);
   };
 
-  const handleDeleteStatus = (id: string) => {
-    db.deleteTenantTaskStatus(id);
-    setStatuses([...db.getTenantTaskStatuses(tenantId)]);
-    refreshMetadata();
+  const handleDeleteStatus = async (id: string) => {
+    if (!tenantId) return;
+    await dbService.deleteTenantTaskStatus(id);
+    const refreshed = await dbService.getTenantTaskStatuses(tenantId);
+    setStatuses(refreshed);
+    await refreshMetadata();
     showNotification('Workflow status removed.');
   };
 
   // --- PRIORITY HANDLERS ---
-  const handleAddPriority = (e: React.FormEvent) => {
+  const handleAddPriority = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPriorityName.trim() || !newPrioritySlug.trim()) return;
+    if (!tenantId || !newPriorityName.trim() || !newPrioritySlug.trim()) return;
 
-    db.createTenantTaskPriority({
+    await dbService.createTenantTaskPriority({
       tenant_id: tenantId,
       name: newPriorityName.trim(),
       slug: newPrioritySlug.trim().toLowerCase(),
@@ -137,31 +207,34 @@ export function TenantAdminPanel() {
       is_default: false,
     });
 
-    setPriorities([...db.getTenantTaskPriorities(tenantId)]);
-    refreshMetadata();
+    const refreshed = await dbService.getTenantTaskPriorities(tenantId);
+    setPriorities(refreshed);
+    await refreshMetadata();
     setIsAddPriorityModalOpen(false);
     setNewPriorityName('');
     setNewPrioritySlug('');
     showNotification(`Priority "${newPriorityName}" created with ${newPrioritySlaHours}h SLA.`);
   };
 
-  const handleDeletePriority = (id: string) => {
-    db.deleteTenantTaskPriority(id);
-    setPriorities([...db.getTenantTaskPriorities(tenantId)]);
-    refreshMetadata();
+  const handleDeletePriority = async (id: string) => {
+    if (!tenantId) return;
+    await dbService.deleteTenantTaskPriority(id);
+    const refreshed = await dbService.getTenantTaskPriorities(tenantId);
+    setPriorities(refreshed);
+    await refreshMetadata();
     showNotification('Task priority level removed.');
   };
 
   // --- CUSTOM FIELD HANDLERS ---
-  const handleAddCustomField = (e: React.FormEvent) => {
+  const handleAddCustomField = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFieldName.trim() || !newFieldKey.trim()) return;
+    if (!tenantId || !newFieldName.trim() || !newFieldKey.trim()) return;
 
     const options = (newFieldType === 'dropdown' || newFieldType === 'multiselect')
       ? newFieldOptions.split(',').map(s => s.trim()).filter(Boolean)
       : undefined;
 
-    db.createTenantCustomField({
+    await dbService.createTenantCustomField({
       tenant_id: tenantId,
       entity_type: 'task',
       field_name: newFieldName.trim(),
@@ -172,8 +245,9 @@ export function TenantAdminPanel() {
       sort_order: customFields.length + 1,
     });
 
-    setCustomFields([...db.getTenantCustomFields(tenantId)]);
-    refreshMetadata();
+    const refreshed = await dbService.getTenantCustomFields(tenantId);
+    setCustomFields(refreshed);
+    await refreshMetadata();
     setIsAddFieldModalOpen(false);
     setNewFieldName('');
     setNewFieldKey('');
@@ -181,18 +255,22 @@ export function TenantAdminPanel() {
     showNotification(`Custom field "${newFieldName}" registered into JSONB schema.`);
   };
 
-  const handleDeleteCustomField = (id: string) => {
-    db.deleteTenantCustomField(id);
-    setCustomFields([...db.getTenantCustomFields(tenantId)]);
-    refreshMetadata();
+  const handleDeleteCustomField = async (id: string) => {
+    if (!tenantId) return;
+    await dbService.deleteTenantCustomField(id);
+    const refreshed = await dbService.getTenantCustomFields(tenantId);
+    setCustomFields(refreshed);
+    await refreshMetadata();
     showNotification('Custom field removed.');
   };
 
   // --- PERMISSION HANDLERS ---
-  const handleTogglePermission = (role: string, permissionKey: string, currentVal: boolean) => {
-    db.updateRolePermission(tenantId, role, permissionKey, !currentVal);
-    setPermissions([...db.getTenantRolePermissions(tenantId)]);
-    refreshMetadata();
+  const handleTogglePermission = async (role: string, permissionKey: string, currentVal: boolean) => {
+    if (!tenantId) return;
+    await dbService.updateRolePermission(tenantId, role, permissionKey, !currentVal);
+    const refreshed = await dbService.getTenantRolePermissions(tenantId);
+    setPermissions(refreshed);
+    await refreshMetadata();
     showNotification(`Updated permission [${permissionKey}] for role ${role}.`);
   };
 
@@ -205,44 +283,41 @@ export function TenantAdminPanel() {
     }
   };
 
-  const handleAddHoliday = (e: React.FormEvent) => {
+  const handleAddHoliday = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newHolidayName) return;
+    if (!tenantId || !newHolidayName) return;
 
-    const newH = {
-      id: `h-${Date.now()}`,
+    const newH = await dbService.addCalendarHoliday({
       tenant_id: tenantId,
-      calendar_id: tenantCalendar.id,
       name: newHolidayName,
       holiday_date: newHolidayDate,
       date: newHolidayDate,
       is_recurring: true,
-      created_at: new Date().toISOString(),
-    };
+    });
 
-    db.holidays.push(newH);
-    setHolidays([...db.holidays.filter(h => h.tenant_id === tenantId)]);
+    const refreshed = await dbService.getCalendarHolidays(tenantId);
+    setHolidays(refreshed);
     setNewHolidayName('');
     showNotification(`Added holiday "${newH.name}".`);
   };
 
-  const handleDeleteHoliday = (id: string) => {
-    db.holidays = db.holidays.filter(h => h.id !== id);
-    setHolidays([...db.holidays.filter(h => h.tenant_id === tenantId)]);
+  const handleDeleteHoliday = async (id: string) => {
+    if (!tenantId) return;
+    await dbService.deleteCalendarHoliday(id);
+    const refreshed = await dbService.getCalendarHolidays(tenantId);
+    setHolidays(refreshed);
   };
 
-  const handleSaveCalendar = () => {
-    if (tenantCalendar) {
-      tenantCalendar.week_start_day = weekStart;
-      tenantCalendar.working_days = workingDays;
-      if (activeTenant) {
-        activeTenant.week_starts_on = weekStart;
-        activeTenant.weekend_days = [0, 1, 2, 3, 4, 5, 6].filter(d => !workingDays.includes(d));
-      }
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
-      showNotification('Working calendar saved & CPM synced.');
+  const handleSaveCalendar = async () => {
+    if (!tenantId) return;
+    await dbService.saveWorkingCalendar(tenantId, weekStart, workingDays);
+    if (activeTenant) {
+      activeTenant.week_starts_on = weekStart;
+      activeTenant.weekend_days = [0, 1, 2, 3, 4, 5, 6].filter(d => !workingDays.includes(d));
     }
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
+    showNotification('Working calendar saved & CPM synced.');
   };
 
   const days = [
@@ -517,7 +592,7 @@ export function TenantAdminPanel() {
                       <div className="text-[10px] text-[var(--muted-foreground)] font-mono">{perm.key}</div>
                     </td>
                     {ROLES.map((role) => {
-                      const isGranted = db.hasPermission(tenantId, role, perm.key);
+                      const isGranted = permissions.find(p => p.role === role && p.permission_key === perm.key)?.is_granted ?? (role === 'admin' ? true : false);
                       return (
                         <td key={role} className="p-3 text-center">
                           <input
@@ -645,27 +720,33 @@ export function TenantAdminPanel() {
         <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xs">
           <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">Workspace Roster & RLS Scopes</h2>
           <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden">
-            {db.users.map((u) => {
-              const membership = db.memberships.find(m => m.user_id === u.id && m.tenant_id === tenantId);
-              return (
-                <div key={u.id} className="flex items-center justify-between p-3.5 text-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-[var(--secondary)] font-bold flex items-center justify-center text-[var(--foreground)] border border-[var(--border)]">
-                      {u.full_name.substring(0, 2).toUpperCase()}
+            {members.length === 0 ? (
+              <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                No members registered in this workspace yet.
+              </div>
+            ) : (
+              members.map((m) => {
+                const u = m.user;
+                return (
+                  <div key={m.id} className="flex items-center justify-between p-3.5 text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-[var(--secondary)] font-bold flex items-center justify-center text-[var(--foreground)] border border-[var(--border)]">
+                        {u?.full_name ? u.full_name.substring(0, 2).toUpperCase() : 'U'}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-[var(--foreground)]">{u?.full_name || 'Team Member'}</div>
+                        <div className="text-[11px] text-[var(--muted-foreground)] font-mono">{u?.email || m.user_id}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-semibold text-[var(--foreground)]">{u.full_name}</div>
-                      <div className="text-[11px] text-[var(--muted-foreground)] font-mono">{u.email}</div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={m.role === 'guest' ? 'warning' : 'outline'}>
+                        {m.role.replace('_', ' ')}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={membership?.role === 'guest' ? 'warning' : 'outline'}>
-                      {membership?.role?.replace('_', ' ') || 'member'}
-                    </Badge>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}

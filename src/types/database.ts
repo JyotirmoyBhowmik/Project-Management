@@ -352,6 +352,8 @@ export interface ProjectBaseline {
   tenant_id: string;
   name: string;
   description?: string | null;
+  version?: string;
+  snapshot_date?: string;
   created_by?: string | null;
   created_at: string;
 }

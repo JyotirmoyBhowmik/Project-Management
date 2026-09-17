@@ -5,7 +5,7 @@
 // ==============================================================================
 
 import { UserNotification, Task, UserProfile } from '@/types/database';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
 
 export interface NotificationPreferences {
   inApp: boolean;
@@ -32,18 +32,18 @@ export const defaultNotificationPreferences: NotificationPreferences = {
 };
 
 export class NotificationDispatcher {
-  public static dispatch(
+  public static async dispatch(
     data: Omit<UserNotification, 'id' | 'created_at' | 'is_read'>
-  ): UserNotification {
-    return db.createNotification(data);
+  ): Promise<UserNotification> {
+    return dbService.createNotification(data);
   }
 
-  public static notifyTaskAssigned(
+  public static async notifyTaskAssigned(
     task: Task,
     assignee: UserProfile,
     actor: UserProfile,
     tenantId: string
-  ): UserNotification {
+  ): Promise<UserNotification> {
     return this.dispatch({
       tenant_id: tenantId,
       recipient_id: assignee.id,
@@ -56,12 +56,12 @@ export class NotificationDispatcher {
     });
   }
 
-  public static notifyDueSoon(
+  public static async notifyDueSoon(
     task: Task,
     recipient: UserProfile,
     hoursRemaining: number,
     tenantId: string
-  ): UserNotification {
+  ): Promise<UserNotification> {
     return this.dispatch({
       tenant_id: tenantId,
       recipient_id: recipient.id,
@@ -74,12 +74,12 @@ export class NotificationDispatcher {
     });
   }
 
-  public static notifyDependencyResolved(
+  public static async notifyDependencyResolved(
     task: Task,
     predecessorTask: Task,
     recipient: UserProfile,
     tenantId: string
-  ): UserNotification {
+  ): Promise<UserNotification> {
     return this.dispatch({
       tenant_id: tenantId,
       recipient_id: recipient.id,
@@ -92,13 +92,13 @@ export class NotificationDispatcher {
     });
   }
 
-  public static notifyMention(
+  public static async notifyMention(
     task: Task,
     mentionedUser: UserProfile,
     actor: UserProfile,
     snippet: string,
     tenantId: string
-  ): UserNotification {
+  ): Promise<UserNotification> {
     return this.dispatch({
       tenant_id: tenantId,
       recipient_id: mentionedUser.id,

@@ -20,39 +20,11 @@ interface TenantState {
 }
 
 export const useTenantStore = create<TenantState>((set, get) => ({
-  activeTenant: {
-    id: 'a0000000-0000-0000-0000-000000000001',
-    name: 'Acme Corporation',
-    slug: 'acme-corp',
-    tenant_code: 'ACME-CORP',
-    code: 'ACME-CORP',
-    domain: 'acme.pms.internal',
-    is_active: true,
-    status: 'active',
-    week_starts_on: 1,
-    weekend_days: [0, 6],
-    branding_json: {
-      primary_color: '#2563eb',
-      theme_preset: 'navy',
-      company_tagline: 'Industrial Engineering & SaaS',
-    },
-    feature_flags: { cpm_enabled: true, export_enabled: true, audit_enabled: true },
-    storage_quota_mb: 10240,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
-  },
-  activeRole: 'tenant_admin',
-  currentUser: {
-    id: 'b0000000-0000-0000-0000-000000000002',
-    email: 'admin@acme.com',
-    full_name: 'Sarah Connor (Tenant Admin)',
-    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
-    is_superadmin: false,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z',
-  },
+  activeTenant: null,
+  activeRole: '',
+  currentUser: null,
   memberships: [],
-  isLoading: false,
+  isLoading: true,
 
   setActiveTenant: (tenant: Tenant, role: string = 'contributor') => {
     // Sync with cookie for server-side Next.js route resolution

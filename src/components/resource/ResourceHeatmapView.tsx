@@ -31,10 +31,11 @@ import { Button } from '@/components/ui/button';
 
 interface ResourceHeatmapViewProps {
   tasks: Task[];
-  assignees: TaskAssignee[];
-  users: UserProfile[];
+  assignees?: TaskAssignee[];
+  users?: UserProfile[];
   calendar: WorkingCalendar;
   holidays: CalendarHoliday[];
+  tenantId?: string;
 }
 
 export function ResourceHeatmapView({
@@ -47,26 +48,57 @@ export function ResourceHeatmapView({
   const [expandedUsers, setExpandedUsers] = React.useState<Record<string, boolean>>({});
   const [timeRange, setTimeRange] = React.useState<'2weeks' | 'month'>('2weeks');
 
+  const resolvedAssignees = React.useMemo(() => {
+    if (assignees && assignees.length > 0) return assignees;
+    const extracted: TaskAssignee[] = [];
+    tasks.forEach((t) => {
+      if (t.assignees && Array.isArray(t.assignees)) {
+        extracted.push(...t.assignees);
+      }
+    });
+    return extracted;
+  }, [assignees, tasks]);
+
+  const resolvedUsers = React.useMemo(() => {
+    if (users && users.length > 0) return users;
+    const userMap = new Map<string, UserProfile>();
+    resolvedAssignees.forEach((a) => {
+      if (a.user) {
+        userMap.set(a.user.id, a.user);
+      }
+    });
+    return Array.from(userMap.values());
+  }, [users, resolvedAssignees]);
+
   // Compute start and end dates for heatmap window
   const { startDate, endDate } = React.useMemo(() => {
-    // Center around October 2026 where tasks are scheduled
-    const start = '2026-10-01';
-    const end = timeRange === '2weeks' ? '2026-10-15' : '2026-10-31';
-    return { startDate: start, endDate: end };
-  }, [timeRange]);
+    // Dynamic window based on tasks or current month
+    let minDate = '2026-10-01';
+    let maxDate = '2026-10-31';
+    if (tasks.length > 0) {
+      const dates = tasks.flatMap((t) => [t.start_date, t.end_date].filter(Boolean));
+      if (dates.length > 0) {
+        dates.sort();
+        minDate = dates[0];
+        maxDate = dates[dates.length - 1];
+      }
+    }
+    const end = timeRange === '2weeks' ? minDate : maxDate;
+    return { startDate: minDate, endDate: end };
+  }, [timeRange, tasks]);
 
   const heatmap: ResourceHeatmapResult = React.useMemo(() => {
     return computeResourceWorkload(
       startDate,
       endDate,
-      users,
+      resolvedUsers,
       tasks,
-      assignees,
+      resolvedAssignees,
       calendar,
       holidays,
       8 // 8 hours daily capacity
     );
-  }, [startDate, endDate, users, tasks, assignees, calendar, holidays]);
+  }, [startDate, endDate, resolvedUsers, tasks, resolvedAssignees, calendar, holidays]);
 
   const toggleUser = (userId: string) => {
     setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
@@ -83,7 +115,7 @@ export function ResourceHeatmapView({
             <span>Total Team Members</span>
             <Users className="h-4 w-4 text-[var(--primary)]" />
           </div>
-          <div className="text-xl font-bold mt-1 text-[var(--foreground)]">{users.length}</div>
+          <div className="text-xl font-bold mt-1 text-[var(--foreground)]">{resolvedUsers.length}</div>
           <div className="text-[10px] text-[var(--muted-foreground)] mt-0.5">Across current workspace</div>
         </div>
 
@@ -331,9 +363,9 @@ export function ResourceHeatmapView({
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {tasks
-                              .filter((t) => assignees.some((a) => a.task_id === t.id && a.user_id === u.userId))
+                              .filter((t) => resolvedAssignees.some((a) => a.task_id === t.id && a.user_id === u.userId))
                               .map((t) => {
-                                const a = assignees.find((asgn) => asgn.task_id === t.id && asgn.user_id === u.userId);
+                                const a = resolvedAssignees.find((asgn) => asgn.task_id === t.id && asgn.user_id === u.userId);
                                 return (
                                   <div
                                     key={t.id}

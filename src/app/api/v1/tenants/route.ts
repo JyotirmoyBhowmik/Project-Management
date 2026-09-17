@@ -5,7 +5,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, createSuccessResponse } from '@/lib/error/api-handler';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
 import { TenantCreateSchema } from '@/lib/validation/schemas';
 
 export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
@@ -13,34 +13,33 @@ export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
   const lookup = url.searchParams.get('lookup'); // slug or code lookup
 
   if (lookup) {
-    const tenant = db.getTenantBySlugOrCode(lookup);
+    const tenant = await dbService.getTenantBySlugOrCode(lookup);
     return createSuccessResponse(tenant, correlationId);
   }
 
   // Return all tenants for tenant switcher
-  return createSuccessResponse(db.tenants, correlationId);
+  const tenants = await dbService.getAllTenants();
+  return createSuccessResponse(tenants, correlationId);
 });
 
 export const POST = apiHandler(async (req: NextRequest, { correlationId }) => {
   const body = await req.json();
   const validated = TenantCreateSchema.parse(body);
 
-  const newTenant = {
-    ...validated,
-    id: `tenant-${Date.now()}`,
-    tenant_code: validated.code || (validated as { tenant_code?: string }).tenant_code || 'NEW-TENANT',
-    code: validated.code || (validated as { tenant_code?: string }).tenant_code || 'NEW-TENANT',
+  const tenantCode = validated.code || (validated as { tenant_code?: string }).tenant_code || 'NEW-TENANT';
+
+  const newTenant = await dbService.createTenant({
+    name: validated.name,
+    code: tenantCode,
+    tenant_code: tenantCode,
+    slug: validated.slug,
+    domain: validated.domain || null,
     is_active: true,
     week_starts_on: 1,
     weekend_days: [0, 6],
-    domain: validated.domain || null,
-    status: 'active' as const,
+    status: 'active',
     feature_flags: { cpm_enabled: true, export_enabled: true, audit_enabled: true },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-
-  db.tenants.push(newTenant);
+  });
 
   return createSuccessResponse(newTenant, correlationId, 201);
 });

@@ -39,12 +39,12 @@ interface InteractiveGanttProps {
   holidays: CalendarHoliday[];
   baselineSnapshots?: TaskBaselineSnapshot[];
   activeTaskMap?: Record<string, CollaboratorPresence[]>;
-  onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
-  onAddDependency: (dep: { predecessor_id: string; successor_id: string; type: 'FS' | 'SS' | 'FF' | 'SF'; lag_days: number }) => void;
-  onAddTask: (task: { title: string; start_date: string; duration_days: number; priority: string; is_milestone: boolean }) => void;
-  onRecalculateCPM: () => void;
-  onOpenExportModal: () => void;
-  onOpenImportModal: () => void;
+  onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
+  onAddDependency?: (dep: { predecessor_id: string; successor_id: string; type: 'FS' | 'SS' | 'FF' | 'SF'; lag_days: number }) => void;
+  onAddTask?: (task: { title: string; start_date: string; duration_days: number; priority: string; is_milestone: boolean }) => void;
+  onRecalculateCPM?: () => void;
+  onOpenExportModal?: () => void;
+  onOpenImportModal?: () => void;
 }
 
 export function InteractiveGantt({
@@ -189,7 +189,7 @@ export function InteractiveGantt({
       newStart.setUTCDate(newStart.getUTCDate() + deltaDays);
       const newEnd = addWorkingDays(newStart, task.duration_days, calendar, holidays);
 
-      onTaskUpdate(task.id, {
+      onTaskUpdate?.(task.id, {
         start_date: formatDateToISO(newStart),
         end_date: formatDateToISO(newEnd),
       });
@@ -198,7 +198,7 @@ export function InteractiveGantt({
       const start = parseISODate(task.start_date);
       const newEnd = addWorkingDays(start, newDuration, calendar, holidays);
 
-      onTaskUpdate(task.id, {
+      onTaskUpdate?.(task.id, {
         duration_days: newDuration,
         end_date: formatDateToISO(newEnd),
       });
@@ -225,7 +225,7 @@ export function InteractiveGantt({
       else if (sourceHandle === 'finish' && targetHandle === 'finish') type = 'FF';
       else if (sourceHandle === 'start' && targetHandle === 'finish') type = 'SF';
 
-      onAddDependency({
+      onAddDependency?.({
         predecessor_id: sourceTaskId,
         successor_id: targetTaskId,
         type,
@@ -239,7 +239,7 @@ export function InteractiveGantt({
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
-    onAddTask({
+    onAddTask?.({
       title: newTaskTitle,
       start_date: newTaskStartDate,
       duration_days: newTaskIsMilestone ? 0 : newTaskDuration,
@@ -288,7 +288,7 @@ export function InteractiveGantt({
 
           {/* Recalculate CPM Button */}
           <button
-            onClick={onRecalculateCPM}
+            onClick={() => onRecalculateCPM?.()}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors cursor-pointer"
             title="Recalculate Early/Late Schedules & Critical Slack"
           >
@@ -302,7 +302,7 @@ export function InteractiveGantt({
           <Button
             size="sm"
             variant="outline"
-            onClick={onOpenExportModal}
+            onClick={() => onOpenExportModal?.()}
             className="gap-1.5 text-xs"
           >
             <Download className="h-3.5 w-3.5" />
@@ -312,7 +312,7 @@ export function InteractiveGantt({
           <Button
             size="sm"
             variant="outline"
-            onClick={onOpenImportModal}
+            onClick={() => onOpenImportModal?.()}
             className="gap-1.5 text-xs"
           >
             <Upload className="h-3.5 w-3.5" />

@@ -5,17 +5,27 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { apiHandler } from '@/lib/error/api-handler';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
+import { Task } from '@/types/database';
 
 export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
   const url = req.nextUrl;
-  const projectId = url.searchParams.get('projectId') || 'd0000000-0000-0000-0000-000000000001';
+  const projectId = url.searchParams.get('projectId');
   const format = url.searchParams.get('format') || 'json';
-  const tenantId = req.headers.get('x-tenant-id') || 'a0000000-0000-0000-0000-000000000001';
+  const tenantId = req.headers.get('x-tenant-id') || url.searchParams.get('tenant_id') || url.searchParams.get('tenantId');
 
-  const project = db.projects.find(p => p.id === projectId);
-  const tasks = db.getProjectTasksWithRelations(projectId, tenantId);
-  const dependencies = db.dependencies.filter(d => d.project_id === projectId);
+  if (!projectId || !tenantId) {
+    return NextResponse.json(
+      { error: 'Missing required parameters: projectId and tenantId' },
+      { status: 400 }
+    );
+  }
+
+  const [project, tasks, dependencies] = await Promise.all([
+    dbService.getProjectDetails(projectId, tenantId),
+    dbService.getTasksForProject(projectId, tenantId),
+    dbService.getDependenciesForProject(projectId, tenantId),
+  ]);
 
   const exportPayload = {
     system: 'Antigravity Enterprise PMS',
@@ -30,7 +40,7 @@ export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
   if (format === 'csv') {
     // Generate CSV data string
     const headers = ['ID', 'Title', 'Status', 'Priority', 'Start Date', 'End Date', 'Duration (Days)', 'Progress %', 'Critical Path'];
-    const rows = tasks.map(t => [
+    const rows = tasks.map((t: Task) => [
       t.id,
       `"${t.title.replace(/"/g, '""')}"`,
       t.status,
@@ -38,11 +48,11 @@ export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
       t.start_date,
       t.end_date,
       t.duration_days,
-      `${t.progress_percent}%`,
+      `${t.progress ?? t.progress_percent ?? 0}%`,
       t.is_critical ? 'YES' : 'NO',
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const csvContent = [headers.join(','), ...rows.map((r: (string | number)[]) => r.join(','))].join('\n');
 
     return new NextResponse(csvContent, {
       status: 200,

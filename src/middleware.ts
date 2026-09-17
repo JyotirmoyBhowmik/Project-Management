@@ -1,91 +1,112 @@
 // ==============================================================================
 // src/middleware.ts
-// Next.js Edge Middleware: Tenant Resolution, Correlation Tracing & Guest Route Trapping
+// Next.js Edge Middleware: Mandatory Authentication & Tenant Routing Gateway
+// Strictly redirects unauthenticated requests to /login (Zero Mock Leakage)
 // ==============================================================================
 
 import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 
-export function middleware(request: NextRequest) {
-  const requestHeaders = new Headers(request.headers);
-
-  // 1. Distributed Tracing: Extract or Generate Unique Correlation ID (Rule 4.2)
-  const existingCorrId =
-    request.headers.get('x-correlation-id') ||
-    request.headers.get('x-request-id');
-  const correlationId = existingCorrId || `corr-${crypto.randomUUID()}`;
-  requestHeaders.set('x-correlation-id', correlationId);
-
-  // 2. Multi-Tenancy Resolution (Domain / Subdomain / Cookie / Header)
-  const host = request.headers.get('host') || '';
-  const url = request.nextUrl.clone();
-  const queryTenant = url.searchParams.get('tenant');
-  const cookieTenant = request.cookies.get('pms_active_tenant_id')?.value;
-
-  let resolvedTenantId = cookieTenant || 'a0000000-0000-0000-0000-000000000001';
-
-  // Subdomain parsing (e.g. acme.pms.internal)
-  if (host.includes('.') && !host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
-    const subdomain = host.split('.')[0].toLowerCase();
-    if (subdomain === 'globex') {
-      resolvedTenantId = 'a0000000-0000-0000-0000-000000000002';
-    }
-  }
-
-  if (queryTenant) {
-    if (queryTenant.toUpperCase() === 'GLOBEX') {
-      resolvedTenantId = 'a0000000-0000-0000-0000-000000000002';
-    } else if (queryTenant.toUpperCase() === 'ACME-CORP') {
-      resolvedTenantId = 'a0000000-0000-0000-0000-000000000001';
-    }
-  }
-
-  requestHeaders.set('x-tenant-id', resolvedTenantId);
-
-  // 3. Guest Trapping & Scoped Access Guard
-  const userRole = request.cookies.get('pms_user_role')?.value || 'tenant_admin';
-  const pathname = request.nextUrl.pathname;
-
-  // Guest accounts are strictly forbidden from accessing Tenant Admin and SuperAdmin panels
-  if (userRole === 'guest' && (pathname.startsWith('/admin') || pathname.startsWith('/api/v1/admin'))) {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json(
-        {
-          timestamp: new Date().toISOString(),
-          status_code: 403,
-          error_code: 'GUEST_ACCESS_RESTRICTED',
-          correlation_id: correlationId,
-          message: 'Guest accounts are strictly prohibited from accessing administrative control panels.',
-        },
-        { status: 403, headers: { 'x-correlation-id': correlationId } }
-      );
-    }
-    // Trapping redirect for web navigation
-    url.pathname = '/projects';
-    return NextResponse.redirect(url);
-  }
-
-  const response = NextResponse.next({
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
     request: {
-      headers: requestHeaders,
+      headers: request.headers,
     },
   });
 
-  // Echo correlation ID back in client response
+  // 1. Correlation ID Tracing (Rule 4.2)
+  const correlationId =
+    request.headers.get('x-correlation-id') ||
+    request.headers.get('x-request-id') ||
+    `corr-${crypto.randomUUID()}`;
   response.headers.set('x-correlation-id', correlationId);
-  response.headers.set('x-tenant-id', resolvedTenantId);
 
-  return response;
+  const pathname = request.nextUrl.pathname;
+
+  // 2. Public Route Whitelist
+  if (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api/cron') ||
+    pathname.includes('.') // static assets, favicon, logos
+  ) {
+    return response;
+  }
+
+  // 3. Subdomain Tenant Extraction (e.g. acme.pms.jyotirmoyb.com -> acme)
+  const host = request.headers.get('host') || '';
+  if (host.includes('.') && !host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
+    const parts = host.split('.');
+    if (parts.length >= 3) {
+      const subdomain = parts[0].toLowerCase();
+      if (subdomain !== 'www' && subdomain !== 'app' && subdomain !== 'pms') {
+        response.headers.set('x-tenant-slug', subdomain);
+      }
+    }
+  }
+
+  // 4. Supabase Session Check
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Database credentials pending; route to login with setup prompt
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
+  }
+
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet: Array<{ name: string; value: string; options?: any }>) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // If unauthenticated, immediately redirect to /login
+    if (!user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = '/login';
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // Pass user ID downstream
+    response.headers.set('x-user-id', user.id);
+    return response;
+  } catch (err) {
+    // Fallback safe redirect on any authentication session error
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    return NextResponse.redirect(loginUrl);
+  }
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

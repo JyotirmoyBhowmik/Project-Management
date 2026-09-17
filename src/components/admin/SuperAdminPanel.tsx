@@ -19,8 +19,9 @@ import {
   Activity,
   Sparkles,
 } from 'lucide-react';
-import { db } from '@/lib/supabase/mock-db';
-import { SystemTheme, ThemeTokens, Tenant } from '@/types/database';
+import { dbService, DEFAULT_THEME_TOKENS, DEFAULT_SYSTEM_THEMES } from '@/lib/supabase/db-service';
+import { createClient } from '@/lib/supabase/client';
+import { SystemTheme, ThemeTokens, Tenant, AuditLog } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -29,9 +30,9 @@ import { Tabs } from '@/components/ui/tabs';
 
 export function SuperAdminPanel() {
   const [activeTab, setActiveTab] = React.useState<'tenants' | 'themes' | 'features' | 'audit'>('tenants');
-  const [tenants, setTenants] = React.useState<Tenant[]>([...db.tenants]);
-  const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>([...db.getSystemThemes()]);
-  const [auditLogs, setAuditLogs] = React.useState([...db.auditLogs]);
+  const [tenants, setTenants] = React.useState<Tenant[]>([]);
+  const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>(DEFAULT_SYSTEM_THEMES);
+  const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
   const [isProvisionModalOpen, setIsProvisionModalOpen] = React.useState(false);
   const [notificationMsg, setNotificationMsg] = React.useState<string | null>(null);
 
@@ -44,10 +45,35 @@ export function SuperAdminPanel() {
 
   // Theme Customizer State
   const [selectedThemeId, setSelectedThemeId] = React.useState<string>('navy');
-  const [editingTokens, setEditingTokens] = React.useState<ThemeTokens>(() => {
-    const th = db.systemThemes.find(t => t.id === 'navy') || db.systemThemes[0];
-    return { ...th.tokens_json };
-  });
+  const [editingTokens, setEditingTokens] = React.useState<ThemeTokens>(DEFAULT_THEME_TOKENS);
+
+  // Live Supabase Loading
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadSuperAdminData() {
+      try {
+        const [fetchedTenants, fetchedThemes, fetchedAudit] = await Promise.all([
+          dbService.getAllTenants(),
+          dbService.getSystemThemes(),
+          dbService.getAuditLogs(),
+        ]);
+        if (!isMounted) return;
+        setTenants(fetchedTenants);
+        setSystemThemes(fetchedThemes);
+        setAuditLogs(fetchedAudit.logs);
+        if (fetchedThemes.length > 0) {
+          const navy = fetchedThemes.find(t => t.id === 'navy') || fetchedThemes[0];
+          setEditingTokens({ ...navy.tokens_json });
+        }
+      } catch (err) {
+        // Graceful handling
+      }
+    }
+    loadSuperAdminData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const showNotification = (msg: string) => {
     setNotificationMsg(msg);
@@ -69,20 +95,20 @@ export function SuperAdminPanel() {
     }));
   };
 
-  const handleSaveTheme = () => {
-    const updated = db.updateSystemTheme(selectedThemeId, {
+  const handleSaveTheme = async () => {
+    const updated = await dbService.updateSystemTheme(selectedThemeId, {
       tokens_json: editingTokens,
     });
-    setSystemThemes([...db.getSystemThemes()]);
-    showNotification(`System Theme "${updated.name}" updated successfully across all tenants.`);
+    const refreshed = await dbService.getSystemThemes();
+    setSystemThemes(refreshed);
+    showNotification(`System Theme "${updated?.name || selectedThemeId}" updated successfully across all tenants.`);
   };
 
-  const handleProvisionTenant = (e: React.FormEvent) => {
+  const handleProvisionTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !code || !slug) return;
 
-    const newTenant: Tenant = {
-      id: `tenant-${Date.now()}`,
+    const newTenant = await dbService.createTenant({
       name,
       code: code.toUpperCase(),
       tenant_code: code.toUpperCase(),
@@ -106,69 +132,74 @@ export function SuperAdminPanel() {
         resource_heatmap_enabled: true,
       },
       storage_quota_mb: storageQuota,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    });
 
-    db.tenants.push(newTenant);
-    db.seedTenantMetadata(newTenant.id);
-    setTenants([...db.tenants]);
+    const refreshed = await dbService.getAllTenants();
+    setTenants(refreshed);
     setIsProvisionModalOpen(false);
 
     setName('');
     setCode('');
     setSlug('');
     setDomain('');
-    showNotification(`Tenant "${newTenant.name}" provisioned with isolated database boundary.`);
+    showNotification(`Tenant "${newTenant?.name || name}" provisioned with isolated database boundary.`);
   };
 
-  const toggleTenantStatus = (tenantId: string) => {
-    const target = db.tenants.find(t => t.id === tenantId);
+  const toggleTenantStatus = async (tenantId: string) => {
+    const target = tenants.find(t => t.id === tenantId);
     if (target) {
-      target.status = target.status === 'active' ? 'suspended' : 'active';
-      target.is_active = target.status === 'active';
-      setTenants([...db.tenants]);
-      showNotification(`Tenant ${target.code} status changed to ${target.status.toUpperCase()}.`);
+      const newStatus = target.status === 'active' ? 'suspended' : 'active';
+      const supabase = createClient();
+      await supabase.from('tenants').update({ status: newStatus, is_active: newStatus === 'active' }).eq('id', tenantId);
+      const refreshed = await dbService.getAllTenants();
+      setTenants(refreshed);
+      showNotification(`Tenant ${target.code} status changed to ${newStatus.toUpperCase()}.`);
     }
   };
 
-  const toggleFeatureFlag = (tenantId: string, flag: string) => {
-    const target = db.tenants.find(t => t.id === tenantId);
+  const toggleFeatureFlag = async (tenantId: string, flag: string) => {
+    const target = tenants.find(t => t.id === tenantId);
     if (target) {
-      if (!target.feature_flags) {
-        target.feature_flags = {
+      const flags = {
+        ...(target.feature_flags || {
           cpm_enabled: true,
           export_enabled: true,
           audit_enabled: true,
           custom_fields_enabled: true,
           resource_heatmap_enabled: true,
-        };
-      }
-      target.feature_flags[flag] = !target.feature_flags[flag];
-      setTenants([...db.tenants]);
+        }),
+        [flag]: !target.feature_flags?.[flag],
+      };
+      const supabase = createClient();
+      await supabase.from('tenants').update({ feature_flags: flags }).eq('id', tenantId);
+      const refreshed = await dbService.getAllTenants();
+      setTenants(refreshed);
       showNotification(`Updated feature flag [${flag}] for ${target.code}.`);
     }
   };
 
-  const handleCloneTenant = (sourceTenant: Tenant) => {
+  const handleCloneTenant = async (sourceTenant: Tenant) => {
     const clonedCode = `${sourceTenant.code}-COPY`;
     const clonedSlug = `${sourceTenant.slug}-copy`;
-    const clonedTenant: Tenant = {
-      ...sourceTenant,
-      id: `tenant-${Date.now()}`,
+
+    const cloned = await dbService.createTenant({
       name: `${sourceTenant.name} (Clone)`,
       code: clonedCode,
       tenant_code: clonedCode,
       slug: clonedSlug,
       domain: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      is_active: true,
+      week_starts_on: sourceTenant.week_starts_on,
+      weekend_days: sourceTenant.weekend_days,
+      status: 'active',
+      branding_json: sourceTenant.branding_json,
+      feature_flags: sourceTenant.feature_flags,
+      storage_quota_mb: sourceTenant.storage_quota_mb,
+    });
 
-    db.tenants.push(clonedTenant);
-    db.seedTenantMetadata(clonedTenant.id);
-    setTenants([...db.tenants]);
-    showNotification(`Cloned tenant ${sourceTenant.name} -> ${clonedTenant.name}.`);
+    const refreshed = await dbService.getAllTenants();
+    setTenants(refreshed);
+    showNotification(`Cloned tenant ${sourceTenant.name} -> ${cloned?.name || clonedCode}.`);
   };
 
   return (

@@ -5,32 +5,25 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, createSuccessResponse } from '@/lib/error/api-handler';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
 
 export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
-  const tenantId = req.headers.get('x-tenant-id') || 'a0000000-0000-0000-0000-000000000001';
+  const tenantId = req.headers.get('x-tenant-id') || req.nextUrl.searchParams.get('tenant_id') || undefined;
   const url = req.nextUrl;
   const page = parseInt(url.searchParams.get('page') || '1', 10);
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);
 
-  const filteredLogs = db.auditLogs.filter(log => log.tenant_id === tenantId);
-  const total = filteredLogs.length;
-
-  const startIndex = (page - 1) * limit;
-  const paginated = filteredLogs.slice(startIndex, startIndex + limit).map(log => ({
-    ...log,
-    actor: db.users.find(u => u.id === log.actor_id),
-  }));
+  const { logs, total } = await dbService.getAuditLogs(tenantId, undefined, limit, page);
 
   return createSuccessResponse(
-    paginated,
+    logs,
     correlationId,
     200,
     {
       page,
       limit,
       total,
-      hasMore: startIndex + limit < total,
+      hasMore: page * limit < total,
     }
   );
 });

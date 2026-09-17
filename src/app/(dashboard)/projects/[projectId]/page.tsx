@@ -1,7 +1,14 @@
+// ==============================================================================
+// src/app/(dashboard)/projects/[projectId]/page.tsx
+// Active Project Workspace (100% Live Supabase PostgreSQL Data)
+// Interactive Gantt, CPM Engine, Kanban, Grid, Baselines & Clean Empty States
+// ==============================================================================
+
 'use client';
 
 import * as React from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   GanttChartSquare,
   Kanban,
@@ -17,9 +24,14 @@ import {
   Users,
   Bookmark,
   Check,
+  Plus,
+  ArrowLeft,
+  Loader2,
+  FolderGit2,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
-import { db } from '@/lib/supabase/mock-db';
+import { createClient } from '@/lib/supabase/client';
+import { dbService } from '@/lib/supabase/db-service';
 import {
   Task,
   TaskDependency,
@@ -28,6 +40,8 @@ import {
   CalendarHoliday,
   ProjectBaseline,
   TaskBaselineSnapshot,
+  TaskPriority,
+  TaskStatus,
 } from '@/types/database';
 import { Tabs } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -41,407 +55,580 @@ import { ProjectCalendarView } from '@/components/calendar/ProjectCalendarView';
 import { ResourceHeatmapView } from '@/components/resource/ResourceHeatmapView';
 import { ImportExportModal } from '@/components/exchange/ImportExportModal';
 import { useProjectPresence } from '@/lib/realtime/presence-service';
+import { calculateCPM } from '@/lib/cpm/cpm-engine';
 
 export default function ProjectWorkspacePage() {
   const params = useParams();
-  const projectId = (params?.projectId as string) || 'd0000000-0000-0000-0000-000000000001';
+  const router = useRouter();
+  const projectId = params?.projectId as string;
+  const supabase = createClient();
 
   const { activeTenant, activeRole, currentUser } = useTenantStore();
   const [activeView, setActiveView] = React.useState<'gantt' | 'kanban' | 'grid' | 'calendar' | 'resource'>('gantt');
 
-  // Local state initialized from db
   const [project, setProject] = React.useState<Project | null>(null);
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [dependencies, setDependencies] = React.useState<TaskDependency[]>([]);
-  const [calendar, setCalendar] = React.useState<WorkingCalendar>(db.calendars[0]);
+  const [calendar, setCalendar] = React.useState<WorkingCalendar>({
+    working_days: [1, 2, 3, 4, 5],
+    weekend_days: [0, 6],
+    daily_working_hours: 8,
+    is_default: true,
+  });
   const [holidays, setHolidays] = React.useState<CalendarHoliday[]>([]);
-
-  // Baselines State
   const [baselines, setBaselines] = React.useState<ProjectBaseline[]>([]);
   const [selectedBaselineId, setSelectedBaselineId] = React.useState<string | null>(null);
-  const [isBaselineModalOpen, setIsBaselineModalOpen] = React.useState(false);
-  const [newBaselineName, setNewBaselineName] = React.useState('');
-  const [newBaselineDescription, setNewBaselineDescription] = React.useState('');
+  const [baselineSnapshots, setBaselineSnapshots] = React.useState<TaskBaselineSnapshot[]>([]);
+
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isCpmCalculating, setIsCpmCalculating] = React.useState(false);
 
   // Modals state
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = React.useState(false);
+  const [isLockBaselineModalOpen, setIsLockBaselineModalOpen] = React.useState(false);
   const [exchangeMode, setExchangeMode] = React.useState<'import' | 'export' | null>(null);
+
+  // New Task Form
+  const [newTaskTitle, setNewTaskTitle] = React.useState('');
+  const [newTaskCode, setNewTaskCode] = React.useState('');
+  const [newTaskDuration, setNewTaskDuration] = React.useState(5);
+  const [newTaskStart, setNewTaskStart] = React.useState(new Date().toISOString().split('T')[0]);
+  const [newTaskPriority, setNewTaskPriority] = React.useState<TaskPriority>('medium');
+  const [isSubmittingTask, setIsSubmittingTask] = React.useState(false);
+
+  // Baseline Form
+  const [baselineName, setBaselineName] = React.useState('');
+  const [isLockingBaseline, setIsLockingBaseline] = React.useState(false);
+
+  const tenantId = activeTenant?.id;
+  const userId = currentUser?.id;
 
   // Real-Time Collaboration Presence
   const { collaborators, activeTaskMap } = useProjectPresence(projectId, currentUser);
 
-  // Load project and tasks data
-  const refreshProjectData = React.useCallback(() => {
-    const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
-    const userId = currentUser?.id || 'b0000000-0000-0000-0000-000000000002';
+  // Load project data
+  const refreshProjectData = React.useCallback(async () => {
+    if (!projectId || !tenantId) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      const prj = db.getProject(projectId, tenantId, userId, activeRole);
+      setIsLoading(true);
+
+      const [prj, prjTasks, prjDeps, prjCal, prjHols, prjBaselines] = await Promise.all([
+        dbService.getProjectDetails(projectId, tenantId, supabase),
+        dbService.getProjectTasks(projectId, tenantId, supabase),
+        dbService.getProjectDependencies(projectId, tenantId, supabase),
+        dbService.getWorkingCalendar(tenantId, null, supabase),
+        dbService.getCalendarHolidays(tenantId, supabase),
+        dbService.getProjectBaselines(projectId, tenantId, supabase),
+      ]);
+
       setProject(prj);
+      setTasks(prjTasks);
+      setDependencies(prjDeps);
+      setCalendar(prjCal);
+      setHolidays(prjHols);
+      setBaselines(prjBaselines);
 
-      const prjTasks = db.getProjectTasksWithRelations(projectId, tenantId);
-      setTasks([...prjTasks]);
-
-      const prjDeps = db.dependencies.filter(d => d.project_id === projectId && d.tenant_id === tenantId);
-      setDependencies([...prjDeps]);
-
-      const cal = db.calendars.find(c => c.id === prj.calendar_id) || db.calendars[0];
-      setCalendar(cal);
-
-      const hols = db.holidays.filter(h => h.tenant_id === tenantId);
-      setHolidays(hols);
-
-      const bls = db.getProjectBaselines(projectId, tenantId);
-      setBaselines([...bls]);
-      if (bls.length > 0 && !selectedBaselineId) {
-        setSelectedBaselineId(bls[0].id);
+      if (prjBaselines.length > 0 && !selectedBaselineId) {
+        setSelectedBaselineId(prjBaselines[0].id);
       }
     } catch (err) {
-      console.error('Failed to load project:', err);
+      console.error('Failed loading project workspace:', err);
+    } finally {
+      setIsLoading(false);
     }
-  }, [projectId, activeTenant, currentUser, activeRole, selectedBaselineId]);
+  }, [projectId, tenantId, selectedBaselineId]);
 
   React.useEffect(() => {
     refreshProjectData();
   }, [refreshProjectData]);
 
-  // Baseline snapshots for Gantt Ghost Variance visualization
-  const baselineSnapshots: TaskBaselineSnapshot[] = React.useMemo(() => {
-    if (!selectedBaselineId) return [];
-    return db.getBaselineSnapshots(selectedBaselineId);
-  }, [selectedBaselineId, baselines]);
-
-  // Task Update Handler (Optimistic with CPM sync)
-  const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
-    const actorId = currentUser?.id || 'b0000000-0000-0000-0000-000000000002';
-    const correlationId = `corr-${Date.now()}`;
-
-    try {
-      db.updateTask(taskId, updates, actorId, correlationId);
-      refreshProjectData();
-    } catch (err) {
-      console.error('Task update failed:', err);
+  // Load baseline snapshots when selected baseline changes
+  React.useEffect(() => {
+    async function loadSnapshots() {
+      if (!selectedBaselineId) {
+        setBaselineSnapshots([]);
+        return;
+      }
+      const snaps = await dbService.getBaselineSnapshots(selectedBaselineId, supabase);
+      setBaselineSnapshots(snaps);
     }
-  };
+    loadSnapshots();
+  }, [selectedBaselineId]);
 
-  // Add Dependency Handler
-  const handleAddDependency = (depData: {
-    predecessor_id: string;
-    successor_id: string;
-    type: 'FS' | 'SS' | 'FF' | 'SF';
-    lag_days: number;
-  }) => {
-    const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
-    const actorId = currentUser?.id || 'b0000000-0000-0000-0000-000000000002';
-    const correlationId = `corr-${Date.now()}`;
-
-    try {
-      db.addDependency(
-        {
-          ...depData,
-          project_id: projectId,
-          tenant_id: tenantId,
-        },
-        actorId,
-        correlationId
-      );
-      refreshProjectData();
-    } catch (err) {
-      alert((err as Error).message || 'Failed to create dependency');
-    }
-  };
-
-  // Add Task Handler (Dynamic Priority)
-  const handleAddTask = (newTask: {
-    title: string;
-    start_date: string;
-    duration_days: number;
-    priority: string;
-    is_milestone: boolean;
-  }) => {
-    const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
-    const actorId = currentUser?.id || 'b0000000-0000-0000-0000-000000000002';
-    const correlationId = `corr-${Date.now()}`;
-
-    try {
-      db.createTask(
-        {
-          ...newTask,
-          priority: newTask.priority as any,
-          project_id: projectId,
-          tenant_id: tenantId,
-          phase_id: null,
-          parent_id: null,
-          description: null,
-          status: 'todo',
-          end_date: newTask.start_date, // will be computed in CPM
-          progress_percent: 0,
-          order_index: tasks.length + 1,
-          created_by: actorId,
-        },
-        actorId,
-        correlationId
-      );
-      refreshProjectData();
-    } catch (err) {
-      console.error('Failed to create task:', err);
-    }
-  };
-
-  // Explicit CPM Recalculate Trigger
-  const handleRecalculateCPM = () => {
-    const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
-    db.recalculateProjectCPM(projectId, tenantId);
-    refreshProjectData();
-  };
-
-  // Create Baseline Handler
-  const handleCreateBaseline = (e: React.FormEvent) => {
+  // Task Creation Handler
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBaselineName.trim()) return;
+    if (!newTaskTitle.trim() || !projectId || !tenantId) return;
 
-    const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
-    const actorId = currentUser?.id || 'b0000000-0000-0000-0000-000000000002';
+    setIsSubmittingTask(true);
+    try {
+      const taskCode = newTaskCode.trim() || `TSK-${tasks.length + 1}`;
+      await dbService.createTask(
+        {
+          project_id: projectId,
+          tenant_id: tenantId,
+          title: newTaskTitle.trim(),
+          code: taskCode.toUpperCase(),
+          duration_days: Number(newTaskDuration) || 1,
+          start_date: newTaskStart,
+          end_date: newTaskStart,
+          priority: newTaskPriority,
+          status: 'todo',
+          progress: 0,
+          is_milestone: Number(newTaskDuration) === 0,
+          order_index: tasks.length + 1,
+          created_by: userId || null,
+        },
+        supabase
+      );
 
-    const created = db.createProjectBaseline(
-      projectId,
-      newBaselineName.trim(),
-      tenantId,
-      actorId,
-      newBaselineDescription.trim() || undefined
-    );
-
-    setSelectedBaselineId(created.id);
-    setIsBaselineModalOpen(false);
-    setNewBaselineName('');
-    setNewBaselineDescription('');
-    refreshProjectData();
+      setIsAddTaskModalOpen(false);
+      setNewTaskTitle('');
+      setNewTaskCode('');
+      await refreshProjectData();
+    } catch (err) {
+      console.error('Failed creating task:', err);
+    } finally {
+      setIsSubmittingTask(false);
+    }
   };
 
-  const criticalTasksCount = tasks.filter(t => t.is_critical).length;
+  // Run CPM Calculation
+  const handleRunCPM = async () => {
+    if (tasks.length === 0 || !tenantId) return;
 
-  if (!project) {
+    setIsCpmCalculating(true);
+    try {
+      const cpmResult = calculateCPM(tasks, dependencies, calendar, holidays);
+
+      // Persist computed CPM values to Supabase
+      await Promise.all(
+        cpmResult.tasks.map((t) =>
+          dbService.updateTask(
+            t.id,
+            {
+              early_start: t.early_start,
+              early_finish: t.early_finish,
+              late_start: t.late_start,
+              late_finish: t.late_finish,
+              total_float: t.total_float,
+              free_float: t.free_float,
+              is_critical: t.is_critical,
+            },
+            supabase
+          )
+        )
+      );
+
+      await refreshProjectData();
+    } catch (err) {
+      console.error('CPM execution failed:', err);
+    } finally {
+      setIsCpmCalculating(false);
+    }
+  };
+
+  // Lock Baseline Snapshot
+  const handleLockBaseline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!baselineName.trim() || !projectId || !tenantId) return;
+
+    setIsLockingBaseline(true);
+    try {
+      const newBaseline = await dbService.createBaselineSnapshot(
+        projectId,
+        tenantId,
+        baselineName.trim(),
+        tasks,
+        userId || undefined,
+        supabase
+      );
+
+      if (newBaseline) {
+        setSelectedBaselineId(newBaseline.id);
+      }
+      setIsLockBaselineModalOpen(false);
+      setBaselineName('');
+      await refreshProjectData();
+    } catch (err) {
+      console.error('Failed creating baseline:', err);
+    } finally {
+      setIsLockingBaseline(false);
+    }
+  };
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64 text-xs text-[var(--muted-foreground)]">
-        Loading project workspace...
+      <div className="h-96 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+        <p className="text-xs font-medium text-[var(--muted-foreground)]">
+          Loading project schedule and critical path data...
+        </p>
       </div>
     );
   }
 
+  // Project Not Found Screen
+  if (!project) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] p-12 text-center space-y-4 max-w-lg mx-auto mt-12">
+        <div className="h-12 w-12 rounded-full bg-[var(--secondary)] flex items-center justify-center mx-auto text-[var(--muted-foreground)]">
+          <FolderGit2 className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-[var(--foreground)]">Project Not Found</h2>
+        <p className="text-xs text-[var(--muted-foreground)]">
+          The requested project does not exist in this workspace or you do not have permission to access it.
+        </p>
+        <Link href="/projects">
+          <Button variant="outline" className="gap-2 text-xs">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Return to Projects Portfolio</span>
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const criticalTasksCount = tasks.filter((t) => t.is_critical).length;
+
   return (
-    <div className="flex flex-col h-[calc(100vh-6.5rem)] space-y-4">
-      {/* 1. Project Title and Meta Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
+    <div className="space-y-5">
+      {/* Project Header Banner */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Link
+              href="/projects"
+              className="text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--primary)] flex items-center gap-1 transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Projects</span>
+            </Link>
+            <span className="text-[var(--muted-foreground)]">/</span>
             <Badge variant="outline" className="font-mono text-[10px]">
               {project.code}
             </Badge>
-            <Badge variant={project.status === 'active' ? 'success' : 'secondary'} className="capitalize text-[10px]">
+            <Badge variant={project.status === 'active' ? 'success' : 'secondary'} className="text-[10px]">
               {project.status}
             </Badge>
             {criticalTasksCount > 0 && (
-              <Badge variant="critical" className="gap-1 text-[10px] py-0 px-2">
+              <Badge variant="destructive" className="gap-1 text-[10px] font-mono">
                 <Flame className="h-3 w-3" />
-                {criticalTasksCount} Critical Tasks
+                <span>{criticalTasksCount} Critical Tasks</span>
               </Badge>
             )}
           </div>
-          <h1 className="text-xl font-bold text-[var(--foreground)] tracking-tight">
+          <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
             {project.name}
           </h1>
+          {project.description && (
+            <p className="text-xs text-[var(--muted-foreground)] max-w-2xl">{project.description}</p>
+          )}
         </div>
 
-        {/* Global Action Buttons, Baselines & Presence */}
+        {/* Global Project Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Active Collaborators Presence Avatars */}
-          <div className="flex items-center -space-x-2 mr-2">
-            {collaborators.map((c) => (
-              <div
-                key={c.userId}
-                title={`${c.userName} ${c.activeTaskId ? `(Viewing Task #${c.activeTaskId})` : '(Active)'}`}
-                className="relative inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-bold text-white shadow-xs border-2 border-[var(--background)] transition-transform hover:scale-110 cursor-pointer"
-                style={{ backgroundColor: c.color }}
+          {/* Baseline Snapshot Picker */}
+          {baselines.length > 0 ? (
+            <div className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/60 px-2.5 py-1">
+              <Bookmark className="h-3.5 w-3.5 text-blue-400" />
+              <select
+                value={selectedBaselineId || ''}
+                onChange={(e) => setSelectedBaselineId(e.target.value)}
+                className="bg-transparent text-xs text-[var(--foreground)] font-medium focus:outline-none cursor-pointer"
               >
-                {c.userName.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-[var(--background)]" />
-              </div>
-            ))}
-          </div>
-
-          {/* Baseline Selector */}
-          <div className="flex items-center gap-1.5 bg-[var(--card)] border border-[var(--border)] rounded-md px-2 py-1 shadow-2xs">
-            <Bookmark className="h-3.5 w-3.5 text-[var(--primary)]" />
-            <select
-              value={selectedBaselineId || ''}
-              onChange={(e) => setSelectedBaselineId(e.target.value || null)}
-              className="bg-transparent text-xs text-[var(--foreground)] outline-hidden cursor-pointer"
+                {baselines.map((bl) => (
+                  <option key={bl.id} value={bl.id} className="bg-[var(--card)] text-[var(--foreground)]">
+                    Baseline: {bl.name} ({bl.snapshot_date || new Date(bl.created_at).toLocaleDateString()})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLockBaselineModalOpen(true)}
+              className="gap-1.5 text-xs"
             >
-              <option value="">No Baseline (Live CPM)</option>
-              {baselines.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({new Date(b.created_at).toLocaleDateString()})
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => setIsBaselineModalOpen(true)}
-              title="Lock Current Schedule as New Baseline"
-              className="text-[10px] font-semibold text-[var(--primary)] hover:underline ml-1 cursor-pointer"
-            >
-              + Lock
-            </button>
-          </div>
+              <Bookmark className="h-3.5 w-3.5 text-blue-400" />
+              <span>Lock Baseline</span>
+            </Button>
+          )}
 
           <Button
-            size="sm"
             variant="outline"
-            onClick={() => setExchangeMode('export')}
+            size="sm"
+            onClick={handleRunCPM}
+            disabled={isCpmCalculating || tasks.length === 0}
             className="gap-1.5 text-xs"
           >
-            <Download className="h-3.5 w-3.5" />
-            Export Schedule
+            <RefreshCw className={`h-3.5 w-3.5 ${isCpmCalculating ? 'animate-spin' : ''}`} />
+            <span>Run CPM</span>
           </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setExchangeMode('import')}
-            className="gap-1.5 text-xs"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            Import (.xlsx)
+          <Button size="sm" onClick={() => setIsAddTaskModalOpen(true)} className="gap-1.5 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Task</span>
           </Button>
         </div>
       </div>
 
-      {/* 2. Synchronized View Navigation Tabs (5 Views) */}
-      <div className="shrink-0">
-        <Tabs
-          activeTab={activeView}
-          onChange={(id) => setActiveView(id as any)}
-          items={[
-            {
-              id: 'gantt',
-              label: 'Interactive Gantt & CPM',
-              icon: <GanttChartSquare className="h-4 w-4" />,
-            },
-            {
-              id: 'kanban',
-              label: 'Kanban Board',
-              icon: <Kanban className="h-4 w-4" />,
-              count: tasks.length,
-            },
-            {
-              id: 'grid',
-              label: 'Hierarchical Grid',
-              icon: <Table className="h-4 w-4" />,
-            },
-            {
-              id: 'calendar',
-              label: 'Calendar Schedule',
-              icon: <CalendarDays className="h-4 w-4" />,
-            },
-            {
-              id: 'resource',
-              label: 'Resource Heatmap',
-              icon: <Users className="h-4 w-4" />,
-            },
-          ]}
-        />
+      {/* Navigation Tabs (Gantt, Kanban, Grid, Calendar, Resource) */}
+      <div className="border-b border-[var(--border)]">
+        <div className="flex gap-2 overflow-x-auto pb-px">
+          {[
+            { id: 'gantt', label: 'Interactive Gantt & CPM', icon: GanttChartSquare },
+            { id: 'kanban', label: `Kanban Board (${tasks.length})`, icon: Kanban },
+            { id: 'grid', label: 'Hierarchical Grid', icon: Table },
+            { id: 'calendar', label: 'Calendar Schedule', icon: CalendarDays },
+            { id: 'resource', label: 'Resource Heatmap', icon: Users },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveView(tab.id as any)}
+                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'border-[var(--primary)] text-[var(--primary)]'
+                    : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* 3. Dynamic View Container */}
-      <div className="flex-1 min-h-0">
-        {activeView === 'gantt' && (
-          <InteractiveGantt
-            tasks={tasks}
-            dependencies={dependencies}
-            calendar={calendar}
-            holidays={holidays}
-            baselineSnapshots={baselineSnapshots}
-            activeTaskMap={activeTaskMap}
-            onTaskUpdate={handleTaskUpdate}
-            onAddDependency={handleAddDependency}
-            onAddTask={handleAddTask}
-            onRecalculateCPM={handleRecalculateCPM}
-            onOpenExportModal={() => setExchangeMode('export')}
-            onOpenImportModal={() => setExchangeMode('import')}
-          />
-        )}
+      {/* View Rendering or Clean Empty State */}
+      {tasks.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] p-12 text-center space-y-4">
+          <div className="h-12 w-12 rounded-full bg-[var(--secondary)] flex items-center justify-center mx-auto text-[var(--muted-foreground)]">
+            <Layers className="h-6 w-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-[var(--foreground)]">No tasks in this project yet</h3>
+            <p className="text-xs text-[var(--muted-foreground)] max-w-sm mx-auto">
+              Get started by adding your first task or milestone to generate the CPM schedule and Gantt timeline.
+            </p>
+          </div>
+          <Button onClick={() => setIsAddTaskModalOpen(true)} className="gap-2 text-xs">
+            <Plus className="h-4 w-4" />
+            <span>Add First Task</span>
+          </Button>
+        </div>
+      ) : (
+        <div>
+          {activeView === 'gantt' && (
+            <InteractiveGantt
+              tasks={tasks}
+              dependencies={dependencies}
+              baselineSnapshots={baselineSnapshots}
+              calendar={calendar}
+              holidays={holidays}
+              onTaskUpdate={async (taskId, updates) => {
+                await dbService.updateTask(taskId, updates, supabase);
+                await refreshProjectData();
+              }}
+              onAddDependency={async (dep) => {
+                if (!projectId || !tenantId) return;
+                await dbService.createDependency(
+                  {
+                    project_id: projectId,
+                    tenant_id: tenantId,
+                    predecessor_id: dep.predecessor_id,
+                    successor_id: dep.successor_id,
+                    dependency_type: dep.type,
+                    lag_days: dep.lag_days,
+                  },
+                  supabase
+                );
+                await refreshProjectData();
+              }}
+              onAddTask={async (task) => {
+                if (!projectId || !tenantId) return;
+                await dbService.createTask(
+                  {
+                    project_id: projectId,
+                    tenant_id: tenantId,
+                    title: task.title,
+                    code: `TSK-${tasks.length + 1}`,
+                    start_date: task.start_date,
+                    end_date: task.start_date,
+                    duration_days: task.duration_days,
+                    priority: task.priority,
+                    status: 'todo',
+                    is_milestone: task.is_milestone,
+                    created_by: userId || null,
+                    order_index: tasks.length + 1,
+                  },
+                  supabase
+                );
+                await refreshProjectData();
+              }}
+              onRecalculateCPM={handleRunCPM}
+              onOpenExportModal={() => setExchangeMode('export')}
+              onOpenImportModal={() => setExchangeMode('import')}
+            />
+          )}
 
-        {activeView === 'kanban' && (
-          <KanbanBoard tasks={tasks} onTaskUpdate={handleTaskUpdate} />
-        )}
+          {activeView === 'kanban' && (
+            <KanbanBoard
+              tasks={tasks}
+              onTaskUpdate={async (taskId, updates) => {
+                await dbService.updateTask(taskId, updates, supabase);
+                await refreshProjectData();
+              }}
+            />
+          )}
 
-        {activeView === 'grid' && (
-          <HierarchicalGrid tasks={tasks} onTaskUpdate={handleTaskUpdate} />
-        )}
+          {activeView === 'grid' && (
+            <HierarchicalGrid
+              tasks={tasks}
+              onTaskUpdate={async (taskId, updates) => {
+                await dbService.updateTask(taskId, updates, supabase);
+                await refreshProjectData();
+              }}
+            />
+          )}
 
-        {activeView === 'calendar' && (
-          <ProjectCalendarView tasks={tasks} calendar={calendar} holidays={holidays} />
-        )}
+          {activeView === 'calendar' && (
+            <ProjectCalendarView tasks={tasks} calendar={calendar} holidays={holidays} />
+          )}
 
-        {activeView === 'resource' && (
-          <ResourceHeatmapView
-            tasks={tasks}
-            assignees={db.assignees}
-            users={db.users}
-            calendar={calendar}
-            holidays={holidays}
-          />
-        )}
-      </div>
+          {activeView === 'resource' && (
+            <ResourceHeatmapView
+              tasks={tasks}
+              calendar={calendar}
+              holidays={holidays}
+              tenantId={tenantId || ''}
+            />
+          )}
+        </div>
+      )}
 
-      {/* 4. Import / Export Modal */}
-      <ImportExportModal
-        mode={exchangeMode}
-        isOpen={exchangeMode !== null}
-        onClose={() => setExchangeMode(null)}
-        project={project}
-        tasks={tasks}
-        dependencies={dependencies}
-        onImportCompleted={refreshProjectData}
-      />
-
-      {/* 5. Lock Schedule Baseline Modal */}
+      {/* Add Task Modal */}
       <Modal
-        isOpen={isBaselineModalOpen}
-        onClose={() => setIsBaselineModalOpen(false)}
-        title="Lock New Schedule Baseline"
-        description="Freezes current task dates, durations, and progress into an immutable benchmark for schedule variance tracking."
+        isOpen={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        title="Add New Work Item"
       >
-        <form onSubmit={handleCreateBaseline} className="space-y-4 text-xs">
-          <div>
-            <label className="font-semibold block mb-1">Baseline Name</label>
+        <form onSubmit={handleCreateTask} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[var(--foreground)]">Task Title</label>
             <Input
-              value={newBaselineName}
-              onChange={(e) => setNewBaselineName(e.target.value)}
-              placeholder="e.g. Baseline 1.0 (Post-Sprint Planning)"
+              placeholder="e.g. Database Schema & RLS Matrix"
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
               required
+              autoFocus
             />
           </div>
 
-          <div>
-            <label className="font-semibold block mb-1">Description / Rationale (Optional)</label>
-            <Input
-              value={newBaselineDescription}
-              onChange={(e) => setNewBaselineDescription(e.target.value)}
-              placeholder="Approved timeline baseline following stakeholder review"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--foreground)]">Task Code</label>
+              <Input
+                placeholder="e.g. TSK-101"
+                value={newTaskCode}
+                onChange={(e) => setNewTaskCode(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--foreground)]">Duration (Days)</label>
+              <Input
+                type="number"
+                min="0"
+                value={newTaskDuration}
+                onChange={(e) => setNewTaskDuration(Number(e.target.value))}
+                required
+              />
+            </div>
           </div>
 
-          <div className="p-3 bg-[var(--secondary)]/40 rounded-lg text-[11px] text-[var(--muted-foreground)] space-y-1">
-            <div className="font-semibold text-[var(--foreground)]">Snapshotted Entities:</div>
-            <div>• {tasks.length} Current Tasks & Durations</div>
-            <div>• Critical Path & Float Statuses</div>
-            <div>• Ghost Baseline overlay will appear on Gantt timeline</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--foreground)]">Start Date</label>
+              <Input
+                type="date"
+                value={newTaskStart}
+                onChange={(e) => setNewTaskStart(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--foreground)]">Priority</label>
+              <select
+                value={newTaskPriority}
+                onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs text-[var(--foreground)]"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
-            <Button type="button" variant="outline" onClick={() => setIsBaselineModalOpen(false)}>
+          <div className="flex justify-end gap-2 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddTaskModalOpen(false)}
+              disabled={isSubmittingTask}
+            >
               Cancel
             </Button>
-            <Button type="submit">Lock Baseline</Button>
+            <Button type="submit" disabled={isSubmittingTask || !newTaskTitle.trim()}>
+              {isSubmittingTask ? 'Adding...' : 'Add Task'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Lock Baseline Modal */}
+      <Modal
+        isOpen={isLockBaselineModalOpen}
+        onClose={() => setIsLockBaselineModalOpen(false)}
+        title="Lock Schedule Baseline"
+      >
+        <form onSubmit={handleLockBaseline} className="space-y-4">
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Locking an approved baseline snapshot preserves current planned dates and durations to track schedule slip (SV/SPI) in the Gantt timeline.
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[var(--foreground)]">Baseline Name</label>
+            <Input
+              placeholder="e.g. Initial Approved Schedule Baseline"
+              value={baselineName}
+              onChange={(e) => setBaselineName(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsLockBaselineModalOpen(false)}
+              disabled={isLockingBaseline}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLockingBaseline || !baselineName.trim()}>
+              {isLockingBaseline ? 'Locking...' : 'Lock Baseline'}
+            </Button>
           </div>
         </form>
       </Modal>

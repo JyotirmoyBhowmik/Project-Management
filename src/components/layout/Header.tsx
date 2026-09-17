@@ -1,7 +1,7 @@
 // ==============================================================================
 // src/components/layout/Header.tsx
 // Dynamic Header Component (Zero Hardcoded Values Mandate)
-// Dynamic theming via database tokens & In-App Notification Center Drawer.
+// Live Supabase Workspace Switcher, User Profile, Notifications & Auth Controls
 // ==============================================================================
 
 'use client';
@@ -20,35 +20,48 @@ import {
   ExternalLink,
   HelpCircle,
   BookOpen,
+  LogOut,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { useDynamicTheme } from '@/lib/theme/dynamic-theme-provider';
 import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
 import { Badge } from '@/components/ui/badge';
-import { db } from '@/lib/supabase/mock-db';
-import { UserNotification } from '@/types/database';
+import { createClient } from '@/lib/supabase/client';
+import { dbService } from '@/lib/supabase/db-service';
+import { UserNotification, Tenant } from '@/types/database';
 
 export function Header() {
-  const { activeTenant, activeRole, currentUser, setActiveTenant } = useTenantStore();
+  const router = useRouter();
+  const supabase = createClient();
+  const { activeTenant, activeRole, currentUser, memberships, setActiveTenant } = useTenantStore();
   const { activeThemeId, systemThemes, setTheme } = useDynamicTheme();
   const { rolePermissions } = useTenantMetadata();
 
   const [tenantMenuOpen, setTenantMenuOpen] = React.useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = React.useState(false);
-  const [roleMenuOpen, setRoleMenuOpen] = React.useState(false);
   const [notifMenuOpen, setNotifMenuOpen] = React.useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
-  const availableTenants = db.tenants;
-  const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
-  const userId = currentUser?.id || 'b0000000-0000-0000-0000-000000000002';
+  // Derive accessible workspaces strictly from user's authenticated memberships
+  const authorizedTenants: Tenant[] = React.useMemo(() => {
+    return memberships
+      .map((m) => m.tenant)
+      .filter((t): t is Tenant => Boolean(t));
+  }, [memberships]);
+
+  const tenantId = activeTenant?.id || '';
+  const userId = currentUser?.id || '';
 
   // Notifications State
   const [notifications, setNotifications] = React.useState<UserNotification[]>([]);
 
-  const refreshNotifications = React.useCallback(() => {
-    setNotifications([...db.getUserNotifications(userId, tenantId)]);
+  const refreshNotifications = React.useCallback(async () => {
+    if (!userId || !tenantId) return;
+    const notifs = await dbService.getUserNotifications(userId, tenantId, supabase);
+    setNotifications(notifs);
   }, [userId, tenantId]);
 
   React.useEffect(() => {
@@ -59,157 +72,151 @@ export function Header() {
     return notifications.filter((n) => !n.is_read).length;
   }, [notifications]);
 
-  const handleMarkAsRead = (notifId: string) => {
-    db.markNotificationRead(notifId);
+  const handleMarkAsRead = async (notifId: string) => {
+    await dbService.markNotificationRead(notifId, supabase);
     refreshNotifications();
   };
 
-  const handleMarkAllRead = () => {
-    db.markAllNotificationsRead(userId, tenantId);
-    refreshNotifications();
-  };
+  const handleTenantSwitch = (tenant: Tenant) => {
+    const targetMem = memberships.find((m) => m.tenant_id === tenant.id);
+    const newRole = targetMem?.role || 'member';
 
-  // Dynamic roles available for current user
-  const roles = [
-    { id: 'tenant_admin', label: 'Tenant Admin', desc: 'Full workspace administration' },
-    { id: 'project_manager', label: 'Project Manager', desc: 'Project schedule & CPM management' },
-    { id: 'member', label: 'Team Member', desc: 'Task execution & progress updates' },
-    { id: 'guest', label: 'Scoped Guest', desc: 'Confined to explicitly shared projects' },
-  ];
-
-  const handleRoleSwitch = (newRole: string) => {
-    if (activeTenant) {
+    if (typeof document !== 'undefined') {
+      document.cookie = `pms_active_tenant_id=${tenant.id}; path=/; max-age=31536000; SameSite=Lax`;
       document.cookie = `pms_user_role=${newRole}; path=/; max-age=31536000; SameSite=Lax`;
-      setActiveTenant(activeTenant, newRole);
     }
-    setRoleMenuOpen(false);
+
+    setActiveTenant(tenant, newRole);
+    setTenantMenuOpen(false);
+    router.push('/');
   };
 
-  const handleTenantSwitch = (tenant: typeof availableTenants[0]) => {
-    setActiveTenant(tenant, activeRole);
-    setTenantMenuOpen(false);
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    if (typeof document !== 'undefined') {
+      document.cookie = 'pms_active_tenant_id=; path=/; max-age=0';
+      document.cookie = 'pms_user_role=; path=/; max-age=0';
+    }
+    router.push('/login');
   };
+
+  // Close other menus when one opens
+  const closeAllMenus = () => {
+    setTenantMenuOpen(false);
+    setThemeMenuOpen(false);
+    setNotifMenuOpen(false);
+    setHelpMenuOpen(false);
+    setUserMenuOpen(false);
+  };
+
+  // User Initials
+  const userInitials = React.useMemo(() => {
+    if (currentUser?.full_name) {
+      const parts = currentUser.full_name.trim().split(' ');
+      if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      return currentUser.full_name.substring(0, 2).toUpperCase();
+    }
+    if (currentUser?.email) {
+      return currentUser.email.substring(0, 2).toUpperCase();
+    }
+    return 'U';
+  }, [currentUser]);
 
   return (
     <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 sm:px-6 transition-colors shadow-xs">
-      {/* Left: Active Tenant Identifier & Switcher */}
+      {/* Left: Active Tenant Identifier & Workspace Switcher */}
       <div className="flex items-center gap-3">
         <div className="relative">
           <button
             onClick={() => {
-              setTenantMenuOpen(!tenantMenuOpen);
-              setThemeMenuOpen(false);
-              setRoleMenuOpen(false);
-              setNotifMenuOpen(false);
+              if (authorizedTenants.length > 1) {
+                setTenantMenuOpen(!tenantMenuOpen);
+                setThemeMenuOpen(false);
+                setNotifMenuOpen(false);
+                setHelpMenuOpen(false);
+                setUserMenuOpen(false);
+              }
             }}
-            className="flex items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)] px-3 py-1.5 text-xs sm:text-sm font-semibold text-[var(--foreground)] hover:border-[var(--primary)] transition-all cursor-pointer shadow-xs"
+            className={`flex items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)] px-3 py-1.5 text-xs sm:text-sm font-semibold text-[var(--foreground)] transition-all shadow-xs ${
+              authorizedTenants.length > 1 ? 'hover:border-[var(--primary)] cursor-pointer' : 'cursor-default'
+            }`}
           >
             <Building2 className="h-4 w-4 text-[var(--primary)]" />
             <div className="flex flex-col text-left">
-              <span className="leading-tight">{activeTenant?.name || 'Select Workspace'}</span>
+              <span className="leading-tight">{activeTenant?.name || 'Workspace'}</span>
               <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                {activeTenant?.tenant_code || activeTenant?.code}
+                {activeTenant?.tenant_code || activeTenant?.code || activeTenant?.slug}
               </span>
             </div>
-            <ChevronDown className="h-3.5 w-3.5 text-[var(--muted-foreground)] ml-1" />
+            {authorizedTenants.length > 1 && (
+              <ChevronDown className="h-3.5 w-3.5 text-[var(--muted-foreground)] ml-1" />
+            )}
           </button>
 
-          {/* Tenant Switcher Dropdown */}
-          {tenantMenuOpen && (
+          {/* Tenant Switcher Dropdown (Shown ONLY if user has multiple authorized workspaces) */}
+          {tenantMenuOpen && authorizedTenants.length > 1 && (
             <div className="absolute left-0 mt-2 w-64 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
               <div className="px-2 py-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
-                Available Workspaces
+                Switch Authorized Workspace
               </div>
-              {availableTenants.map((tenant) => {
-                const isCurrent = tenant.id === activeTenant?.id;
-                return (
+              <div className="space-y-1">
+                {authorizedTenants.map((t) => (
                   <button
-                    key={tenant.id}
-                    onClick={() => handleTenantSwitch(tenant)}
-                    className="flex w-full items-center justify-between p-2 text-left rounded-md hover:bg-[var(--secondary)] transition-colors cursor-pointer"
+                    key={t.id}
+                    onClick={() => handleTenantSwitch(t)}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 text-xs rounded-md transition-colors cursor-pointer text-left ${
+                      activeTenant?.id === t.id
+                        ? 'bg-[var(--primary)] text-white font-medium'
+                        : 'text-[var(--foreground)] hover:bg-[var(--secondary)]'
+                    }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="h-7 w-7 rounded-md flex items-center justify-center text-xs font-bold text-white shadow-xs"
-                        style={{ backgroundColor: tenant.branding_json?.primary_color || '#3b82f6' }}
-                      >
-                        {tenant.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-xs font-semibold text-[var(--foreground)]">{tenant.name}</div>
-                        <div className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                          {tenant.tenant_code || tenant.code}
-                        </div>
+                    <div>
+                      <div className="font-semibold">{t.name}</div>
+                      <div className="text-[10px] opacity-75 font-mono">
+                        {t.tenant_code || t.code || t.slug}
                       </div>
                     </div>
-                    {isCurrent && <Check className="h-4 w-4 text-[var(--primary)]" />}
+                    {activeTenant?.id === t.id && <Check className="h-3.5 w-3.5 text-white" />}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Right Side: Role Simulator, Dynamic Theming, Notification Drawer, and Observability */}
-      <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* Role Simulator Pill */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setRoleMenuOpen(!roleMenuOpen);
-              setTenantMenuOpen(false);
-              setThemeMenuOpen(false);
-              setNotifMenuOpen(false);
-            }}
-            className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] px-2.5 py-1 text-xs font-medium text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
+      {/* Right Controls */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Dynamic Role Badge */}
+        {activeRole && (
+          <Badge
+            variant={activeRole === 'guest' ? 'warning' : 'outline'}
+            className="hidden sm:inline-flex text-[11px] font-medium capitalize"
           >
-            <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
-            <span className="capitalize">{activeRole.replace('_', ' ')}</span>
-            <ChevronDown className="h-3 w-3 text-[var(--muted-foreground)]" />
-          </button>
+            {activeRole.replace('_', ' ')}
+          </Badge>
+        )}
 
-          {roleMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-2 py-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
-                Simulate Role Context
-              </div>
-              {roles.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => handleRoleSwitch(r.id)}
-                  className="flex w-full items-center justify-between p-2 text-left rounded-md hover:bg-[var(--secondary)] transition-colors cursor-pointer"
-                >
-                  <div>
-                    <div className="text-xs font-semibold text-[var(--foreground)]">{r.label}</div>
-                    <div className="text-[10px] text-[var(--muted-foreground)]">{r.desc}</div>
-                  </div>
-                  {activeRole === r.id && <Check className="h-4 w-4 text-[var(--primary)]" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Dynamic Database Theme Switcher */}
+        {/* Dynamic Theme Switcher */}
         <div className="relative">
           <button
             onClick={() => {
               setThemeMenuOpen(!themeMenuOpen);
               setTenantMenuOpen(false);
-              setRoleMenuOpen(false);
               setNotifMenuOpen(false);
+              setHelpMenuOpen(false);
+              setUserMenuOpen(false);
             }}
             className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] p-1.5 text-xs text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
-            title="Switch Dynamic Theme"
+            title="Switch Theme"
           >
-            <Palette className="h-4 w-4 text-[var(--primary)]" />
+            <Palette className="h-4 w-4 text-[var(--foreground)]" />
           </button>
 
           {themeMenuOpen && (
-            <div className="absolute right-0 mt-2 w-60 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
-              <div className="px-2 py-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
-                Database Theme Presets
+            <div className="absolute right-0 mt-2 w-48 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="px-2 py-1 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                Theme Presets
               </div>
               {systemThemes.map((th) => (
                 <button
@@ -218,7 +225,11 @@ export function Header() {
                     setTheme(th.id);
                     setThemeMenuOpen(false);
                   }}
-                  className="flex w-full items-center justify-between p-2 text-left rounded-md hover:bg-[var(--secondary)] transition-colors cursor-pointer"
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${
+                    activeThemeId === th.id
+                      ? 'bg-[var(--primary)]/15 text-[var(--primary)] font-medium'
+                      : 'text-[var(--foreground)] hover:bg-[var(--secondary)]'
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <div
@@ -234,14 +245,15 @@ export function Header() {
           )}
         </div>
 
-        {/* In-App Notification Center Drawer */}
+        {/* In-App Notification Center */}
         <div className="relative">
           <button
             onClick={() => {
               setNotifMenuOpen(!notifMenuOpen);
               setTenantMenuOpen(false);
               setThemeMenuOpen(false);
-              setRoleMenuOpen(false);
+              setHelpMenuOpen(false);
+              setUserMenuOpen(false);
             }}
             className="relative flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] p-1.5 text-xs text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
             title="In-App Notifications"
@@ -266,16 +278,6 @@ export function Header() {
                     </span>
                   )}
                 </div>
-
-                {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllRead}
-                    className="flex items-center gap-1 text-[11px] text-[var(--primary)] hover:underline cursor-pointer"
-                  >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    Mark all read
-                  </button>
-                )}
               </div>
 
               <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
@@ -315,7 +317,7 @@ export function Header() {
               setNotifMenuOpen(false);
               setTenantMenuOpen(false);
               setThemeMenuOpen(false);
-              setRoleMenuOpen(false);
+              setUserMenuOpen(false);
             }}
             className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] p-1.5 text-xs text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
             title="Help & Documentation"
@@ -369,20 +371,60 @@ export function Header() {
           )}
         </div>
 
-        {/* Observability Correlation ID Badge (Rule 4.2) */}
+        {/* Distributed Tracing Badge (Rule 4.2) */}
         <div
           className="hidden md:flex items-center gap-1.5 rounded-md bg-[var(--secondary)] px-2 py-1 text-[10px] font-mono text-[var(--muted-foreground)] border border-[var(--border)] cursor-default"
-          title="Distributed Tracing Correlation ID (Rule 4.2)"
+          title="Distributed Tracing Active"
         >
           <Activity className="h-3 w-3 text-emerald-500 animate-pulse" />
-          <span>trace:live</span>
+          <span>RLS:active</span>
         </div>
 
-        {/* Current User Profile Pill */}
-        <div className="flex items-center gap-2 pl-1">
-          <div className="h-7 w-7 rounded-full bg-[var(--primary)] text-white text-xs font-bold flex items-center justify-center ring-2 ring-[var(--border)]">
-            {currentUser?.full_name?.substring(0, 2).toUpperCase() || 'SA'}
-          </div>
+        {/* Authenticated User Profile Pill & Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setUserMenuOpen(!userMenuOpen);
+              setTenantMenuOpen(false);
+              setThemeMenuOpen(false);
+              setNotifMenuOpen(false);
+              setHelpMenuOpen(false);
+            }}
+            className="flex items-center gap-2 pl-1 cursor-pointer"
+            title="User Account"
+          >
+            <div className="h-8 w-8 rounded-full bg-[var(--primary)] text-white text-xs font-bold flex items-center justify-center ring-2 ring-[var(--border)] hover:ring-[var(--primary)] transition-all">
+              {userInitials}
+            </div>
+          </button>
+
+          {userMenuOpen && (
+            <div className="absolute right-0 mt-2 w-60 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 overflow-hidden">
+              <div className="p-3 border-b border-[var(--border)] bg-[var(--secondary)]/30">
+                <div className="font-bold text-xs text-[var(--foreground)]">
+                  {currentUser?.full_name || 'Authenticated User'}
+                </div>
+                <div className="text-[11px] text-[var(--muted-foreground)] truncate">
+                  {currentUser?.email}
+                </div>
+                {currentUser?.is_superadmin && (
+                  <Badge variant="destructive" className="mt-1.5 text-[9px] font-mono">
+                    SuperAdmin
+                  </Badge>
+                )}
+              </div>
+
+              <div className="p-1">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

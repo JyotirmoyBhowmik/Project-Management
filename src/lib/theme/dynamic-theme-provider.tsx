@@ -9,7 +9,7 @@
 import * as React from 'react';
 import { ThemeTokens, SystemTheme } from '@/types/database';
 import { useTenantStore } from '@/lib/stores/tenant-store';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService, DEFAULT_THEME_TOKENS, DEFAULT_SYSTEM_THEMES } from '@/lib/supabase/db-service';
 
 interface DynamicThemeContextType {
   activeThemeId: string;
@@ -54,42 +54,71 @@ export function generateCssVariables(tokens: ThemeTokens): string {
 
 export function DynamicThemeProvider({ children }: { children: React.ReactNode }) {
   const { activeTenant } = useTenantStore();
-  const tenantId = activeTenant?.id || 'a0000000-0000-0000-0000-000000000001';
+  const tenantId = activeTenant?.id;
 
-  const [activeThemeId, setActiveThemeId] = React.useState<string>('navy');
-  const [tokens, setTokens] = React.useState<ThemeTokens>(() => db.getTenantTheme(tenantId));
-  const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>(() => db.getSystemThemes());
+  const [activeThemeId, setActiveThemeId] = React.useState<string>(() => {
+    return activeTenant?.branding_json?.theme_preset || 'navy';
+  });
+  const [tokens, setTokens] = React.useState<ThemeTokens>(DEFAULT_THEME_TOKENS);
+  const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>(DEFAULT_SYSTEM_THEMES);
 
-  // Refresh theme when tenant changes
+  // Refresh theme when tenant changes or mounts
   React.useEffect(() => {
-    const override = db.tenantThemeOverrides.find((o) => o.tenant_id === tenantId);
-    const themeId = override?.active_theme_id || 'navy';
-    setActiveThemeId(themeId);
-    setTokens(db.getTenantTheme(tenantId));
-    setSystemThemes(db.getSystemThemes());
+    let isMounted = true;
+
+    async function loadTheme() {
+      const themes = await dbService.getSystemThemes();
+      if (!isMounted) return;
+      setSystemThemes(themes);
+
+      if (tenantId) {
+        const tenantTokens = await dbService.getTenantTheme(tenantId);
+        if (!isMounted) return;
+        setTokens(tenantTokens);
+      }
+    }
+
+    loadTheme();
+
+    return () => {
+      isMounted = false;
+    };
   }, [tenantId]);
 
   const setTheme = React.useCallback(
-    (themeId: string) => {
+    async (themeId: string) => {
       setActiveThemeId(themeId);
-      db.setTenantTheme(tenantId, themeId, {});
-      const newTokens = db.getTenantTheme(tenantId);
-      setTokens(newTokens);
+      const matched = systemThemes.find(t => t.id === themeId);
+      if (matched) {
+        setTokens(matched.tokens_json);
+      }
+      if (tenantId) {
+        await dbService.setTenantTheme(tenantId, themeId, {});
+        const newTokens = await dbService.getTenantTheme(tenantId);
+        setTokens(newTokens);
+      }
     },
-    [tenantId]
+    [tenantId, systemThemes]
   );
 
   const updateCustomTokens = React.useCallback(
-    (custom: Partial<ThemeTokens>) => {
-      db.setTenantTheme(tenantId, activeThemeId, custom);
+    async (custom: Partial<ThemeTokens>) => {
       setTokens((prev) => ({ ...prev, ...custom }));
+      if (tenantId) {
+        await dbService.setTenantTheme(tenantId, activeThemeId, custom);
+      }
     },
     [tenantId, activeThemeId]
   );
 
-  const resetToDefault = React.useCallback(() => {
-    db.setTenantTheme(tenantId, activeThemeId, {});
-    setTokens(db.getTenantTheme(tenantId));
+  const resetToDefault = React.useCallback(async () => {
+    if (tenantId) {
+      await dbService.setTenantTheme(tenantId, activeThemeId, {});
+      const newTokens = await dbService.getTenantTheme(tenantId);
+      setTokens(newTokens);
+    } else {
+      setTokens(DEFAULT_THEME_TOKENS);
+    }
   }, [tenantId, activeThemeId]);
 
   const cssRules = React.useMemo(() => generateCssVariables(tokens), [tokens]);

@@ -5,7 +5,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiHandler, createSuccessResponse } from '@/lib/error/api-handler';
-import { db } from '@/lib/supabase/mock-db';
+import { dbService } from '@/lib/supabase/db-service';
 import { StandardImportRowSchema, ValidatedStandardImportRow } from '@/lib/validation/schemas';
 import { addWorkingDays, parseISODate, formatDateToISO } from '@/lib/calendar/calendar-engine';
 import { topologicalSort } from '@/lib/cpm/cpm-engine';
@@ -15,13 +15,22 @@ export const POST = apiHandler(async (req: NextRequest, { correlationId }) => {
   const body = await req.json();
   const { projectId, dryRun = true, rows = [] } = body;
 
-  const tenantId = req.headers.get('x-tenant-id') || 'a0000000-0000-0000-0000-000000000001';
-  const actorId = req.headers.get('x-user-id') || 'b0000000-0000-0000-0000-000000000002';
-  const tenant = db.tenants.find(t => t.id === tenantId);
+  const tenantId = req.headers.get('x-tenant-id') || req.nextUrl.searchParams.get('tenant_id');
+  const actorId = req.headers.get('x-user-id') || null;
+
+  if (!tenantId) {
+    throw new Error('Tenant ID is required for import');
+  }
+
+  const [tenant, holidays, members] = await Promise.all([
+    dbService.getTenantById(tenantId),
+    dbService.getCalendarHolidays(tenantId),
+    dbService.getTenantMembers(tenantId),
+  ]);
+
   const calendar = {
     working_days: tenant?.weekend_days ? [0, 1, 2, 3, 4, 5, 6].filter(d => !tenant.weekend_days?.includes(d)) : [1, 2, 3, 4, 5],
   };
-  const holidays = db.holidays.filter(h => h.tenant_id === tenantId);
 
   const previewResults: Array<{
     rowIndex: number;
@@ -52,7 +61,7 @@ export const POST = apiHandler(async (req: NextRequest, { correlationId }) => {
       const matchedAssignees: string[] = [];
 
       data.assignee_emails.forEach(email => {
-        const found = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        const found = members.find(m => m.user?.email.toLowerCase() === email.toLowerCase())?.user;
         if (found) {
           matchedAssignees.push(found.full_name);
         } else {
@@ -166,65 +175,29 @@ export const POST = apiHandler(async (req: NextRequest, { correlationId }) => {
     const start = parseISODate(item.start_date);
     const end = addWorkingDays(start, item.duration_days, calendar, holidays);
 
-    // Map phase if present
-    let phaseId: string | null = null;
-    if (item.phase) {
-      let existingPhase = db.phases.find(
-        p => p.project_id === projectId && p.name.toLowerCase() === item.phase!.toLowerCase()
-      );
-      if (!existingPhase) {
-        existingPhase = {
-          id: `phase-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          tenant_id: tenantId,
-          project_id: projectId,
-          name: item.phase,
-          sort_order: db.phases.length + 1,
-          created_at: new Date().toISOString(),
-        };
-        db.phases.push(existingPhase);
-      }
-      phaseId = existingPhase.id;
-    }
-
-    const task = db.createTask(
-      {
-        tenant_id: tenantId,
-        project_id: projectId,
-        phase_id: phaseId,
-        parent_task_id: null,
-        title: item.title,
-        description: item.description || null,
-        status: item.status as any,
-        priority: item.priority,
-        start_date: item.start_date,
-        end_date: formatDateToISO(end),
-        duration_days: item.duration_days,
-        progress: item.progress,
-        is_milestone: item.duration_days === 0,
-        sort_order: db.tasks.length + 1,
-        created_by: actorId,
-      },
-      actorId,
-      correlationId
-    );
-
-    createdTasks.push(task);
-    if (item.task_id) {
-      taskIdMap.set(item.task_id, task.id);
-    }
-
-    // Bind matched assignees
-    item.assignee_emails.forEach(email => {
-      const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (user) {
-        db.assignees.push({
-          task_id: task.id,
-          user_id: user.id,
-          allocation_percent: 100,
-          created_at: new Date().toISOString(),
-        });
-      }
+    const task = await dbService.createTask({
+      tenant_id: tenantId,
+      project_id: projectId,
+      phase_id: null,
+      parent_id: null,
+      title: item.title,
+      description: item.description || null,
+      status: item.status as any,
+      priority: item.priority,
+      start_date: item.start_date,
+      end_date: formatDateToISO(end),
+      duration_days: item.duration_days,
+      progress: item.progress,
+      is_milestone: item.duration_days === 0,
+      created_by: actorId,
     });
+
+    if (task) {
+      createdTasks.push(task);
+      if (item.task_id) {
+        taskIdMap.set(item.task_id, task.id);
+      }
+    }
   }
 
   // 4. Create dependency connections
@@ -235,19 +208,14 @@ export const POST = apiHandler(async (req: NextRequest, { correlationId }) => {
         if (taskIdMap.has(pred.id)) {
           const predDbId = taskIdMap.get(pred.id)!;
           try {
-            db.addDependency(
-              {
-                tenant_id: tenantId,
-                project_id: projectId,
-                predecessor_id: predDbId,
-                successor_id: succDbId,
-                dep_type: pred.type,
-                type: pred.type,
-                lag_days: pred.lag_days,
-              },
-              actorId,
-              correlationId
-            );
+            await dbService.createDependency({
+              tenant_id: tenantId,
+              project_id: projectId,
+              predecessor_id: predDbId,
+              successor_id: succDbId,
+              dep_type: pred.type,
+              lag_days: pred.lag_days,
+            });
           } catch {
             // Cycle or duplicate skipped gracefully
           }
