@@ -102,20 +102,20 @@ export class Logger {
     }
   }
 
-  public debug(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; ctx?: Record<string, unknown> }) {
-    this.write('DEBUG', message, meta?.fn, meta?.traceId || meta?.corrId, meta?.ctx);
+  public debug(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; correlationId?: string; ctx?: Record<string, unknown> }) {
+    this.write('DEBUG', message, meta?.fn, meta?.traceId || meta?.corrId || meta?.correlationId, meta?.ctx);
   }
 
-  public info(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; ctx?: Record<string, unknown> }) {
-    this.write('INFO', message, meta?.fn, meta?.traceId || meta?.corrId, meta?.ctx);
+  public info(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; correlationId?: string; ctx?: Record<string, unknown> }) {
+    this.write('INFO', message, meta?.fn, meta?.traceId || meta?.corrId || meta?.correlationId, meta?.ctx);
   }
 
-  public warn(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; ctx?: Record<string, unknown>; err?: unknown }) {
-    this.write('WARN', message, meta?.fn, meta?.traceId || meta?.corrId, meta?.ctx, meta?.err);
+  public warn(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; correlationId?: string; ctx?: Record<string, unknown>; err?: unknown }) {
+    this.write('WARN', message, meta?.fn, meta?.traceId || meta?.corrId || meta?.correlationId, meta?.ctx, meta?.err);
   }
 
-  public error(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; ctx?: Record<string, unknown>; err?: unknown }) {
-    this.write('ERROR', message, meta?.fn, meta?.traceId || meta?.corrId, meta?.ctx, meta?.err);
+  public error(message: string, meta?: { fn?: string; traceId?: string; corrId?: string; correlationId?: string; ctx?: Record<string, unknown>; err?: unknown }) {
+    this.write('ERROR', message, meta?.fn, meta?.traceId || meta?.corrId || meta?.correlationId, meta?.ctx, meta?.err);
   }
 }
 

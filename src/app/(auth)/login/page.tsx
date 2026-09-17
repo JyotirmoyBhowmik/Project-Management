@@ -101,12 +101,33 @@ function LoginPageContent() {
 
     try {
       // 1. Authenticate with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
-      if (authError || !authData.user) {
+      // Automated self-healing for GoTrue "Database error querying schema" 500
+      if (authError && (authError.message.includes('Database error') || authError.status === 500)) {
+        try {
+          const repairRes = await fetch('/api/v1/auth/repair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim(), password }),
+          });
+          if (repairRes.ok) {
+            const retryResult = await supabase.auth.signInWithPassword({
+              email: email.trim(),
+              password,
+            });
+            authData = retryResult.data;
+            authError = retryResult.error;
+          }
+        } catch {
+          // Fall through to display standard error if repair call fails
+        }
+      }
+
+      if (authError || !authData?.user) {
         setError(authError?.message || 'Invalid credentials. Please check your email and password.');
         setIsLoading(false);
         return;

@@ -95,6 +95,29 @@ DO $$ BEGIN
     ALTER TABLE task_dependencies ADD COLUMN IF NOT EXISTS type VARCHAR(16) DEFAULT 'FS';
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
+-- Fix GoTrue NULL Scan Errors for all auth.users
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
+        UPDATE auth.users
+        SET 
+            confirmation_token = COALESCE(confirmation_token, ''),
+            recovery_token = COALESCE(recovery_token, ''),
+            email_change = COALESCE(email_change, ''),
+            email_change_token_new = COALESCE(email_change_token_new, '');
+    END IF;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
+        UPDATE auth.users
+        SET 
+            email_change_token_current = COALESCE(email_change_token_current, ''),
+            phone_change = COALESCE(phone_change, ''),
+            phone_change_token = COALESCE(phone_change_token, ''),
+            reauthentication_token = COALESCE(reauthentication_token, '');
+    END IF;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 -- Execution Block
 DO $$
 DECLARE
@@ -116,19 +139,89 @@ DECLARE
     t2_id UUID := 'f0000000-0000-0000-0000-000000000012'::UUID;
     t3_id UUID := 'f0000000-0000-0000-0000-000000000013'::UUID;
 BEGIN
-    -- 1. Auth Users
+    -- 1. Auth Users (Explicit empty string tokens to avoid GoTrue NULL scan errors)
     BEGIN
         IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
-            INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, role, aud)
+            INSERT INTO auth.users (
+                id, instance_id, email, encrypted_password, email_confirmed_at,
+                raw_app_meta_data, raw_user_meta_data, role, aud,
+                confirmation_token, recovery_token, email_change, email_change_token_new
+            )
             VALUES
-            (super_admin_id, '00000000-0000-0000-0000-000000000000', 'admin@jyotirmoyb.com', crypt('Admin@jyotirmoyb2026!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"System Administrator"}', 'authenticated', 'authenticated'),
-            (guest_user_id, '00000000-0000-0000-0000-000000000000', 'guest@external-partner.com', crypt('GuestPass2026!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Guest Auditor (Partner Org)"}', 'authenticated', 'authenticated'),
-            (engineer_user_id, '00000000-0000-0000-0000-000000000000', 'lead.engineer@core.internal', crypt('Password123!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Sarah Lin"}', 'authenticated', 'authenticated'),
-            (devops_user_id, '00000000-0000-0000-0000-000000000000', 'devops@core.internal', crypt('Password123!', gen_salt('bf')), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Kenji Sato"}', 'authenticated', 'authenticated')
-            ON CONFLICT (id) DO NOTHING;
+            (
+                super_admin_id, '00000000-0000-0000-0000-000000000000', 'admin@jyotirmoyb.com',
+                crypt('Admin@jyotirmoyb2026!', gen_salt('bf')), NOW(),
+                '{"provider":"email","providers":["email"]}'::jsonb,
+                '{"full_name":"System Administrator"}'::jsonb,
+                'authenticated', 'authenticated',
+                '', '', '', ''
+            ),
+            (
+                guest_user_id, '00000000-0000-0000-0000-000000000000', 'guest@external-partner.com',
+                crypt('GuestPass2026!', gen_salt('bf')), NOW(),
+                '{"provider":"email","providers":["email"]}'::jsonb,
+                '{"full_name":"Guest Auditor (Partner Org)"}'::jsonb,
+                'authenticated', 'authenticated',
+                '', '', '', ''
+            ),
+            (
+                engineer_user_id, '00000000-0000-0000-0000-000000000000', 'lead.engineer@core.internal',
+                crypt('Password123!', gen_salt('bf')), NOW(),
+                '{"provider":"email","providers":["email"]}'::jsonb,
+                '{"full_name":"Sarah Lin"}'::jsonb,
+                'authenticated', 'authenticated',
+                '', '', '', ''
+            ),
+            (
+                devops_user_id, '00000000-0000-0000-0000-000000000000', 'devops@core.internal',
+                crypt('Password123!', gen_salt('bf')), NOW(),
+                '{"provider":"email","providers":["email"]}'::jsonb,
+                '{"full_name":"Kenji Sato"}'::jsonb,
+                'authenticated', 'authenticated',
+                '', '', '', ''
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                encrypted_password = EXCLUDED.encrypted_password,
+                email_confirmed_at = COALESCE(auth.users.email_confirmed_at, NOW()),
+                raw_app_meta_data = EXCLUDED.raw_app_meta_data,
+                raw_user_meta_data = EXCLUDED.raw_user_meta_data,
+                confirmation_token = '',
+                recovery_token = '',
+                email_change = '',
+                email_change_token_new = '';
+
+            UPDATE auth.users
+            SET confirmation_token = COALESCE(confirmation_token, ''),
+                recovery_token = COALESCE(recovery_token, ''),
+                email_change = COALESCE(email_change, ''),
+                email_change_token_new = COALESCE(email_change_token_new, '')
+            WHERE id IN (super_admin_id, guest_user_id, engineer_user_id, devops_user_id);
         END IF;
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Notice: auth.users provisioning: %', SQLERRM;
+    END;
+
+    -- 1b. Auth Identities (Required by GoTrue email provider to allow sign-in)
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'identities') THEN
+            INSERT INTO auth.identities (
+                id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+            )
+            VALUES
+            (
+                super_admin_id, super_admin_id, super_admin_id::text,
+                jsonb_build_object('sub', super_admin_id::text, 'email', 'admin@jyotirmoyb.com'),
+                'email', NOW(), NOW(), NOW()
+            ),
+            (
+                engineer_user_id, engineer_user_id, engineer_user_id::text,
+                jsonb_build_object('sub', engineer_user_id::text, 'email', 'lead.engineer@core.internal'),
+                'email', NOW(), NOW(), NOW()
+            )
+            ON CONFLICT DO NOTHING;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Notice: auth.identities provisioning: %', SQLERRM;
     END;
 
     -- 2. User Profiles

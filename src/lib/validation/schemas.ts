@@ -187,3 +187,9 @@ export type ValidatedStandardImportRow = z.infer<typeof StandardImportRowSchema>
 
 export const ImportRowSchema = StandardImportRowSchema;
 export type ValidatedImportRow = ValidatedStandardImportRow;
+
+export const AuthRepairSchema = z.object({
+  email: z.string().email().transform(sanitizeString),
+  password: z.string().min(6).max(100),
+});
+export type ValidatedAuthRepair = z.infer<typeof AuthRepairSchema>;
