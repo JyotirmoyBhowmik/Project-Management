@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #1e293b;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent: #e2e8f0;
+    --accent-foreground: #0f172a;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #2563eb;
+    --radius: 0.5rem;
+    --critical-path: #ef4444;
+    --non-working-day: rgba(226, 232, 240, 0.4);
+    --holiday-day: rgba(254, 226, 226, 0.5);
+  }
+
+  /* Dark Theme */
+  .dark, .theme-dark {
+    --background: #090d16;
+    --foreground: #f8fafc;
+    --card: #111827;
+    --card-foreground: #f8fafc;
+    --popover: #111827;
+    --popover-foreground: #f8fafc;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --secondary: #1f2937;
+    --secondary-foreground: #f8fafc;
+    --muted: #1f2937;
+    --muted-foreground: #9ca3af;
+    --accent: #374151;
+    --accent-foreground: #f8fafc;
+    --destructive: #f87171;
+    --destructive-foreground: #ffffff;
+    --border: #1f2937;
+    --input: #1f2937;
+    --ring: #3b82f6;
+    --critical-path: #f87171;
+    --non-working-day: rgba(31, 41, 55, 0.4);
+    --holiday-day: rgba(127, 29, 29, 0.25);
+  }
+
+  /* Enterprise Navy Theme */
+  .theme-navy {
+    --background: #0a1128;
+    --foreground: #f1f5f9;
+    --card: #101f42;
+    --card-foreground: #ffffff;
+    --popover: #101f42;
+    --popover-foreground: #ffffff;
+    --primary: #38bdf8;
+    --primary-foreground: #0a1128;
+    --secondary: #1e3a6d;
+    --secondary-foreground: #f1f5f9;
+    --muted: #1e3a6d;
+    --muted-foreground: #94a3b8;
+    --accent: #254a85;
+    --accent-foreground: #ffffff;
+    --destructive: #ff5555;
+    --destructive-foreground: #ffffff;
+    --border: #1e3a6d;
+    --input: #1e3a6d;
+    --ring: #38bdf8;
+    --critical-path: #f43f5e;
+    --non-working-day: rgba(30, 58, 109, 0.45);
+    --holiday-day: rgba(136, 19, 55, 0.35);
+  }
+
+  /* Monokai OLED Theme */
+  .theme-monokai {
+    --background: #0d0e0f;
+    --foreground: #f8f8f2;
+    --card: #191a1c;
+    --card-foreground: #f8f8f2;
+    --popover: #191a1c;
+    --popover-foreground: #f8f8f2;
+    --primary: #a6e22e;
+    --primary-foreground: #0d0e0f;
+    --secondary: #272822;
+    --secondary-foreground: #f8f8f2;
+    --muted: #272822;
+    --muted-foreground: #75715e;
+    --accent: #3e3d32;
+    --accent-foreground: #fd971f;
+    --destructive: #f92672;
+    --destructive-foreground: #ffffff;
+    --border: #272822;
+    --input: #272822;
+    --ring: #a6e22e;
+    --critical-path: #f92672;
+    --non-working-day: rgba(39, 40, 34, 0.5);
+    --holiday-day: rgba(249, 38, 114, 0.2);
+  }
+
+  /* High-Contrast Theme (WCAG AAA) */
+  .theme-high-contrast {
+    --background: #000000;
+    --foreground: #ffffff;
+    --card: #050505;
+    --card-foreground: #ffffff;
+    --popover: #050505;
+    --popover-foreground: #ffffff;
+    --primary: #ffff00;
+    --primary-foreground: #000000;
+    --secondary: #202020;
+    --secondary-foreground: #ffffff;
+    --muted: #202020;
+    --muted-foreground: #ffffff;
+    --accent: #404040;
+    --accent-foreground: #ffffff;
+    --destructive: #ff0000;
+    --destructive-foreground: #ffffff;
+    --border: #ffffff;
+    --input: #ffffff;
+    --ring: #ffff00;
+    --critical-path: #ff0000;
+    --non-working-day: rgba(80, 80, 80, 0.6);
+    --holiday-day: rgba(255, 0, 0, 0.4);
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Gantt and Canvas Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
