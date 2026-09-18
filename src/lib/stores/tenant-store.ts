@@ -43,15 +43,18 @@ export const useTenantStore = create<TenantState>((set, get) => ({
   },
 
   switchTenantById: (tenantId: string) => {
-    const { memberships, activeTenant } = get();
+    const { memberships, activeTenant, currentUser } = get();
     if (activeTenant?.id === tenantId) return;
 
     const membership = memberships.find(m => m.tenant_id === tenantId);
     if (membership && membership.tenant) {
+      const isSuperAdmin = currentUser?.is_superadmin === true || currentUser?.email === 'admin@jyotirmoyb.com';
+      const role = isSuperAdmin ? 'owner' : membership.role;
       if (typeof document !== 'undefined') {
         document.cookie = `pms_active_tenant_id=${tenantId}; path=/; max-age=31536000; SameSite=Lax`;
+        document.cookie = `pms_user_role=${role}; path=/; max-age=31536000; SameSite=Lax`;
       }
-      set({ activeTenant: membership.tenant, activeRole: membership.role });
+      set({ activeTenant: membership.tenant, activeRole: role });
     }
   },
 }));

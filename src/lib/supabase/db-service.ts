@@ -1248,6 +1248,76 @@ export class DatabaseService {
       return payload as AuditLog;
     }
   }
+
+  // ----------------------------------------------------------------------------
+  // 16. SuperAdmin: Global User Directory
+  // ----------------------------------------------------------------------------
+
+  public async getAllUsers(client?: any): Promise<any[]> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, memberships:tenant_memberships(*, tenant:tenants(id, name, slug, code))')
+        .order('created_at', { ascending: false });
+      if (error) {
+        logger.warn('Error fetching all users', { fn: 'dbService.getAllUsers', ctx: { error: error.message } });
+        return [];
+      }
+      return data || [];
+    } catch (err) {
+      logger.error('Exception fetching all users', { fn: 'dbService.getAllUsers', err });
+      return [];
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 17. SuperAdmin: Global Audit Logs
+  // ----------------------------------------------------------------------------
+
+  public async getGlobalAuditLogs(limit: number = 100, client?: any): Promise<{ logs: AuditLog[]; total: number }> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error, count } = await supabase
+        .from('audit_logs')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) {
+        logger.warn('Error fetching global audit logs', { fn: 'dbService.getGlobalAuditLogs', ctx: { error: error.message } });
+        return { logs: [], total: 0 };
+      }
+      return { logs: data || [], total: count || 0 };
+    } catch (err) {
+      logger.error('Exception fetching global audit logs', { fn: 'dbService.getGlobalAuditLogs', err });
+      return { logs: [], total: 0 };
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 18. Baseline Locking via PostgreSQL RPC
+  // ----------------------------------------------------------------------------
+
+  public async lockProjectBaseline(
+    projectId: string,
+    baselineName: string,
+    tenantId: string,
+    client?: any
+  ): Promise<{ id: string } | null> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase.rpc('lock_project_baseline', {
+        p_project_id: projectId,
+        p_baseline_name: baselineName,
+        p_tenant_id: tenantId,
+      });
+      if (error) throw error;
+      return { id: data };
+    } catch (err) {
+      logger.error('Failed to lock baseline via RPC', { fn: 'dbService.lockProjectBaseline', err });
+      throw err;
+    }
+  }
 }
 
 export const DEFAULT_THEME_TOKENS: ThemeTokens = {

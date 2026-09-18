@@ -77,7 +77,28 @@ export default function DashboardLayout({
         if (isMounted) setCurrentUser(userProfile);
 
         // 3. Fetch Authorized Workspace Memberships
-        const memberships = await dbService.getUserTenantMemberships(authUser.id, supabase);
+        let memberships = await dbService.getUserTenantMemberships(authUser.id, supabase);
+
+        // 3a. SuperAdmin: synthesize owner memberships for ALL tenants
+        const isSuperAdmin = userProfile.is_superadmin === true || authUser.email === 'admin@jyotirmoyb.com';
+        if (isSuperAdmin) {
+          const allTenants = await dbService.getAllTenants(supabase);
+          const existingTenantIds = new Set(memberships.map((m: any) => m.tenant_id));
+          const synthesized = allTenants
+            .filter((t: any) => !existingTenantIds.has(t.id))
+            .map((t: any) => ({
+              id: `synth-${t.id}`,
+              tenant_id: t.id,
+              user_id: authUser.id,
+              role: 'owner',
+              is_active: true,
+              tenant: t,
+              created_at: new Date().toISOString(),
+            }));
+          memberships = memberships.map((m: any) => ({ ...m, role: 'owner' }));
+          memberships = [...memberships, ...synthesized] as any;
+        }
+
         if (isMounted) setMemberships(memberships);
 
         // 4. Resolve Active Workspace
@@ -87,14 +108,14 @@ export default function DashboardLayout({
           if (match) activeId = match[1];
         }
 
-        let targetMembership = memberships.find((m) => m.tenant_id === activeId);
+        let targetMembership = memberships.find((m: any) => m.tenant_id === activeId);
         if (!targetMembership && memberships.length > 0) {
           targetMembership = memberships[0];
         }
 
-        if (targetMembership && targetMembership.tenant) {
+        if (targetMembership && (targetMembership as any).tenant) {
           if (isMounted) {
-            setActiveTenant(targetMembership.tenant, targetMembership.role);
+            setActiveTenant((targetMembership as any).tenant, (targetMembership as any).role);
             setIsInitializing(false);
           }
           return;
@@ -106,16 +127,6 @@ export default function DashboardLayout({
           const guestTenant = await dbService.getTenantById(guestRecords[0].tenant_id, supabase);
           if (guestTenant && isMounted) {
             setActiveTenant(guestTenant, 'guest');
-            setIsInitializing(false);
-            return;
-          }
-        }
-
-        // 6. Check if Platform SuperAdmin
-        if (userProfile.is_superadmin) {
-          const allTenants = await dbService.getAllTenants(supabase);
-          if (allTenants.length > 0 && isMounted) {
-            setActiveTenant(allTenants[0], 'admin');
             setIsInitializing(false);
             return;
           }

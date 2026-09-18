@@ -18,6 +18,7 @@ import {
   Power,
   Activity,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import { dbService, DEFAULT_THEME_TOKENS, DEFAULT_SYSTEM_THEMES } from '@/lib/supabase/db-service';
 import { createClient } from '@/lib/supabase/client';
@@ -29,8 +30,9 @@ import { Modal } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
 
 export function SuperAdminPanel() {
-  const [activeTab, setActiveTab] = React.useState<'tenants' | 'themes' | 'features' | 'audit'>('tenants');
+  const [activeTab, setActiveTab] = React.useState<'tenants' | 'users' | 'themes' | 'features' | 'audit'>('tenants');
   const [tenants, setTenants] = React.useState<Tenant[]>([]);
+  const [users, setUsers] = React.useState<any[]>([]);
   const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>(DEFAULT_SYSTEM_THEMES);
   const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
   const [isProvisionModalOpen, setIsProvisionModalOpen] = React.useState(false);
@@ -52,13 +54,15 @@ export function SuperAdminPanel() {
     let isMounted = true;
     async function loadSuperAdminData() {
       try {
-        const [fetchedTenants, fetchedThemes, fetchedAudit] = await Promise.all([
+        const [fetchedTenants, fetchedThemes, fetchedAudit, fetchedUsers] = await Promise.all([
           dbService.getAllTenants(),
           dbService.getSystemThemes(),
           dbService.getAuditLogs(),
+          dbService.getAllUsers(),
         ]);
         if (!isMounted) return;
         setTenants(fetchedTenants);
+        setUsers(fetchedUsers);
         setSystemThemes(fetchedThemes);
         setAuditLogs(fetchedAudit.logs);
         if (fetchedThemes.length > 0) {
@@ -236,6 +240,7 @@ export function SuperAdminPanel() {
         onChange={(tab) => setActiveTab(tab as any)}
         items={[
           { id: 'tenants', label: 'Tenants & Lifecycle', icon: <Building2 className="h-4 w-4" />, count: tenants.length },
+          { id: 'users', label: 'User Directory', icon: <Users className="h-4 w-4" />, count: users.length },
           { id: 'themes', label: 'Master Theme Engine', icon: <Palette className="h-4 w-4" />, count: systemThemes.length },
           { id: 'features', label: 'Feature Tiers & Flags', icon: <Sliders className="h-4 w-4" /> },
           { id: 'audit', label: 'Global Audit Trail', icon: <Activity className="h-4 w-4" />, count: auditLogs.length },
@@ -309,6 +314,67 @@ export function SuperAdminPanel() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: User Directory */}
+      {activeTab === 'users' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-[var(--foreground)]">Global User Directory</h2>
+            <Badge variant="outline" className="text-[10px] font-mono">{users.length} registered users</Badge>
+          </div>
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-[var(--secondary)] border-b border-[var(--border)]">
+                  <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">User</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Email</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Role</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Tenant Affiliations</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Joined</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {users.map((u: any) => (
+                  <tr key={u.id} className="hover:bg-[var(--secondary)]/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-full bg-[var(--primary)] text-white text-[10px] font-bold flex items-center justify-center">
+                          {u.full_name?.substring(0, 2).toUpperCase() || 'U'}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-[var(--foreground)]">{u.full_name}</div>
+                          {u.is_superadmin && <Badge variant="destructive" className="text-[8px] mt-0.5">SuperAdmin</Badge>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[var(--muted-foreground)]">{u.email}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={u.is_superadmin ? 'destructive' : 'outline'} className="text-[10px]">
+                        {u.is_superadmin ? 'SuperAdmin' : 'Standard'}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(u.memberships || []).map((m: any, idx: number) => (
+                          <Badge key={m.id || `${u.id}-${idx}`} variant="secondary" className="text-[9px] font-mono">
+                            {m.tenant?.name || m.tenant?.slug || 'Unknown'} ({m.role})
+                          </Badge>
+                        ))}
+                        {(!u.memberships || u.memberships.length === 0) && (
+                          <span className="text-[var(--muted-foreground)] italic">No affiliations</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[var(--muted-foreground)]">
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

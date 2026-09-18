@@ -54,6 +54,7 @@ export function Header() {
 
   const tenantId = activeTenant?.id || '';
   const userId = currentUser?.id || '';
+  const showSwitcher = authorizedTenants.length > 1 || Boolean(currentUser?.is_superadmin);
 
   // Notifications State
   const [notifications, setNotifications] = React.useState<UserNotification[]>([]);
@@ -78,8 +79,9 @@ export function Header() {
   };
 
   const handleTenantSwitch = (tenant: Tenant) => {
+    const isSuperAdmin = currentUser?.is_superadmin === true || currentUser?.email === 'admin@jyotirmoyb.com';
     const targetMem = memberships.find((m) => m.tenant_id === tenant.id);
-    const newRole = targetMem?.role || 'member';
+    const newRole = isSuperAdmin ? 'owner' : (targetMem?.role || 'member');
 
     if (typeof document !== 'undefined') {
       document.cookie = `pms_active_tenant_id=${tenant.id}; path=/; max-age=31536000; SameSite=Lax`;
@@ -129,7 +131,7 @@ export function Header() {
         <div className="relative">
           <button
             onClick={() => {
-              if (authorizedTenants.length > 1) {
+              if (showSwitcher) {
                 setTenantMenuOpen(!tenantMenuOpen);
                 setThemeMenuOpen(false);
                 setNotifMenuOpen(false);
@@ -138,7 +140,7 @@ export function Header() {
               }
             }}
             className={`flex items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)] px-3 py-1.5 text-xs sm:text-sm font-semibold text-[var(--foreground)] transition-all shadow-xs ${
-              authorizedTenants.length > 1 ? 'hover:border-[var(--primary)] cursor-pointer' : 'cursor-default'
+              showSwitcher ? 'hover:border-[var(--primary)] cursor-pointer' : 'cursor-default'
             }`}
           >
             <Building2 className="h-4 w-4 text-[var(--primary)]" />
@@ -148,13 +150,13 @@ export function Header() {
                 {activeTenant?.tenant_code || activeTenant?.code || activeTenant?.slug}
               </span>
             </div>
-            {authorizedTenants.length > 1 && (
+            {showSwitcher && (
               <ChevronDown className="h-3.5 w-3.5 text-[var(--muted-foreground)] ml-1" />
             )}
           </button>
 
           {/* Tenant Switcher Dropdown (Shown ONLY if user has multiple authorized workspaces) */}
-          {tenantMenuOpen && authorizedTenants.length > 1 && (
+          {tenantMenuOpen && showSwitcher && (
             <div className="absolute left-0 mt-2 w-64 rounded-lg border border-[var(--border)] bg-[var(--card)] p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
               <div className="px-2 py-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
                 Switch Authorized Workspace

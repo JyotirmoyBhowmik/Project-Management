@@ -7,7 +7,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   GanttChartSquare,
@@ -64,7 +64,22 @@ export default function ProjectWorkspacePage() {
   const supabase = createClient();
 
   const { activeTenant, activeRole, currentUser } = useTenantStore();
-  const [activeView, setActiveView] = React.useState<'gantt' | 'kanban' | 'grid' | 'calendar' | 'resource'>('gantt');
+
+  const searchParams = useSearchParams();
+  const viewParam = searchParams?.get('view') || 'gantt';
+  const validViews = ['gantt', 'kanban', 'grid', 'calendar', 'resource'] as const;
+  type ViewType = typeof validViews[number];
+  const activeView: ViewType = (validViews as readonly string[]).includes(viewParam) ? (viewParam as ViewType) : 'gantt';
+
+  const [isPending, startTransition] = React.useTransition();
+
+  const setActiveView = React.useCallback((view: ViewType) => {
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams?.toString() || '');
+      params.set('view', view);
+      router.replace(`?${params.toString()}`, { scroll: false });
+    });
+  }, [searchParams, router]);
 
   const [project, setProject] = React.useState<Project | null>(null);
   const [tasks, setTasks] = React.useState<Task[]>([]);
@@ -160,19 +175,20 @@ export default function ProjectWorkspacePage() {
   }, [selectedBaselineId]);
 
   // Task Creation Handler
+  const [taskError, setTaskError] = React.useState<string | null>(null);
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim() || !projectId || !tenantId) return;
 
     setIsSubmittingTask(true);
+    setTaskError(null);
     try {
-      const taskCode = newTaskCode.trim() || `TSK-${tasks.length + 1}`;
       await dbService.createTask(
         {
           project_id: projectId,
           tenant_id: tenantId,
           title: newTaskTitle.trim(),
-          code: taskCode.toUpperCase(),
           duration_days: Number(newTaskDuration) || 1,
           start_date: newTaskStart,
           end_date: newTaskStart,
@@ -190,7 +206,10 @@ export default function ProjectWorkspacePage() {
       setNewTaskTitle('');
       setNewTaskCode('');
       await refreshProjectData();
-    } catch (err) {
+    } catch (err: any) {
+      const pgCode = err?.code || '';
+      const msg = err?.message || 'Unknown error';
+      setTaskError(`Task creation failed [${pgCode}]: ${msg}`);
       console.error('Failed creating task:', err);
     } finally {
       setIsSubmittingTask(false);

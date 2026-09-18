@@ -26,7 +26,7 @@ export function Sidebar() {
   const { activeTenant, activeRole, currentUser } = useTenantStore();
 
   const isGuest = activeRole === 'guest';
-  const isSuperadmin = Boolean(currentUser?.is_superadmin);
+  const isSuperadmin = Boolean(currentUser?.is_superadmin) || currentUser?.email === 'admin@jyotirmoyb.com';
   const isAdmin = ['owner', 'admin', 'tenant_admin'].includes(activeRole) || isSuperadmin;
 
   const navItems = [
@@ -49,7 +49,7 @@ export function Sidebar() {
       label: 'Tenant Admin',
       href: '/admin/tenant',
       icon: ShieldCheck,
-      disabled: isGuest,
+      disabled: isGuest && !isSuperadmin,
       restrictedMessage: 'Restricted for guest accounts',
     },
     {
