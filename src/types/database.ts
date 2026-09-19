@@ -163,6 +163,7 @@ export interface TaskDependency {
   dep_type?: DependencyType;
   // Alias
   type?: DependencyType;
+  dependency_type?: DependencyType;
   lag_days: number;
   created_at: string;
 }
@@ -394,3 +395,70 @@ export interface TenantRolePermission {
   is_granted: boolean;
   created_at?: string;
 }
+
+// ------------------------------------------------------------------------------
+// Phase 4: Task Comments, Activity Stream, Attachments & System Health Audit
+// ------------------------------------------------------------------------------
+
+export interface TaskComment {
+  id: string;
+  tenant_id: string;
+  task_id: string;
+  user_id: string;
+  content_markdown: string;
+  created_at: string;
+  updated_at: string;
+  author?: UserProfile;
+}
+
+export interface TaskActivityLog {
+  id: string;
+  tenant_id: string;
+  task_id: string;
+  actor_id: string | null;
+  action_type: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  actor?: UserProfile;
+}
+
+export interface TaskAttachment {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  task_id: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  storage_path: string;
+  uploaded_by: string | null;
+  created_at: string;
+  uploader?: UserProfile;
+  signed_url?: string;
+}
+
+export interface SystemHealthCheckResult {
+  status: 'PASS' | 'WARN' | 'FAIL';
+  latency_ms?: number;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface SystemHealthAuditReport {
+  timestamp: string;
+  overall_status: 'PASS' | 'WARN' | 'FAIL';
+  checks: {
+    database: SystemHealthCheckResult;
+    rls_isolation: SystemHealthCheckResult;
+    storage_bucket: SystemHealthCheckResult;
+    orphan_records: SystemHealthCheckResult;
+  };
+  metrics: {
+    tenants_count: number;
+    projects_count: number;
+    tasks_count: number;
+    attachments_count: number;
+    active_realtime_connections?: number;
+  };
+}
+

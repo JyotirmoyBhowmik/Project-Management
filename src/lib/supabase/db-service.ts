@@ -27,6 +27,9 @@ import {
   ThemeTokens,
   TenantThemeOverride,
   AuditLog,
+  TaskComment,
+  TaskActivityLog,
+  TaskAttachment,
 } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
 
@@ -1340,6 +1343,292 @@ export class DatabaseService {
     } catch (err) {
       logger.error('Failed to lock baseline via RPC', { fn: 'dbService.lockProjectBaseline', err });
       throw err;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 19. Phase 4: Task Comments & Discussion Stream
+  // ----------------------------------------------------------------------------
+
+  public async getTaskComments(taskId: string, client?: any): Promise<TaskComment[]> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('task_comments')
+        .select(`
+          *,
+          author:profiles(id, full_name, email, avatar_url)
+        `)
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return (data as TaskComment[]) || [];
+    } catch (err) {
+      logger.error('Failed to fetch task comments', { fn: 'dbService.getTaskComments', ctx: { taskId }, err });
+      return [];
+    }
+  }
+
+  public async createTaskComment(
+    comment: {
+      tenant_id: string;
+      task_id: string;
+      user_id: string;
+      content_markdown: string;
+    },
+    client?: any
+  ): Promise<TaskComment | null> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('task_comments')
+        .insert({
+          tenant_id: comment.tenant_id,
+          task_id: comment.task_id,
+          user_id: comment.user_id,
+          content_markdown: comment.content_markdown,
+        })
+        .select(`
+          *,
+          author:profiles(id, full_name, email, avatar_url)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      // Also log this in the task activity log
+      await this.createTaskActivityLog({
+        tenant_id: comment.tenant_id,
+        task_id: comment.task_id,
+        actor_id: comment.user_id,
+        action_type: 'comment_added',
+        metadata: { snippet: comment.content_markdown.substring(0, 80) },
+      }, client);
+
+      return data as TaskComment;
+    } catch (err) {
+      logger.error('Failed to create task comment', { fn: 'dbService.createTaskComment', err });
+      throw err;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 20. Phase 4: Task Activity Log
+  // ----------------------------------------------------------------------------
+
+  public async getTaskActivityLogs(taskId: string, client?: any): Promise<TaskActivityLog[]> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('task_activity_log')
+        .select(`
+          *,
+          actor:profiles(id, full_name, email, avatar_url)
+        `)
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data as TaskActivityLog[]) || [];
+    } catch (err) {
+      logger.error('Failed to fetch task activity logs', { fn: 'dbService.getTaskActivityLogs', ctx: { taskId }, err });
+      return [];
+    }
+  }
+
+  public async createTaskActivityLog(
+    activity: {
+      tenant_id: string;
+      task_id: string;
+      actor_id?: string | null;
+      action_type: string;
+      metadata?: Record<string, any>;
+    },
+    client?: any
+  ): Promise<TaskActivityLog | null> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('task_activity_log')
+        .insert({
+          tenant_id: activity.tenant_id,
+          task_id: activity.task_id,
+          actor_id: activity.actor_id || null,
+          action_type: activity.action_type,
+          metadata: activity.metadata || {},
+        })
+        .select(`
+          *,
+          actor:profiles(id, full_name, email, avatar_url)
+        `)
+        .single();
+
+      if (error) {
+        logger.warn('Failed to insert activity log (non-fatal)', { fn: 'dbService.createTaskActivityLog', ctx: { error: error.message } });
+        return null;
+      }
+      return data as TaskActivityLog;
+    } catch (err) {
+      logger.warn('Error inserting activity log (non-fatal)', { fn: 'dbService.createTaskActivityLog', err });
+      return null;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 21. Phase 4: Secure File Attachments & Supabase Storage
+  // ----------------------------------------------------------------------------
+
+  public async getTaskAttachments(taskId: string, client?: any): Promise<TaskAttachment[]> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('task_attachments')
+        .select(`
+          *,
+          uploader:profiles(id, full_name, email, avatar_url)
+        `)
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data as TaskAttachment[]) || [];
+    } catch (err) {
+      logger.error('Failed to fetch task attachments', { fn: 'dbService.getTaskAttachments', ctx: { taskId }, err });
+      return [];
+    }
+  }
+
+  public async createTaskAttachmentRecord(
+    record: {
+      tenant_id: string;
+      project_id: string;
+      task_id: string;
+      file_name: string;
+      file_size: number;
+      file_type: string;
+      storage_path: string;
+      uploaded_by?: string | null;
+    },
+    client?: any
+  ): Promise<TaskAttachment | null> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('task_attachments')
+        .insert({
+          tenant_id: record.tenant_id,
+          project_id: record.project_id,
+          task_id: record.task_id,
+          file_name: record.file_name,
+          file_size: record.file_size,
+          file_type: record.file_type,
+          storage_path: record.storage_path,
+          uploaded_by: record.uploaded_by || null,
+        })
+        .select(`
+          *,
+          uploader:profiles(id, full_name, email, avatar_url)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      // Log in task activity
+      await this.createTaskActivityLog({
+        tenant_id: record.tenant_id,
+        task_id: record.task_id,
+        actor_id: record.uploaded_by || null,
+        action_type: 'attachment_uploaded',
+        metadata: {
+          file_name: record.file_name,
+          file_size: record.file_size,
+          file_type: record.file_type,
+        },
+      }, client);
+
+      return data as TaskAttachment;
+    } catch (err) {
+      logger.error('Failed to create task attachment record', { fn: 'dbService.createTaskAttachmentRecord', err });
+      throw err;
+    }
+  }
+
+  public async deleteTaskAttachmentRecord(
+    attachmentId: string,
+    storagePath: string,
+    client?: any
+  ): Promise<boolean> {
+    const supabase = getSupabase(client);
+    try {
+      // 1. Delete DB record
+      const { error: dbError } = await supabase
+        .from('task_attachments')
+        .delete()
+        .eq('id', attachmentId);
+
+      if (dbError) throw dbError;
+
+      // 2. Delete storage file if path provided
+      if (storagePath) {
+        await supabase.storage.from('task-attachments').remove([storagePath]);
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('Failed to delete attachment', { fn: 'dbService.deleteTaskAttachmentRecord', ctx: { attachmentId }, err });
+      throw err;
+    }
+  }
+
+  public async getAttachmentSignedUrl(
+    storagePath: string,
+    expiresInSeconds: number = 900,
+    client?: any
+  ): Promise<string | null> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase.storage
+        .from('task-attachments')
+        .createSignedUrl(storagePath, expiresInSeconds);
+
+      if (error || !data?.signedUrl) {
+        logger.warn('Could not generate signed URL', { fn: 'dbService.getAttachmentSignedUrl', ctx: { storagePath, error: error?.message } });
+        return null;
+      }
+      return data.signedUrl;
+    } catch (err) {
+      logger.error('Error generating attachment signed URL', { fn: 'dbService.getAttachmentSignedUrl', ctx: { storagePath }, err });
+      return null;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+  // 22. Phase 4: Team Members & Notifications Subsystem
+  // ----------------------------------------------------------------------------
+
+  public async getTenantMembersWithProfiles(
+    tenantId: string,
+    client?: any
+  ): Promise<Array<{ id: string; user_id: string; role: string; profile: UserProfile }>> {
+    const supabase = getSupabase(client);
+    try {
+      const { data, error } = await supabase
+        .from('tenant_memberships')
+        .select(`
+          id,
+          user_id,
+          role,
+          profile:profiles(id, full_name, email, avatar_url, theme_preference)
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      return (data as any[]) || [];
+    } catch (err) {
+      logger.error('Failed to fetch tenant members with profiles', { fn: 'dbService.getTenantMembersWithProfiles', ctx: { tenantId }, err });
+      return [];
     }
   }
 }

@@ -36,10 +36,10 @@ interface GanttState {
 }
 
 const ZOOM_WIDTHS: Record<GanttZoomLevel, number> = {
-  day: 44,
-  week: 110,
-  month: 160,
-  quarter: 220,
+  day: 48,
+  week: 120,
+  month: 200,
+  quarter: 320,
 };
 
 export const useGanttStore = create<GanttState>((set) => ({

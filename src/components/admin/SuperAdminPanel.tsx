@@ -19,7 +19,9 @@ import {
   Activity,
   Sparkles,
   Users,
+  ShieldCheck,
 } from 'lucide-react';
+import Link from 'next/link';
 import { dbService, DEFAULT_THEME_TOKENS, DEFAULT_SYSTEM_THEMES } from '@/lib/supabase/db-service';
 import { createClient } from '@/lib/supabase/client';
 import { SystemTheme, ThemeTokens, Tenant, AuditLog } from '@/types/database';
@@ -264,6 +266,12 @@ export function SuperAdminPanel() {
               {notificationMsg}
             </div>
           )}
+          <Link href="/admin/multisite/diagnostics">
+            <Button variant="outline" className="gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              System Diagnostics
+            </Button>
+          </Link>
           <Button onClick={() => setIsProvisionModalOpen(true)} className="gap-1.5 text-xs">
             <Plus className="h-4 w-4" />
             Provision New Tenant

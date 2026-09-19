@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { Task, TaskDependency, WorkingCalendar, CalendarHoliday, TaskBaselineSnapshot } from '@/types/database';
 import { useGanttStore, GanttZoomLevel } from '@/lib/stores/gantt-store';
@@ -24,7 +26,9 @@ import {
   formatDateToISO,
   generateDayGrid,
   addWorkingDays,
+  calculateWorkingDays,
 } from '@/lib/calendar/calendar-engine';
+import { topologicalSort } from '@/lib/cpm/cpm-engine';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/dialog';
@@ -45,6 +49,7 @@ interface InteractiveGanttProps {
   onRecalculateCPM?: () => void;
   onOpenExportModal?: () => void;
   onOpenImportModal?: () => void;
+  onSelectTask?: (task: Task) => void;
 }
 
 export function InteractiveGantt({
@@ -60,6 +65,7 @@ export function InteractiveGantt({
   onRecalculateCPM,
   onOpenExportModal,
   onOpenImportModal,
+  onSelectTask,
 }: InteractiveGanttProps) {
   const {
     zoomLevel,
@@ -78,6 +84,8 @@ export function InteractiveGantt({
   } = useGanttStore();
 
   const [mousePos, setMousePos] = React.useState<{ x: number; y: number } | null>(null);
+  const [cycleWarning, setCycleWarning] = React.useState<string | null>(null);
+
   const [draggingTask, setDraggingTask] = React.useState<{
     taskId: string;
     action: 'move' | 'resize-start' | 'resize-end';
@@ -99,12 +107,28 @@ export function InteractiveGantt({
   const svgRef = React.useRef<SVGSVGElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
 
+  // Scaling factor: pixels per single calendar day based on zoom preset
+  const pxPerDay = React.useMemo(() => {
+    switch (zoomLevel) {
+      case 'day':
+        return columnWidth; // 48px / day
+      case 'week':
+        return columnWidth / 7; // 120px / 7 days ~ 17.14px / day
+      case 'month':
+        return columnWidth / 30; // 200px / 30 days ~ 6.67px / day
+      case 'quarter':
+        return columnWidth / 90; // 320px / 90 days ~ 3.55px / day
+      default:
+        return columnWidth;
+    }
+  }, [zoomLevel, columnWidth]);
+
   // Determine timeline boundary dates
   const { minDate, maxDate, dayGrid } = React.useMemo(() => {
     let min = parseISODate('2026-10-01');
     let max = parseISODate('2026-12-15');
 
-    tasks.forEach(t => {
+    tasks.forEach((t) => {
       const s = parseISODate(t.start_date);
       const e = parseISODate(t.end_date);
       if (s < min) min = s;
@@ -113,17 +137,17 @@ export function InteractiveGantt({
 
     // Add buffer days on both ends
     const startBound = new Date(min.getTime());
-    startBound.setUTCDate(startBound.getUTCDate() - 5);
+    startBound.setUTCDate(startBound.getUTCDate() - 7);
     const endBound = new Date(max.getTime());
-    endBound.setUTCDate(endBound.getUTCDate() + 15);
+    endBound.setUTCDate(endBound.getUTCDate() + 21);
 
     const grid = generateDayGrid(startBound, endBound, calendar, holidays);
     return { minDate: startBound, maxDate: endBound, dayGrid: grid };
   }, [tasks, calendar, holidays]);
 
-  const timelineWidth = dayGrid.length * columnWidth;
-  const headerHeight = 52;
-  const contentHeight = tasks.length * rowHeight;
+  const timelineWidth = Math.max(1200, dayGrid.length * pxPerDay);
+  const headerHeight = 56;
+  const contentHeight = Math.max(400, tasks.length * rowHeight);
   const totalSvgHeight = headerHeight + contentHeight;
 
   // Coordinate conversion helper functions
@@ -131,19 +155,9 @@ export function InteractiveGantt({
     (dateStr: string): number => {
       const target = parseISODate(dateStr);
       const diffDays = Math.round((target.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
-      return Math.max(0, diffDays * columnWidth);
+      return Math.max(0, diffDays * pxPerDay);
     },
-    [minDate, columnWidth]
-  );
-
-  const xToDate = React.useCallback(
-    (x: number): Date => {
-      const dayIndex = Math.floor(x / columnWidth);
-      const result = new Date(minDate.getTime());
-      result.setUTCDate(result.getUTCDate() + dayIndex);
-      return result;
-    },
-    [minDate, columnWidth]
+    [minDate, pxPerDay]
   );
 
   // Handle Drag Move & Resize
@@ -153,7 +167,7 @@ export function InteractiveGantt({
     action: 'move' | 'resize-start' | 'resize-end'
   ) => {
     e.stopPropagation();
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
     setDraggingTask({
@@ -178,10 +192,10 @@ export function InteractiveGantt({
     if (!draggingTask) return;
 
     const deltaX = e.clientX - draggingTask.startX;
-    const deltaDays = Math.round(deltaX / columnWidth);
+    const deltaDays = Math.round(deltaX / pxPerDay);
     if (deltaDays === 0) return;
 
-    const task = tasks.find(t => t.id === draggingTask.taskId);
+    const task = tasks.find((t) => t.id === draggingTask.taskId);
     if (!task) return;
 
     if (draggingTask.action === 'move') {
@@ -202,6 +216,19 @@ export function InteractiveGantt({
         duration_days: newDuration,
         end_date: formatDateToISO(newEnd),
       });
+    } else if (draggingTask.action === 'resize-start') {
+      const origStart = parseISODate(draggingTask.origStartDate);
+      const newStart = new Date(origStart.getTime());
+      newStart.setUTCDate(newStart.getUTCDate() + deltaDays);
+      const currentEnd = parseISODate(task.end_date);
+
+      if (newStart <= currentEnd) {
+        const newDuration = Math.max(1, calculateWorkingDays(newStart, currentEnd, calendar, holidays));
+        onTaskUpdate?.(task.id, {
+          start_date: formatDateToISO(newStart),
+          duration_days: newDuration,
+        });
+      }
     }
   };
 
@@ -211,19 +238,38 @@ export function InteractiveGantt({
     }
   };
 
-  // Drag-to-connect dependency complete handler
+  // Drag-to-connect dependency complete handler with Kahn's loop guard
   const handleConnectorMouseUp = (targetTaskId: string, targetHandle: 'start' | 'finish') => {
     if (isConnectingDependency && sourceTaskId && sourceTaskId !== targetTaskId) {
-      // Determine dependency type based on handle combination:
-      // Finish -> Start = FS
-      // Start -> Start = SS
-      // Finish -> Finish = FF
-      // Start -> Finish = SF
       let type: 'FS' | 'SS' | 'FF' | 'SF' = 'FS';
       if (sourceHandle === 'finish' && targetHandle === 'start') type = 'FS';
       else if (sourceHandle === 'start' && targetHandle === 'start') type = 'SS';
       else if (sourceHandle === 'finish' && targetHandle === 'finish') type = 'FF';
       else if (sourceHandle === 'start' && targetHandle === 'finish') type = 'SF';
+
+      // 1. Circular Dependency Guard using Kahn's algorithm
+      const candidateDep: TaskDependency = {
+        id: 'candidate-check',
+        tenant_id: tasks[0]?.tenant_id || '',
+        project_id: tasks[0]?.project_id || '',
+        predecessor_id: sourceTaskId,
+        successor_id: targetTaskId,
+        dependency_type: type,
+        lag_days: 0,
+        created_at: new Date().toISOString(),
+      };
+
+      const { hasCycle } = topologicalSort(tasks, [...dependencies, candidateDep]);
+      if (hasCycle) {
+        const predTask = tasks.find((t) => t.id === sourceTaskId);
+        const succTask = tasks.find((t) => t.id === targetTaskId);
+        setCycleWarning(
+          `Circular Dependency Blocked: Connecting "${predTask?.title || 'Predecessor'}" to "${succTask?.title || 'Successor'}" creates an impossible cyclic loop in the project network.`
+        );
+        setTimeout(() => setCycleWarning(null), 6000);
+        cancelDependencyConnection();
+        return;
+      }
 
       onAddDependency?.({
         predecessor_id: sourceTaskId,
@@ -233,6 +279,11 @@ export function InteractiveGantt({
       });
     }
     cancelDependencyConnection();
+  };
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTaskId(task.id);
+    onSelectTask?.(task);
   };
 
   const handleCreateTask = (e: React.FormEvent) => {
@@ -252,7 +303,21 @@ export function InteractiveGantt({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-xs">
+    <div className="flex flex-col h-full bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden shadow-xs relative">
+      {/* Loop Prevention Alert Toast */}
+      {cycleWarning && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-rose-950/95 text-rose-200 border border-rose-500/50 px-4 py-2.5 rounded-lg shadow-xl text-xs backdrop-blur-md animate-in fade-in slide-in-from-top-2">
+          <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+          <span className="font-medium">{cycleWarning}</span>
+          <button
+            onClick={() => setCycleWarning(null)}
+            className="p-1 hover:bg-rose-800/50 rounded cursor-pointer ml-1"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* 1. Control Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b border-[var(--border)] bg-[var(--secondary)]/50">
         <div className="flex items-center gap-2">
@@ -278,11 +343,11 @@ export function InteractiveGantt({
             onClick={toggleCriticalPathHighlight}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
               highlightCriticalPath
-                ? 'bg-rose-500/15 border-rose-500 text-rose-500 shadow-xs'
+                ? 'bg-amber-500/20 border-amber-500 text-amber-400 shadow-xs'
                 : 'border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
             }`}
           >
-            <Flame className="h-3.5 w-3.5" />
+            <Flame className="h-3.5 w-3.5 text-amber-400" />
             <span>Critical Path</span>
           </button>
 
@@ -351,13 +416,14 @@ export function InteractiveGantt({
           {/* Grid Rows */}
           <div className="divide-y divide-[var(--border)]">
             {tasks.map((task, index) => {
-              const isCritical = task.is_critical && highlightCriticalPath;
+              const isZeroFloat = task.total_float === 0;
+              const isCritical = (task.is_critical || isZeroFloat) && highlightCriticalPath;
               const isSelected = selectedTaskId === task.id;
 
               return (
                 <div
                   key={task.id}
-                  onClick={() => setSelectedTaskId(task.id)}
+                  onClick={() => handleTaskClick(task)}
                   style={{ height: rowHeight }}
                   className={`flex items-center justify-between px-3 text-xs transition-colors cursor-pointer ${
                     isSelected
@@ -377,7 +443,7 @@ export function InteractiveGantt({
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {isCritical && (
-                      <Badge variant="critical" className="text-[9px] py-0 px-1">
+                      <Badge variant="critical" className="text-[9px] py-0 px-1 bg-amber-500/20 text-amber-300 border-amber-500/40">
                         CP
                       </Badge>
                     )}
@@ -423,11 +489,25 @@ export function InteractiveGantt({
                 markerHeight="6"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 1 L 10 5 L 0 9 z" fill="#f43f5e" />
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
               </marker>
+
+              {/* CPM Neon Amber Glow Shader */}
+              <filter id="cpm-neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feColorMatrix
+                  type="matrix"
+                  values="0 0 0 0 0.96  0 0 0 0 0.62  0 0 0 0 0.04  0 0 0 0.85 0"
+                  result="coloredBlur"
+                />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
             </defs>
 
-            {/* 1. Header Scale Dates */}
+            {/* 1. Header Scale Dates across 4 Zoom Presets */}
             <g className="timeline-header">
               <rect
                 x="0"
@@ -437,66 +517,198 @@ export function InteractiveGantt({
                 fill="var(--secondary)"
                 className="border-b border-[var(--border)]"
               />
-              {dayGrid.map((day, i) => {
-                const x = i * columnWidth;
-                const d = day.date;
-                const isFirstOfMonth = d.getUTCDate() === 1;
 
-                return (
-                  <g key={day.dateString} transform={`translate(${x}, 0)`}>
-                    {/* Top Month Header Label */}
-                    {isFirstOfMonth && (
+              {/* Header Rendering based on zoomLevel */}
+              {zoomLevel === 'day' &&
+                dayGrid.map((day, i) => {
+                  const x = i * pxPerDay;
+                  const d = day.date;
+                  const isFirstOfMonth = d.getUTCDate() === 1 || i === 0;
+
+                  return (
+                    <g key={day.dateString} transform={`translate(${x}, 0)`}>
+                      {isFirstOfMonth && (
+                        <text
+                          x="4"
+                          y="18"
+                          className="text-[11px] font-bold fill-[var(--foreground)]"
+                        >
+                          {d.toLocaleString('default', { month: 'short', year: 'numeric' })}
+                        </text>
+                      )}
                       <text
-                        x="4"
-                        y="18"
-                        className="text-[11px] font-bold fill-[var(--foreground)]"
+                        x={pxPerDay / 2}
+                        y="42"
+                        textAnchor="middle"
+                        className={`text-[10px] font-mono ${
+                          day.isWeekend
+                            ? 'fill-[var(--muted-foreground)] opacity-60'
+                            : day.isHoliday
+                            ? 'fill-rose-500 font-bold'
+                            : 'fill-[var(--foreground)] font-medium'
+                        }`}
                       >
-                        {d.toLocaleString('default', { month: 'short', year: 'numeric' })}
+                        {d.getUTCDate()}
                       </text>
-                    )}
-                    {/* Bottom Day Label */}
-                    <text
-                      x={columnWidth / 2}
-                      y="40"
-                      textAnchor="middle"
-                      className={`text-[10px] font-mono ${
-                        day.isWeekend
-                          ? 'fill-[var(--muted-foreground)] font-normal opacity-60'
-                          : day.isHoliday
-                          ? 'fill-rose-500 font-bold'
-                          : 'fill-[var(--foreground)] font-medium'
-                      }`}
-                    >
-                      {d.getUTCDate()}
-                    </text>
-                    <line
-                      x1={columnWidth}
-                      y1="24"
-                      x2={columnWidth}
-                      y2={headerHeight}
-                      stroke="var(--border)"
-                      strokeWidth="1"
-                    />
-                  </g>
-                );
-              })}
+                      <line
+                        x1={pxPerDay}
+                        y1="24"
+                        x2={pxPerDay}
+                        y2={headerHeight}
+                        stroke="var(--border)"
+                        strokeWidth="1"
+                      />
+                    </g>
+                  );
+                })}
+
+              {zoomLevel === 'week' &&
+                (() => {
+                  const weeks: { startDayIndex: number; date: Date; weekNum: number }[] = [];
+                  for (let i = 0; i < dayGrid.length; i += 7) {
+                    const d = dayGrid[i].date;
+                    const weekNum = Math.ceil((d.getUTCDate() + 6) / 7);
+                    weeks.push({ startDayIndex: i, date: d, weekNum });
+                  }
+
+                  return weeks.map((w, idx) => {
+                    const x = w.startDayIndex * pxPerDay;
+                    const weekWidth = 7 * pxPerDay;
+                    return (
+                      <g key={`week-${idx}`} transform={`translate(${x}, 0)`}>
+                        <text
+                          x="6"
+                          y="18"
+                          className="text-[11px] font-bold fill-[var(--foreground)]"
+                        >
+                          {w.date.toLocaleString('default', { month: 'short', year: 'numeric' })}
+                        </text>
+                        <text
+                          x={weekWidth / 2}
+                          y="42"
+                          textAnchor="middle"
+                          className="text-[10px] font-semibold fill-[var(--foreground)]"
+                        >
+                          Week {idx + 1} ({w.date.getUTCMonth() + 1}/{w.date.getUTCDate()})
+                        </text>
+                        <line
+                          x1={weekWidth}
+                          y1="0"
+                          x2={weekWidth}
+                          y2={headerHeight}
+                          stroke="var(--border)"
+                          strokeWidth="1"
+                        />
+                      </g>
+                    );
+                  });
+                })()}
+
+              {zoomLevel === 'month' &&
+                (() => {
+                  const months: { startDayIndex: number; date: Date }[] = [];
+                  for (let i = 0; i < dayGrid.length; i++) {
+                    const d = dayGrid[i].date;
+                    if (d.getUTCDate() === 1 || i === 0) {
+                      months.push({ startDayIndex: i, date: d });
+                    }
+                  }
+
+                  return months.map((m, idx) => {
+                    const x = m.startDayIndex * pxPerDay;
+                    const nextX = idx < months.length - 1 ? months[idx + 1].startDayIndex * pxPerDay : timelineWidth;
+                    const width = nextX - x;
+                    return (
+                      <g key={`month-${idx}`} transform={`translate(${x}, 0)`}>
+                        <text
+                          x="8"
+                          y="22"
+                          className="text-[12px] font-bold fill-[var(--foreground)]"
+                        >
+                          {m.date.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                        </text>
+                        {/* Weekly sub-ticks */}
+                        <text
+                          x={width / 2}
+                          y="44"
+                          textAnchor="middle"
+                          className="text-[9px] font-mono fill-[var(--muted-foreground)]"
+                        >
+                          Aggregated Weekly Schedule
+                        </text>
+                        <line
+                          x1={width}
+                          y1="0"
+                          x2={width}
+                          y2={headerHeight}
+                          stroke="var(--border)"
+                          strokeWidth="1.5"
+                        />
+                      </g>
+                    );
+                  });
+                })()}
+
+              {zoomLevel === 'quarter' &&
+                (() => {
+                  const quarters: { startDayIndex: number; date: Date; q: number }[] = [];
+                  for (let i = 0; i < dayGrid.length; i++) {
+                    const d = dayGrid[i].date;
+                    const m = d.getUTCMonth();
+                    if ((m % 3 === 0 && d.getUTCDate() === 1) || i === 0) {
+                      quarters.push({ startDayIndex: i, date: d, q: Math.floor(m / 3) + 1 });
+                    }
+                  }
+
+                  return quarters.map((q, idx) => {
+                    const x = q.startDayIndex * pxPerDay;
+                    const nextX = idx < quarters.length - 1 ? quarters[idx + 1].startDayIndex * pxPerDay : timelineWidth;
+                    const width = nextX - x;
+                    return (
+                      <g key={`quarter-${idx}`} transform={`translate(${x}, 0)`}>
+                        <text
+                          x="8"
+                          y="22"
+                          className="text-[12px] font-bold fill-[var(--foreground)]"
+                        >
+                          Q{q.q} {q.date.getUTCFullYear()}
+                        </text>
+                        <text
+                          x={width / 2}
+                          y="44"
+                          textAnchor="middle"
+                          className="text-[10px] font-semibold fill-[var(--muted-foreground)]"
+                        >
+                          Monthly Partition Scale
+                        </text>
+                        <line
+                          x1={width}
+                          y1="0"
+                          x2={width}
+                          y2={headerHeight}
+                          stroke="var(--border)"
+                          strokeWidth="2"
+                        />
+                      </g>
+                    );
+                  });
+                })()}
             </g>
 
-            {/* 2. Non-Working Day and Holiday Vertical Stripes */}
-            <g className="non-working-stripes">
-              {dayGrid.map((day, i) => {
-                const x = i * columnWidth;
+            {/* 2. Non-Working Day and Holiday Vertical Stripes (Cross-Zoom Scaled) */}
+            <g className="non-working-stripes pointer-events-none">
+              {dayGrid.map((day) => {
                 if (day.isWorkingDay) return null;
+                const x = dateToX(day.dateString);
 
                 return (
                   <rect
                     key={`bg-${day.dateString}`}
                     x={x}
                     y={headerHeight}
-                    width={columnWidth}
+                    width={pxPerDay}
                     height={contentHeight}
-                    fill={day.isHoliday ? 'var(--holiday-day)' : 'var(--non-working-day)'}
-                    className="pointer-events-none"
+                    fill={day.isHoliday ? 'rgba(239, 68, 68, 0.12)' : 'rgba(100, 116, 139, 0.08)'}
                   />
                 );
               })}
@@ -524,17 +736,17 @@ export function InteractiveGantt({
             {/* 4. Dependency Connector Lines (Bezier Curves) */}
             <g className="dependency-links">
               {dependencies.map((dep) => {
-                const predIndex = tasks.findIndex(t => t.id === dep.predecessor_id);
-                const succIndex = tasks.findIndex(t => t.id === dep.successor_id);
+                const predIndex = tasks.findIndex((t) => t.id === dep.predecessor_id);
+                const succIndex = tasks.findIndex((t) => t.id === dep.successor_id);
                 if (predIndex === -1 || succIndex === -1) return null;
 
                 const predTask = tasks[predIndex];
                 const succTask = tasks[succIndex];
 
                 const predStartX = dateToX(predTask.start_date);
-                const predEndX = dateToX(predTask.end_date) + columnWidth;
+                const predEndX = dateToX(predTask.end_date) + pxPerDay;
                 const succStartX = dateToX(succTask.start_date);
-                const succEndX = dateToX(succTask.end_date) + columnWidth;
+                const succEndX = dateToX(succTask.end_date) + pxPerDay;
 
                 const predY = headerHeight + predIndex * rowHeight + rowHeight / 2;
                 const succY = headerHeight + succIndex * rowHeight + rowHeight / 2;
@@ -554,12 +766,14 @@ export function InteractiveGantt({
                 }
 
                 const isCriticalLink =
-                  highlightCriticalPath && predTask.is_critical && succTask.is_critical;
-                const strokeColor = isCriticalLink ? '#f43f5e' : 'var(--muted-foreground)';
+                  highlightCriticalPath &&
+                  (predTask.is_critical || predTask.total_float === 0) &&
+                  (succTask.is_critical || succTask.total_float === 0);
+
+                const strokeColor = isCriticalLink ? '#f59e0b' : 'var(--muted-foreground)';
                 const strokeWidth = isCriticalLink ? 2.5 : 1.5;
                 const markerEnd = isCriticalLink ? 'url(#dep-arrow-critical)' : 'url(#dep-arrow)';
 
-                // Compute smooth bezier path
                 const dx = Math.abs(endX - startX) / 2;
                 const pathD = `M ${startX} ${predY} C ${startX + dx} ${predY}, ${endX - dx} ${succY}, ${endX} ${succY}`;
 
@@ -580,18 +794,19 @@ export function InteractiveGantt({
             {/* 5. Interactive Task Bars & Milestone Diamonds */}
             <g className="task-bars">
               {tasks.map((task, index) => {
-                const y = headerHeight + index * rowHeight + (rowHeight - 24) / 2;
+                const y = headerHeight + index * rowHeight + (rowHeight - 26) / 2;
                 const startX = dateToX(task.start_date);
-                const endX = dateToX(task.end_date) + columnWidth;
-                const width = Math.max(columnWidth, endX - startX);
-                const isCritical = task.is_critical && highlightCriticalPath;
+                const endX = dateToX(task.end_date) + pxPerDay;
+                const width = Math.max(pxPerDay, endX - startX);
+                const isZeroFloat = task.total_float === 0;
+                const isCritical = (task.is_critical || isZeroFloat) && highlightCriticalPath;
                 const isSelected = selectedTaskId === task.id;
 
-                // Baseline Variance calculation
+                // Baseline Variance
                 const baselineSnapshot = baselineSnapshots.find((s) => s.task_id === task.id);
                 const baseStartX = baselineSnapshot ? dateToX(baselineSnapshot.start_date) : 0;
-                const baseEndX = baselineSnapshot ? dateToX(baselineSnapshot.end_date) + columnWidth : 0;
-                const baseWidth = baselineSnapshot ? Math.max(columnWidth, baseEndX - baseStartX) : 0;
+                const baseEndX = baselineSnapshot ? dateToX(baselineSnapshot.end_date) + pxPerDay : 0;
+                const baseWidth = baselineSnapshot ? Math.max(pxPerDay, baseEndX - baseStartX) : 0;
                 const varianceDays = baselineSnapshot
                   ? Math.round(
                       (parseISODate(task.end_date).getTime() - parseISODate(baselineSnapshot.end_date).getTime()) /
@@ -599,20 +814,20 @@ export function InteractiveGantt({
                     )
                   : 0;
 
-                // Milestone Rendering (Rotated Diamond)
+                // Milestone Rendering
                 if (task.is_milestone) {
-                  const centerX = startX + columnWidth / 2;
-                  const centerY = y + 12;
+                  const centerX = startX + pxPerDay / 2;
+                  const centerY = y + 13;
 
                   return (
                     <g key={task.id} className="cursor-pointer group">
                       <polygon
                         points={`${centerX},${centerY - 10} ${centerX + 10},${centerY} ${centerX},${centerY + 10} ${centerX - 10},${centerY}`}
-                        fill={isCritical ? '#f43f5e' : 'var(--primary)'}
-                        stroke={isSelected ? '#ffffff' : 'none'}
+                        fill={isCritical ? '#f59e0b' : 'var(--primary)'}
+                        stroke={isSelected ? '#ffffff' : isCritical ? '#fcd34d' : 'none'}
                         strokeWidth="2"
                         className="transition-transform group-hover:scale-125"
-                        onClick={() => setSelectedTaskId(task.id)}
+                        onClick={() => handleTaskClick(task)}
                       />
                       <text
                         x={centerX + 16}
@@ -625,15 +840,14 @@ export function InteractiveGantt({
                   );
                 }
 
-                // Standard Task Bar
                 return (
                   <g key={task.id} className="group">
-                    {/* Dual-Bar Ghost Baseline Rendering */}
+                    {/* Ghost Baseline Rendering */}
                     {baselineSnapshot && (
                       <g className="pointer-events-none opacity-70">
                         <rect
                           x={baseStartX}
-                          y={y + 26}
+                          y={y + 28}
                           width={baseWidth}
                           height="5"
                           rx="2.5"
@@ -645,7 +859,7 @@ export function InteractiveGantt({
                         {varianceDays !== 0 && (
                           <text
                             x={Math.max(startX + width, baseStartX + baseWidth) + 8}
-                            y={y + 20}
+                            y={y + 22}
                             className={`text-[9px] font-mono font-bold ${
                               varianceDays > 0 ? 'fill-rose-400' : 'fill-emerald-400'
                             }`}
@@ -656,24 +870,27 @@ export function InteractiveGantt({
                       </g>
                     )}
 
-                    {/* Main Bar Background & Critical Glow */}
+                    {/* Main Bar Background & Critical Path Glow Shader */}
                     <rect
                       x={startX}
                       y={y}
                       width={width}
-                      height="24"
-                      rx="5"
-                      fill={isCritical ? '#f43f5e' : 'var(--primary)'}
+                      height="26"
+                      rx="6"
+                      fill={isCritical ? '#f59e0b' : 'var(--primary)'}
+                      stroke={isCritical ? '#fef08a' : isSelected ? '#ffffff' : 'transparent'}
+                      strokeWidth={isCritical ? '2' : isSelected ? '2' : '0'}
+                      filter={isCritical ? 'url(#cpm-neon-glow)' : undefined}
                       className={`cursor-grab active:cursor-grabbing transition-all ${
-                        isCritical ? 'filter drop-shadow(0 0 6px rgba(244, 63, 94, 0.6))' : ''
-                      } ${isSelected ? 'stroke-2 stroke-white' : ''}`}
+                        isCritical ? 'animate-pulse' : ''
+                      }`}
                       onMouseDown={(e) => handleMouseDown(e, task.id, 'move')}
-                      onClick={() => setSelectedTaskId(task.id)}
+                      onClick={() => handleTaskClick(task)}
                     />
 
                     {/* Active Collaborator Presence Markers */}
                     {activeTaskMap[task.id] && activeTaskMap[task.id].length > 0 && (
-                      <g transform={`translate(${startX + width + 6}, ${y + 4})`}>
+                      <g transform={`translate(${startX + width + 6}, ${y + 5})`}>
                         {activeTaskMap[task.id].map((c, cIdx) => (
                           <g key={c.userId} transform={`translate(${cIdx * 18}, 0)`}>
                             <circle cx="8" cy="8" r="8" fill={c.color} stroke="white" strokeWidth="1.5" />
@@ -691,49 +908,49 @@ export function InteractiveGantt({
                         x={startX}
                         y={y}
                         width={(width * (task.progress ?? task.progress_percent ?? 0)) / 100}
-                        height="24"
-                        rx="5"
+                        height="26"
+                        rx="6"
                         fill="rgba(255, 255, 255, 0.25)"
                         className="pointer-events-none"
                       />
                     )}
 
-                    {/* Task Title Label inside bar */}
+                    {/* Task Title Label */}
                     <text
                       x={startX + 8}
-                      y={y + 16}
-                      className="text-[11px] font-medium fill-white pointer-events-none truncate"
+                      y={y + 17}
+                      className="text-[11px] font-semibold fill-white pointer-events-none truncate select-none"
                     >
                       {task.title}
                     </text>
 
-                    {/* Resize Left Handle */}
+                    {/* Resize Left Handle (Start Date change) */}
                     <rect
                       x={startX}
                       y={y}
-                      width="6"
-                      height="24"
+                      width="8"
+                      height="26"
                       fill="transparent"
                       className="cursor-ew-resize hover:fill-white/30"
                       onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-start')}
                     />
 
-                    {/* Resize Right Handle */}
+                    {/* Resize Right Handle (Duration change) */}
                     <rect
-                      x={startX + width - 6}
+                      x={startX + width - 8}
                       y={y}
-                      width="6"
-                      height="24"
+                      width="8"
+                      height="26"
                       fill="transparent"
                       className="cursor-ew-resize hover:fill-white/30"
                       onMouseDown={(e) => handleMouseDown(e, task.id, 'resize-end')}
                     />
 
-                    {/* Dependency Connectors (Left = Start, Right = Finish) */}
+                    {/* Dependency Connector Anchors (Start & Finish) */}
                     <circle
-                      cx={startX - 4}
-                      cy={y + 12}
-                      r="4"
+                      cx={startX - 5}
+                      cy={y + 13}
+                      r="5"
                       fill="#38bdf8"
                       stroke="#ffffff"
                       strokeWidth="1.5"
@@ -746,12 +963,14 @@ export function InteractiveGantt({
                         e.stopPropagation();
                         handleConnectorMouseUp(task.id, 'start');
                       }}
-                    />
+                    >
+                      <title>Drag to connect dependency</title>
+                    </circle>
 
                     <circle
-                      cx={startX + width + 4}
-                      cy={y + 12}
-                      r="4"
+                      cx={startX + width + 5}
+                      cy={y + 13}
+                      r="5"
                       fill="#38bdf8"
                       stroke="#ffffff"
                       strokeWidth="1.5"
@@ -764,7 +983,9 @@ export function InteractiveGantt({
                         e.stopPropagation();
                         handleConnectorMouseUp(task.id, 'finish');
                       }}
-                    />
+                    >
+                      <title>Drag to connect dependency</title>
+                    </circle>
                   </g>
                 );
               })}
@@ -774,13 +995,13 @@ export function InteractiveGantt({
             {isConnectingDependency && sourceTaskId && mousePos && (
               <g className="active-dep-preview pointer-events-none">
                 {(() => {
-                  const sIdx = tasks.findIndex(t => t.id === sourceTaskId);
+                  const sIdx = tasks.findIndex((t) => t.id === sourceTaskId);
                   if (sIdx === -1) return null;
                   const sTask = tasks[sIdx];
                   const sX =
                     sourceHandle === 'start'
                       ? dateToX(sTask.start_date)
-                      : dateToX(sTask.end_date) + columnWidth;
+                      : dateToX(sTask.end_date) + pxPerDay;
                   const sY = headerHeight + sIdx * rowHeight + rowHeight / 2;
 
                   return (
@@ -790,7 +1011,7 @@ export function InteractiveGantt({
                       x2={mousePos.x}
                       y2={mousePos.y}
                       stroke="#38bdf8"
-                      strokeWidth="2"
+                      strokeWidth="2.5"
                       strokeDasharray="4,4"
                       markerEnd="url(#dep-arrow)"
                     />

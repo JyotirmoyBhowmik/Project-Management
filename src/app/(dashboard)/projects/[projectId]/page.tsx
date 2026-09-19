@@ -55,6 +55,7 @@ import { HierarchicalGrid } from '@/components/grid/HierarchicalGrid';
 import { ProjectCalendarView } from '@/components/calendar/ProjectCalendarView';
 import { ResourceHeatmapView } from '@/components/resource/ResourceHeatmapView';
 import { ImportExportModal } from '@/components/exchange/ImportExportModal';
+import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
 import { useProjectPresence } from '@/lib/realtime/presence-service';
 import { calculateCPM } from '@/lib/cpm/cpm-engine';
 
@@ -99,6 +100,7 @@ function ProjectWorkspaceContent() {
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isCpmCalculating, setIsCpmCalculating] = React.useState(false);
+  const [selectedTaskForDrawer, setSelectedTaskForDrawer] = React.useState<Task | null>(null);
 
   // Modals state
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = React.useState(false);
@@ -509,6 +511,7 @@ function ProjectWorkspaceContent() {
               onRecalculateCPM={handleRunCPM}
               onOpenExportModal={() => setExchangeMode('export')}
               onOpenImportModal={() => setExchangeMode('import')}
+              onSelectTask={(t) => setSelectedTaskForDrawer(t)}
             />
           )}
 
@@ -519,6 +522,7 @@ function ProjectWorkspaceContent() {
                 await dbService.updateTask(taskId, updates, supabase);
                 await refreshProjectData();
               }}
+              onSelectTask={(t) => setSelectedTaskForDrawer(t)}
             />
           )}
 
@@ -529,6 +533,7 @@ function ProjectWorkspaceContent() {
                 await dbService.updateTask(taskId, updates, supabase);
                 await refreshProjectData();
               }}
+              onSelectTask={(t) => setSelectedTaskForDrawer(t)}
             />
           )}
 
@@ -546,6 +551,26 @@ function ProjectWorkspaceContent() {
           )}
         </div>
       )}
+
+      {/* Interactive Task Detail Drawer */}
+      <TaskDetailDrawer
+        isOpen={!!selectedTaskForDrawer}
+        task={selectedTaskForDrawer}
+        onClose={() => setSelectedTaskForDrawer(null)}
+        tenantId={tenantId || ''}
+        projectId={projectId || ''}
+        currentUserId={userId}
+        currentUserProfile={currentUser}
+        calendar={calendar}
+        holidays={holidays}
+        onTaskUpdate={async (taskId, updates) => {
+          await dbService.updateTask(taskId, updates, supabase);
+          if (selectedTaskForDrawer && selectedTaskForDrawer.id === taskId) {
+            setSelectedTaskForDrawer((prev) => (prev ? { ...prev, ...updates } : null));
+          }
+          await refreshProjectData();
+        }}
+      />
 
       {/* Add Task Modal */}
       <Modal

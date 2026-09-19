@@ -20,9 +20,10 @@ interface HierarchicalGridProps {
   tasks: Task[];
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
   onCustomFieldUpdate?: (taskId: string, fieldId: string, value: unknown) => void;
+  onSelectTask?: (task: Task) => void;
 }
 
-export function HierarchicalGrid({ tasks, onTaskUpdate }: HierarchicalGridProps) {
+export function HierarchicalGrid({ tasks, onTaskUpdate, onSelectTask }: HierarchicalGridProps) {
   const { statuses, priorities, customFields } = useTenantMetadata();
   const [expandedMap, setExpandedMap] = React.useState<Record<string, boolean>>({});
 
@@ -119,7 +120,11 @@ export function HierarchicalGrid({ tasks, onTaskUpdate }: HierarchicalGridProps)
                       ) : (
                         <div className="w-4" />
                       )}
-                      <span className="font-medium text-[var(--foreground)] truncate max-w-sm">
+                      <span
+                        onClick={() => onSelectTask?.(task)}
+                        className="font-medium text-[var(--foreground)] truncate max-w-sm cursor-pointer hover:text-[var(--primary)] hover:underline transition-colors"
+                        title="Click to view details & discussion"
+                      >
                         {task.title}
                       </span>
                     </div>

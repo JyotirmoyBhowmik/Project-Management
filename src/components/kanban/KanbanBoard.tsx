@@ -20,9 +20,10 @@ import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
 interface KanbanBoardProps {
   tasks: Task[];
   onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
+  onSelectTask?: (task: Task) => void;
 }
 
-export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardProps) {
   const { statuses, priorities } = useTenantMetadata();
 
   // Dynamic lane order derived from database positions
@@ -108,7 +109,8 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
                   return (
                     <div
                       key={task.id}
-                      className={`group rounded-lg border p-3.5 shadow-xs transition-all bg-[var(--card)] hover:shadow-md ${
+                      onClick={() => onSelectTask?.(task)}
+                      className={`group rounded-lg border p-3.5 shadow-xs transition-all bg-[var(--card)] hover:shadow-md cursor-pointer ${
                         task.is_critical
                           ? 'border-rose-500/50 hover:border-rose-500 ring-1 ring-rose-500/20'
                           : 'border-[var(--border)] hover:border-[var(--primary)]'
@@ -146,7 +148,10 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
                         <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                           {canMovePrev && (
                             <button
-                              onClick={() => moveLane(task, 'prev')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveLane(task, 'prev');
+                              }}
                               className="p-1 rounded hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
                               title="Move back"
                             >
@@ -155,7 +160,10 @@ export function KanbanBoard({ tasks, onTaskUpdate }: KanbanBoardProps) {
                           )}
                           {canMoveNext && (
                             <button
-                              onClick={() => moveLane(task, 'next')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveLane(task, 'next');
+                              }}
                               className="p-1 rounded hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
                               title="Move forward"
                             >
