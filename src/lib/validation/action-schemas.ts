@@ -134,3 +134,92 @@ export const CreateDocSchema = z.object({
 });
 
 export type CreateDocInput = z.infer<typeof CreateDocSchema>;
+
+// ------------------------------------------------------------------------------
+// 6. Phase 6: Identity Federation & IAM Schemas
+// ------------------------------------------------------------------------------
+
+export const TenantSSOConfigSchema = z.object({
+  tenant_id: z.string().uuid('Valid tenant UUID is required'),
+  idp_entity_id: z.string().min(1, 'Entity ID is required'),
+  idp_sso_url: z.string().url('Valid IdP SSO URL is required'),
+  idp_certificate: z.string().min(10, 'Public X.509 certificate is required'),
+  metadata_xml_url: z.string().url('Invalid metadata URL').nullable().optional(),
+  allowed_domains: z.array(z.string().min(2)).default([]),
+  enforce_sso: z.boolean().default(false),
+  is_active: z.boolean().default(true),
+});
+
+export type TenantSSOConfigInput = z.infer<typeof TenantSSOConfigSchema>;
+
+export const TenantDirectorySyncConfigSchema = z.object({
+  tenant_id: z.string().uuid('Valid tenant UUID is required'),
+  protocol: z.enum(['ldap', 'ldaps', 'azure_ad_graph', 'scim']),
+  host_url: z.string().nullable().optional(),
+  port: z.number().int().min(1).max(65535).nullable().optional(),
+  bind_dn: z.string().nullable().optional(),
+  bind_credentials: z.string().nullable().optional(),
+  search_base: z.string().nullable().optional(),
+  user_search_filter: z.string().default('(objectClass=user)'),
+  group_search_filter: z.string().nullable().optional(),
+  sync_interval_hours: z.number().int().min(1).default(24),
+  auto_deactivate_missing_users: z.boolean().default(true),
+  is_enabled: z.boolean().default(false),
+});
+
+export type TenantDirectorySyncConfigInput = z.infer<typeof TenantDirectorySyncConfigSchema>;
+
+// ------------------------------------------------------------------------------
+// 7. Phase 6: Member Provisioning Schemas
+// ------------------------------------------------------------------------------
+
+export const ProvisionMemberSchema = z.object({
+  tenant_id: z.string().uuid('Valid tenant UUID is required'),
+  email: z.string().email('Valid email address is required'),
+  full_name: z.string().min(1, 'Full name is required').max(100),
+  role: z.enum(['owner', 'admin', 'project_manager', 'member', 'guest']).default('member'),
+  team_id: z.string().uuid().nullable().optional(),
+  send_invite_email: z.boolean().default(true),
+});
+
+export type ProvisionMemberInput = z.infer<typeof ProvisionMemberSchema>;
+
+export const UpdateMemberRoleSchema = z.object({
+  membership_id: z.string().uuid('Valid membership UUID is required'),
+  tenant_id: z.string().uuid('Valid tenant UUID is required'),
+  role: z.enum(['owner', 'admin', 'project_manager', 'member', 'guest']),
+});
+
+export type UpdateMemberRoleInput = z.infer<typeof UpdateMemberRoleSchema>;
+
+// ------------------------------------------------------------------------------
+// 8. Phase 6: Lifecycle Deletion Schemas
+// ------------------------------------------------------------------------------
+
+export const DeleteTaskSchema = z.object({
+  task_id: z.string().uuid('Valid task UUID is required'),
+  tenant_id: z.string().uuid('Valid tenant UUID is required'),
+  project_id: z.string().uuid('Valid project UUID is required'),
+  dependency_strategy: z.enum(['bridge', 'sever']).default('bridge'),
+  is_hard_delete: z.boolean().default(false),
+});
+
+export type DeleteTaskInput = z.infer<typeof DeleteTaskSchema>;
+
+export const DeleteProjectSchema = z.object({
+  project_id: z.string().uuid('Valid project UUID is required'),
+  tenant_id: z.string().uuid('Valid tenant UUID is required'),
+  confirm_project_code: z.string().min(1, 'Project code confirmation is required'),
+  is_hard_delete: z.boolean().default(false),
+});
+
+export type DeleteProjectInput = z.infer<typeof DeleteProjectSchema>;
+
+export const PurgeTenantSchema = z.object({
+  tenant_id: z.string().uuid('Valid tenant UUID is required'),
+  confirm_slug: z.string().trim().min(1, 'Tenant slug confirmation is required'),
+  admin_password_confirmation: z.string().optional(),
+});
+
+export type PurgeTenantInput = z.infer<typeof PurgeTenantSchema>;
+

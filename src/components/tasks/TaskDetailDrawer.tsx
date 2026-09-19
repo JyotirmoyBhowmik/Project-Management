@@ -20,6 +20,7 @@ import {
   User,
   Sliders,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { Task, TaskComment, TaskActivityLog, WorkingCalendar, CalendarHoliday, UserProfile } from '@/types/database';
 import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
@@ -29,6 +30,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TaskAttachmentsManager } from './TaskAttachmentsManager';
+import { DeleteTaskModal } from '@/components/modals/DeleteTaskModal';
 
 interface TaskDetailDrawerProps {
   task: Task | null;
@@ -41,6 +43,7 @@ interface TaskDetailDrawerProps {
   calendar: WorkingCalendar;
   holidays: CalendarHoliday[];
   onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
+  onTaskDeleted?: (taskId: string) => void;
 }
 
 export function TaskDetailDrawer({
@@ -54,9 +57,11 @@ export function TaskDetailDrawer({
   calendar,
   holidays,
   onTaskUpdate,
+  onTaskDeleted,
 }: TaskDetailDrawerProps) {
   const { statuses, priorities } = useTenantMetadata();
   const [activeTab, setActiveTab] = React.useState<'details' | 'discussion' | 'attachments'>('details');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
 
   // Local editable task fields
   const [title, setTitle] = React.useState('');
@@ -307,6 +312,13 @@ export function TaskDetailDrawer({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-red-500/10 text-[var(--muted-foreground)] hover:text-red-400 transition-colors cursor-pointer"
+              title="Delete Task"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
@@ -700,6 +712,24 @@ export function TaskDetailDrawer({
           )}
         </div>
       </div>
+
+      {/* Cascading Task Deletion Modal */}
+      {task && (
+        <DeleteTaskModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          taskId={task.id}
+          taskTitle={task.title || 'Untitled Task'}
+          taskCode={task.task_code || `TASK-${task.id.slice(0, 6).toUpperCase()}`}
+          tenantId={tenantId}
+          projectId={projectId}
+          onDeleted={() => {
+            setIsDeleteModalOpen(false);
+            onClose();
+            if (onTaskDeleted) onTaskDeleted(task.id);
+          }}
+        />
+      )}
     </div>
   );
 }

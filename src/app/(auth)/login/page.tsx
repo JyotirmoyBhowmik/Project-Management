@@ -19,6 +19,8 @@ import {
   ArrowLeft,
   Database,
   CheckCircle2,
+  KeyRound,
+  Globe,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { dbService } from '@/lib/supabase/db-service';
@@ -27,6 +29,8 @@ import { Tenant } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { lookupSSOByDomainAction } from '@/actions/identity';
+import { cn } from '@/lib/utils';
 
 function LoginPageContent() {
   const router = useRouter();
@@ -37,6 +41,16 @@ function LoginPageContent() {
   const [step, setStep] = React.useState<1 | 2>(1);
   const [workspaceCode, setWorkspaceCode] = React.useState('');
   const [resolvedTenant, setResolvedTenant] = React.useState<Tenant | null>(null);
+
+  const [loginMethod, setLoginMethod] = React.useState<'workspace' | 'sso'>('workspace');
+  const [ssoDomainInput, setSsoDomainInput] = React.useState('');
+  const [ssoConfig, setSsoConfig] = React.useState<{
+    tenant_id: string;
+    idp_entity_id: string;
+    idp_sso_url: string;
+    enforce_sso: boolean;
+  } | null>(null);
+  const [checkingSSO, setCheckingSSO] = React.useState(false);
 
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -87,9 +101,74 @@ function LoginPageContent() {
     }
   };
 
+  const checkDomainSSO = async (targetEmail: string) => {
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setSsoConfig(null);
+      return;
+    }
+    const domain = targetEmail.split('@')[1]?.trim().toLowerCase();
+    if (!domain || !domain.includes('.')) {
+      setSsoConfig(null);
+      return;
+    }
+    setCheckingSSO(true);
+    try {
+      const res = await lookupSSOByDomainAction(domain);
+      if (res.success && res.data) {
+        setSsoConfig(res.data);
+      } else {
+        setSsoConfig(null);
+      }
+    } catch {
+      setSsoConfig(null);
+    } finally {
+      setCheckingSSO(false);
+    }
+  };
+
+  const handleSSOLogin = async (domainToUse?: string) => {
+    const raw = domainToUse || (email.includes('@') ? email.split('@')[1] : ssoDomainInput);
+    const domain = raw.trim().toLowerCase();
+    if (!domain) {
+      setError('Please enter a valid work email or corporate domain for Single Sign-On.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const { data, error: ssoErr } = await supabase.auth.signInWithSSO({
+        domain,
+        options: {
+          redirectTo: `${origin}/`,
+        },
+      });
+
+      if (ssoErr) {
+        setError(ssoErr.message || 'Single Sign-On authentication request failed.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error occurred connecting to SSO identity provider.');
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resolvedTenant) return;
+
+    if (ssoConfig?.enforce_sso) {
+      await handleSSOLogin(email.split('@')[1]);
+      return;
+    }
 
     if (!email.trim() || !password) {
       setError('Please enter both your work email and password.');
@@ -230,59 +309,147 @@ function LoginPageContent() {
           </div>
         )}
 
-        {/* STAGE 1: WORKSPACE RESOLUTION */}
+        {/* STAGE 1: WORKSPACE OR DIRECT SSO RESOLUTION */}
         {step === 1 && (
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold block text-[var(--foreground)]">
-                Step 1: Enter Workspace Code or Domain Slug
-              </label>
-              <p className="text-[11px] text-[var(--muted-foreground)]">
-                Enter your organization’s unique tenant identifier (e.g. <code className="font-mono">CORE-SYS</code> or <code className="font-mono">core</code>).
-              </p>
-              <div className="relative mt-2">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
-                <Input
-                  placeholder="e.g. CORE-SYS, ACME, core"
-                  value={workspaceCode}
-                  onChange={(e) => {
-                    setWorkspaceCode(e.target.value);
-                    setError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleResolveWorkspace();
-                    }
-                  }}
-                  className="pl-9 h-11 text-sm bg-[var(--background)] font-mono"
-                  disabled={isLoading}
-                  autoFocus
-                />
-              </div>
+            {/* Method Toggle */}
+            <div className="flex rounded-lg bg-[var(--secondary)] p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('workspace');
+                  setError(null);
+                }}
+                className={cn(
+                  'flex-1 py-1.5 rounded-md font-semibold transition-all cursor-pointer text-center',
+                  loginMethod === 'workspace'
+                    ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                )}
+              >
+                Workspace Code
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('sso');
+                  setError(null);
+                }}
+                className={cn(
+                  'flex-1 py-1.5 rounded-md font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 text-center',
+                  loginMethod === 'sso'
+                    ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                )}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                Enterprise SSO
+              </button>
             </div>
 
-            <Button
-              onClick={() => handleResolveWorkspace()}
-              disabled={isLoading || !workspaceCode.trim()}
-              className="w-full h-11 gap-2 text-xs font-semibold"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Validating Workspace...</span>
-                </>
-              ) : (
-                <>
-                  <span>Continue to Sign In</span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </Button>
+            {loginMethod === 'workspace' ? (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold block text-[var(--foreground)]">
+                    Workspace Code or Domain Slug
+                  </label>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Enter your organization’s unique tenant identifier (e.g. <code className="font-mono">CORE-SYS</code> or <code className="font-mono">core</code>).
+                  </p>
+                  <div className="relative mt-2">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
+                    <Input
+                      placeholder="e.g. CORE-SYS, ACME, core"
+                      value={workspaceCode}
+                      onChange={(e) => {
+                        setWorkspaceCode(e.target.value);
+                        setError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleResolveWorkspace();
+                        }
+                      }}
+                      className="pl-9 h-11 text-sm bg-[var(--background)] font-mono"
+                      disabled={isLoading}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => handleResolveWorkspace()}
+                  disabled={isLoading || !workspaceCode.trim()}
+                  className="w-full h-11 gap-2 text-xs font-semibold"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Validating Workspace...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue to Sign In</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold block text-[var(--foreground)]">
+                    Corporate Domain or Work Email
+                  </label>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    Authenticate via your enterprise IdP (Microsoft Entra ID, Okta, PingFederate).
+                  </p>
+                  <div className="relative mt-2">
+                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
+                    <Input
+                      placeholder="e.g. acme.com or user@acme.com"
+                      value={ssoDomainInput}
+                      onChange={(e) => {
+                        setSsoDomainInput(e.target.value);
+                        setError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSSOLogin(ssoDomainInput);
+                        }
+                      }}
+                      className="pl-9 h-11 text-sm bg-[var(--background)] font-mono"
+                      disabled={isLoading}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => handleSSOLogin(ssoDomainInput)}
+                  disabled={isLoading || !ssoDomainInput.trim()}
+                  className="w-full h-11 gap-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-950/20"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Initiating SAML Handshake...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="h-4 w-4" />
+                      <span>Continue with Enterprise SSO</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* STAGE 2: TENANT-SCOPED CREDENTIAL LOGIN */}
+        {/* STAGE 2: TENANT-SCOPED CREDENTIAL OR SSO LOGIN */}
         {step === 2 && resolvedTenant && (
           <form onSubmit={handleLogin} className="space-y-4">
             {/* Resolved Tenant Badge */}
@@ -303,6 +470,7 @@ function LoginPageContent() {
                 onClick={() => {
                   setStep(1);
                   setError(null);
+                  setSsoConfig(null);
                 }}
                 className="text-[11px] text-[var(--primary)] hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -313,14 +481,26 @@ function LoginPageContent() {
 
             {/* Email Input */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold block text-[var(--foreground)]">Work Email</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold block text-[var(--foreground)]">Work Email</label>
+                {checkingSSO && (
+                  <span className="text-[10px] text-indigo-400 flex items-center gap-1 font-mono">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                    Checking SSO...
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
                 <Input
                   type="email"
                   placeholder="name@company.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    checkDomainSSO(e.target.value);
+                  }}
+                  onBlur={() => checkDomainSSO(email)}
                   className="pl-9 h-11 text-sm bg-[var(--background)]"
                   disabled={isLoading}
                   required
@@ -329,36 +509,98 @@ function LoginPageContent() {
               </div>
             </div>
 
-            {/* Password Input */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold block text-[var(--foreground)]">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9 h-11 text-sm bg-[var(--background)]"
-                  disabled={isLoading}
-                  required
-                />
+            {/* Detected SSO Indicator */}
+            {ssoConfig && (
+              <div className="p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-500/30 text-xs text-indigo-300 flex items-center justify-between animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 min-w-0">
+                  <KeyRound className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span className="truncate">SAML SSO: {ssoConfig.idp_entity_id}</span>
+                </div>
+                {ssoConfig.enforce_sso ? (
+                  <Badge variant="outline" className="text-[9px] border-indigo-500/50 text-indigo-300 font-bold shrink-0">
+                    SSO Enforced
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[9px] border-indigo-500/30 text-indigo-400 shrink-0">
+                    SSO Enabled
+                  </Badge>
+                )}
               </div>
-            </div>
+            )}
 
-            <Button type="submit" disabled={isLoading} className="w-full h-11 gap-2 text-xs font-semibold mt-2">
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Verifying Membership & Signing In...</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="h-4 w-4" />
-                  <span>Authenticate to {resolvedTenant.name}</span>
-                </>
-              )}
-            </Button>
+            {/* Password Input or SSO-Enforced Gateway */}
+            {ssoConfig?.enforce_sso ? (
+              <div className="space-y-3 pt-1">
+                <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed">
+                  Enterprise Single Sign-On is strictly enforced for your organization. Password authentication is disabled.
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => handleSSOLogin(email.split('@')[1])}
+                  disabled={isLoading}
+                  className="w-full h-11 gap-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-950/30"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Redirecting to IdP...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="h-4 w-4" />
+                      <span>Sign In with {ssoConfig.idp_entity_id || 'Enterprise SSO'}</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold block text-[var(--foreground)]">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-9 h-11 text-sm bg-[var(--background)]"
+                      disabled={isLoading}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" disabled={isLoading} className="w-full h-11 gap-2 text-xs font-semibold mt-2">
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Verifying Membership & Signing In...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>Authenticate to {resolvedTenant.name}</span>
+                    </>
+                  )}
+                </Button>
+
+                {ssoConfig && (
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleSSOLogin(email.split('@')[1])}
+                      disabled={isLoading}
+                      className="w-full h-10 gap-2 text-xs font-semibold text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/10"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                      <span>Sign In with Single Sign-On Instead</span>
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </form>
         )}
 

@@ -11,9 +11,10 @@ export interface ModalProps {
   description?: string;
   children: React.ReactNode;
   maxWidth?: string;
+  className?: string;
 }
 
-export function Modal({ isOpen, onClose, title, description, children, maxWidth = 'max-w-xl' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, description, children, maxWidth = 'max-w-xl', className }: ModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -21,7 +22,8 @@ export function Modal({ isOpen, onClose, title, description, children, maxWidth 
       <div
         className={cn(
           'relative w-full rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-2xl transition-all',
-          maxWidth
+          maxWidth,
+          className
         )}
       >
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">

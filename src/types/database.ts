@@ -71,6 +71,8 @@ export interface TenantMembership {
   user_id: string;
   role: UserTenantRole;
   is_active?: boolean;
+  is_suspended?: boolean;
+  suspended_at?: string | null;
   created_at: string;
   updated_at?: string;
   tenant?: Tenant;
@@ -663,5 +665,76 @@ export interface SoftDeletedItem {
   project_id?: string;
   project_name?: string;
 }
+
+// ------------------------------------------------------------------------------
+// Phase 6: Identity Federation & IAM
+// ------------------------------------------------------------------------------
+
+export interface TenantSSOConfig {
+  id: string;
+  tenant_id: string;
+  idp_entity_id: string;
+  idp_sso_url: string;
+  idp_certificate: string;
+  metadata_xml_url?: string | null;
+  allowed_domains: string[];
+  enforce_sso: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DirectorySyncProtocol = 'ldap' | 'ldaps' | 'azure_ad_graph' | 'scim';
+
+export interface TenantDirectorySyncConfig {
+  id: string;
+  tenant_id: string;
+  protocol: DirectorySyncProtocol;
+  host_url?: string | null;
+  port?: number | null;
+  bind_dn?: string | null;
+  bind_credentials?: string | null;
+  search_base?: string | null;
+  user_search_filter?: string | null;
+  group_search_filter?: string | null;
+  sync_interval_hours: number;
+  auto_deactivate_missing_users: boolean;
+  is_enabled: boolean;
+  last_sync_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DirectorySyncLog {
+  id: string;
+  tenant_id: string;
+  sync_started_at: string;
+  sync_completed_at?: string | null;
+  users_created: number;
+  users_updated: number;
+  users_suspended: number;
+  status: 'success' | 'failed' | 'partial';
+  error_payload?: Record<string, any> | null;
+}
+
+export interface CrossTenantUser {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string | null;
+  is_superadmin: boolean;
+  is_suspended?: boolean;
+  created_at: string;
+  tenants: Array<{
+    tenant_id: string;
+    tenant_name: string;
+    role: string;
+    is_active: boolean;
+    is_suspended?: boolean;
+  }>;
+  auth_provider: 'SAML/AzureAD' | 'Password' | 'MagicLink' | 'SCIM';
+  last_sign_in_at?: string | null;
+}
+
 
 

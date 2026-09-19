@@ -591,6 +591,10 @@ function ProjectWorkspaceContent() {
           }
           await refreshProjectData();
         }}
+        onTaskDeleted={async () => {
+          setSelectedTaskForDrawer(null);
+          await refreshProjectData();
+        }}
       />
 
       {/* Create Task Dialog */}

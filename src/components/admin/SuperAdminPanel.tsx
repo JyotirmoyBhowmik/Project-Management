@@ -20,6 +20,7 @@ import {
   Sparkles,
   Users,
   ShieldCheck,
+  Skull,
 } from 'lucide-react';
 import Link from 'next/link';
 import { dbService, DEFAULT_THEME_TOKENS, DEFAULT_SYSTEM_THEMES } from '@/lib/supabase/db-service';
@@ -369,6 +370,16 @@ export function SuperAdminPanel() {
                     <Power className="h-3.5 w-3.5" />
                     {tenant.status === 'active' ? 'Suspend' : 'Activate'}
                   </Button>
+                  <Link href={`/admin/multisite/tenants/${tenant.id}/danger`}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1 text-xs text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20"
+                    >
+                      <Skull className="h-3.5 w-3.5 text-red-500" />
+                      Danger
+                    </Button>
+                  </Link>
                 </div>
               </div>
             ))}

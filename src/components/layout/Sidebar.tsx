@@ -20,6 +20,8 @@ import {
   Clock,
   Zap,
   Trash2,
+  Users,
+  KeyRound,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { cn } from '@/lib/utils';
@@ -60,6 +62,20 @@ export function Sidebar() {
       icon: ShieldCheck,
       disabled: isGuest && !isSuperadmin,
       restrictedMessage: 'Restricted for guest accounts',
+    },
+    {
+      label: 'Workspace Members',
+      href: '/settings/members',
+      icon: Users,
+      disabled: isGuest && !isSuperadmin,
+      restrictedMessage: 'Restricted for guest accounts',
+    },
+    {
+      label: 'Identity & SSO',
+      href: '/settings/identity',
+      icon: KeyRound,
+      disabled: !isAdmin,
+      restrictedMessage: 'Requires Admin or Owner role',
     },
     {
       label: 'Workflow Automations',

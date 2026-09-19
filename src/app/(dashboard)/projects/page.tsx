@@ -17,6 +17,7 @@ import {
   Search,
   Filter,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { createClient } from '@/lib/supabase/client';
@@ -26,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/dialog';
+import { DeleteProjectModal } from '@/components/modals/DeleteProjectModal';
 
 export default function ProjectsPortfolioPage() {
   const supabase = createClient();
@@ -35,6 +37,7 @@ export default function ProjectsPortfolioPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [statusFilter, setStatusFilter] = React.useState<string>('all');
   const [searchQuery, setSearchQuery] = React.useState<string>('');
+  const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(null);
 
   // Project Creation Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState<boolean>(false);
@@ -241,6 +244,20 @@ export default function ProjectsPortfolioPage() {
                   <span>Open Workspace</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
+
+                {(activeRole === 'owner' || activeRole === 'admin' || currentUser?.is_superadmin) && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setProjectToDelete(prj);
+                    }}
+                    className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--muted-foreground)] hover:text-red-400 transition-colors cursor-pointer"
+                    title="Delete Project"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -320,6 +337,22 @@ export default function ProjectsPortfolioPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Project Destruction Confirmation Modal */}
+      {projectToDelete && tenantId && (
+        <DeleteProjectModal
+          isOpen={!!projectToDelete}
+          onClose={() => setProjectToDelete(null)}
+          projectId={projectToDelete.id}
+          projectName={projectToDelete.name}
+          projectCode={projectToDelete.code || projectToDelete.name}
+          tenantId={tenantId}
+          onDeleted={async () => {
+            setProjectToDelete(null);
+            await loadProjects();
+          }}
+        />
+      )}
     </div>
   );
 }
