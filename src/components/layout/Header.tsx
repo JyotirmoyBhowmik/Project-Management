@@ -209,6 +209,7 @@ export function Header() {
               setHelpMenuOpen(false);
               setUserMenuOpen(false);
             }}
+            aria-label="Switch theme"
             className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] p-1.5 text-xs text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
             title="Switch Theme"
           >
@@ -257,6 +258,7 @@ export function Header() {
               setHelpMenuOpen(false);
               setUserMenuOpen(false);
             }}
+            aria-label="In-app notifications"
             className="relative flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] p-1.5 text-xs text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
             title="In-App Notifications"
           >
@@ -321,6 +323,7 @@ export function Header() {
               setThemeMenuOpen(false);
               setUserMenuOpen(false);
             }}
+            aria-label="Help and documentation"
             className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] p-1.5 text-xs text-[var(--foreground)] hover:border-[var(--primary)] transition-colors cursor-pointer"
             title="Help & Documentation"
           >
@@ -392,6 +395,7 @@ export function Header() {
               setNotifMenuOpen(false);
               setHelpMenuOpen(false);
             }}
+            aria-label="User account menu"
             className="flex items-center gap-2 pl-1 cursor-pointer"
             title="User Account"
           >

@@ -79,12 +79,14 @@ export function ProjectCalendarView({ tasks, calendar, holidays }: ProjectCalend
         <div className="flex items-center gap-1.5">
           <button
             onClick={prevMonth}
+            aria-label="Previous month"
             className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-[var(--foreground)] cursor-pointer"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             onClick={nextMonth}
+            aria-label="Next month"
             className="p-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-[var(--foreground)] cursor-pointer"
           >
             <ChevronRight className="h-4 w-4" />

@@ -244,6 +244,7 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
                                 e.stopPropagation();
                                 moveLane(task, 'prev');
                               }}
+                              aria-label="Move task to previous status column"
                               className="p-1 rounded hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
                               title="Move back"
                             >
@@ -256,6 +257,7 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
                                 e.stopPropagation();
                                 moveLane(task, 'next');
                               }}
+                              aria-label="Move task to next status column"
                               className="p-1 rounded hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
                               title="Move forward"
                             >

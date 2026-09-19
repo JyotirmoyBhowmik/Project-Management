@@ -321,6 +321,7 @@ export function TaskDetailDrawer({
             </button>
             <button
               onClick={onClose}
+              aria-label="Close task details"
               className="p-1.5 rounded-lg hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
             >
               <X className="h-4 w-4" />
