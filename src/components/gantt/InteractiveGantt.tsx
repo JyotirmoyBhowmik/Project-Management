@@ -925,7 +925,7 @@ export function InteractiveGantt({
                 const baseStartX = baselineSnapshot ? dateToX(baselineSnapshot.start_date) : 0;
                 const baseEndX = baselineSnapshot ? dateToX(baselineSnapshot.end_date) + pxPerDay : 0;
                 const baseWidth = baselineSnapshot ? Math.max(pxPerDay, baseEndX - baseStartX) : 0;
-                const varianceDays = baselineSnapshot
+                const varianceDays = baselineSnapshot && task.end_date && baselineSnapshot.end_date
                   ? Math.round(
                       (parseISODate(task.end_date).getTime() - parseISODate(baselineSnapshot.end_date).getTime()) /
                         (1000 * 60 * 60 * 24)

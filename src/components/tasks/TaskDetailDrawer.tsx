@@ -50,6 +50,52 @@ interface TaskDetailDrawerProps {
   onTaskDeleted?: (taskId: string) => void;
 }
 
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class DrawerErrorBoundary extends React.Component<
+  { children: React.ReactNode; onClose: () => void },
+  ErrorBoundaryState
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: any) {
+    console.error('TaskDetailDrawer rendering caught error:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3">
+          <div className="text-amber-500 font-bold text-sm">Unable to render task details</div>
+          <p className="text-xs text-[var(--muted-foreground)] max-w-xs">
+            A minor data formatting anomaly occurred with this task. You can close this drawer and continue working.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              this.setState({ hasError: false });
+              this.props.onClose();
+            }}
+          >
+            Close Drawer
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function TaskDetailDrawer({
   task,
   isOpen,
@@ -282,6 +328,26 @@ export function TaskDetailDrawer({
     );
   };
 
+function formatSafeDateTime(val: string | null | undefined): string {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? '' : d.toLocaleString();
+  } catch {
+    return '';
+  }
+}
+
+function formatSafeTime(val: string | null | undefined): string {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
   // Unified Chronological History Feed
   const unifiedHistory = React.useMemo(() => {
     type FeedItem =
@@ -292,16 +358,16 @@ export function TaskDetailDrawer({
       ...comments.map((c) => ({
         type: 'comment' as const,
         data: c,
-        timestamp: new Date(c.created_at).getTime(),
+        timestamp: c?.created_at ? new Date(c.created_at).getTime() || 0 : 0,
       })),
       ...activityLogs.map((a) => ({
         type: 'activity' as const,
         data: a,
-        timestamp: new Date(a.created_at).getTime(),
+        timestamp: a?.created_at ? new Date(a.created_at).getTime() || 0 : 0,
       })),
     ];
 
-    return items.sort((a, b) => b.timestamp - a.timestamp);
+    return items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [comments, activityLogs]);
 
   // Handle Comment Submission & @Mentions
@@ -407,11 +473,12 @@ export function TaskDetailDrawer({
 
       {/* Drawer Container */}
       <div className="w-full max-w-2xl bg-[var(--card)] border-l border-[var(--border)] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-300">
+        <DrawerErrorBoundary onClose={onClose}>
         {/* Drawer Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--border)] bg-[var(--secondary)]/40">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-mono text-[var(--muted-foreground)] bg-[var(--secondary)] px-2 py-0.5 rounded border border-[var(--border)]">
-              TASK-{task.id.slice(0, 6).toUpperCase()}
+            <span className="text-xs font-mono text-[var(--primary)] bg-[var(--primary)]/10 px-2 py-0.5 rounded border border-[var(--primary)]/20 font-bold">
+              {task.task_code || (task as any).code || `TASK-${(task.id || '').slice(0, 6).toUpperCase()}`}
             </span>
             {task.is_critical && (
               <Badge variant="critical" className="gap-1 text-[10px] py-0 px-1.5 bg-amber-500/20 text-amber-300 border-amber-500/40">
@@ -891,7 +958,7 @@ export function TaskDetailDrawer({
                                 </span>
                               </div>
                               <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-                                {new Date(c.created_at).toLocaleString()}
+                                {formatSafeDateTime(c.created_at)}
                               </span>
                             </div>
                             <div className="text-xs text-[var(--foreground)] whitespace-pre-wrap pl-7">
@@ -911,7 +978,7 @@ export function TaskDetailDrawer({
                               <span className="font-semibold text-[var(--foreground)]">
                                 {a.actor?.full_name || 'System'}{' '}
                               </span>
-                              <span>{a.action_type.replace(/_/g, ' ')}</span>
+                              <span>{(a.action_type || 'activity').replace(/_/g, ' ')}</span>
                               {a.metadata && Object.keys(a.metadata).length > 0 && (
                                 <span className="text-[10px] font-mono block text-[var(--muted-foreground)]">
                                   {JSON.stringify(a.metadata)}
@@ -919,7 +986,7 @@ export function TaskDetailDrawer({
                               )}
                             </div>
                             <span className="text-[10px] font-mono shrink-0">
-                              {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {formatSafeTime(a.created_at)}
                             </span>
                           </div>
                         );
@@ -942,6 +1009,7 @@ export function TaskDetailDrawer({
             />
           )}
         </div>
+        </DrawerErrorBoundary>
       </div>
 
       {/* Cascading Task Deletion Modal */}

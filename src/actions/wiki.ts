@@ -1,13 +1,14 @@
 // ==============================================================================
 // src/actions/wiki.ts
 // Production Server Actions for Living Documentation, Wiki Trees & Task Links
+// Robust Profile Hydration: Disambiguates foreign keys to prevent PostgREST PGRST200
 // ==============================================================================
 
 'use server';
 
 import { revalidatePath } from 'next/cache';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { ProjectDocument, DocumentTaskLink, Task } from '@/types/database';
+import { ProjectDocument, Task, UserProfile } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
 import {
   CreateDocSchema,
@@ -37,13 +38,33 @@ export async function createDocumentAction(rawInput: CreateDocInput): Promise<Ac
         created_by: user?.id || null,
         updated_by: user?.id || null,
       })
-      .select('*, author:profiles(id, full_name, avatar_url)')
+      .select('*')
       .single();
 
-    if (error) return { success: false, error: error.message, correlation_id: correlationId };
+    if (error) {
+      logger.error('Failed to create document in database', { correlationId, err: error.message });
+      return { success: false, error: error.message, correlation_id: correlationId };
+    }
+
+    // Hydrate author profile safely
+    let author: UserProfile | undefined = undefined;
+    if (user?.id) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, email')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (prof) author = prof as UserProfile;
+    }
+
     revalidatePath(`/projects/${parsed.data.project_id}`);
-    return { success: true, data: data as ProjectDocument, correlation_id: correlationId };
+    return {
+      success: true,
+      data: { ...data, author } as ProjectDocument,
+      correlation_id: correlationId,
+    };
   } catch (err: any) {
+    logger.error('Exception in createDocumentAction', { correlationId, err: err?.message });
     return { success: false, error: err?.message || 'Failed to create document', correlation_id: correlationId };
   }
 }
@@ -68,13 +89,33 @@ export async function updateDocumentContentAction(
       .from('project_documents')
       .update(payload)
       .eq('id', docId)
-      .select('*, author:profiles(id, full_name, avatar_url)')
+      .select('*')
       .single();
 
-    if (error) return { success: false, error: error.message, correlation_id: correlationId };
+    if (error) {
+      logger.error('Failed to update document', { correlationId, err: error.message });
+      return { success: false, error: error.message, correlation_id: correlationId };
+    }
+
+    // Hydrate author profile safely
+    let author: UserProfile | undefined = undefined;
+    if (data.created_by) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, email')
+        .eq('id', data.created_by)
+        .maybeSingle();
+      if (prof) author = prof as UserProfile;
+    }
+
     if (updates.projectId) revalidatePath(`/projects/${updates.projectId}`);
-    return { success: true, data: data as ProjectDocument, correlation_id: correlationId };
+    return {
+      success: true,
+      data: { ...data, author } as ProjectDocument,
+      correlation_id: correlationId,
+    };
   } catch (err: any) {
+    logger.error('Exception in updateDocumentContentAction', { correlationId, err: err?.message });
     return { success: false, error: err?.message || 'Failed to update document', correlation_id: correlationId };
   }
 }
@@ -84,19 +125,45 @@ export async function getDocumentTreeAction(projectId: string): Promise<ActionRe
   try {
     const supabase = await createServerSupabaseClient();
 
+    // Query documents without ambiguous profile embeds to avoid PGRST200
     const { data, error } = await supabase
       .from('project_documents')
-      .select('*, author:profiles(id, full_name, avatar_url), links:document_task_links(task_id, task:tasks(id, title, task_code, status))')
+      .select('*, links:document_task_links(task_id, task:tasks(id, title, task_code, status))')
       .eq('project_id', projectId)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
 
-    if (error) return { success: false, error: error.message, correlation_id: correlationId };
+    if (error) {
+      logger.error('Failed to fetch project documents', { correlationId, err: error.message });
+      return { success: false, error: error.message, correlation_id: correlationId };
+    }
+
+    // Batch hydrate author profiles safely
+    const authorIds = Array.from(
+      new Set(
+        (data || [])
+          .map((d: any) => d.created_by)
+          .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+      )
+    );
+
+    const profileMap = new Map<string, UserProfile>();
+    if (authorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, email')
+        .in('id', authorIds);
+
+      (profiles || []).forEach((p: any) => {
+        profileMap.set(p.id, p as UserProfile);
+      });
+    }
 
     // Format into tree hierarchy
     const docs = (data || []).map((d: any) => ({
       ...d,
+      author: d.created_by ? profileMap.get(d.created_by) || null : null,
       linked_tasks: (d.links || []).map((l: any) => l.task).filter(Boolean),
     }));
 
@@ -118,6 +185,7 @@ export async function getDocumentTreeAction(projectId: string): Promise<ActionRe
 
     return { success: true, data: roots, correlation_id: correlationId };
   } catch (err: any) {
+    logger.error('Exception in getDocumentTreeAction', { correlationId, err: err?.message });
     return { success: false, error: err?.message || 'Failed to fetch document tree', correlation_id: correlationId };
   }
 }
@@ -149,23 +217,6 @@ export async function unlinkTaskFromDocAction(docId: string, taskId: string): Pr
 
     if (error) return { success: false, error: error.message, correlation_id: correlationId };
     return { success: true, correlation_id: correlationId };
-  } catch (err: any) {
-    return { success: false, error: err?.message, correlation_id: correlationId };
-  }
-}
-
-export async function getTaskLinkedDocsAction(taskId: string): Promise<ActionResponse<ProjectDocument[]>> {
-  const correlationId = `act-get-task-docs-${Date.now()}`;
-  try {
-    const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase
-      .from('document_task_links')
-      .select('doc_id, document:project_documents(*)')
-      .eq('task_id', taskId);
-
-    if (error) return { success: false, error: error.message, correlation_id: correlationId };
-    const docs = (data || []).map((d: any) => d.document).filter(Boolean);
-    return { success: true, data: docs as ProjectDocument[], correlation_id: correlationId };
   } catch (err: any) {
     return { success: false, error: err?.message, correlation_id: correlationId };
   }

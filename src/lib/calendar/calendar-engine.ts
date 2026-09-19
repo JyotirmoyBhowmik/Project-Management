@@ -15,26 +15,52 @@ export interface CalendarDayInfo {
   holidayName?: string;
 }
 
-export function formatDateToISO(d: Date): string {
+export function formatDateToISO(d: Date | string | null | undefined): string {
+  if (!d) {
+    return new Date().toISOString().split('T')[0];
+  }
+  if (typeof d === 'string') {
+    const clean = d.split('T')[0].trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+    return new Date().toISOString().split('T')[0];
+  }
+  if (isNaN(d.getTime())) {
+    return new Date().toISOString().split('T')[0];
+  }
   const year = d.getUTCFullYear();
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
-export function parseISODate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+export function parseISODate(dateStr: string | null | undefined): Date {
+  if (!dateStr || typeof dateStr !== 'string') {
+    return new Date();
+  }
+  const clean = dateStr.split('T')[0].trim();
+  const parts = clean.split('-').map(Number);
+  if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0));
+  }
+  const fallback = new Date(dateStr);
+  return isNaN(fallback.getTime()) ? new Date() : fallback;
 }
 
-export function normalizeHolidays(holidays: (string | CalendarHoliday)[]): Map<string, string> {
+export function normalizeHolidays(holidays?: (string | CalendarHoliday)[] | null): Map<string, string> {
   const map = new Map<string, string>();
+  if (!holidays || !Array.isArray(holidays)) return map;
+
   for (const h of holidays) {
+    if (!h) continue;
     if (typeof h === 'string') {
       map.set(h, 'Holiday');
     } else {
       const d = h.holiday_date || h.date;
-      if (d) map.set(d, h.name);
+      if (d) map.set(d, h.name || 'Holiday');
     }
   }
   return map;
@@ -45,18 +71,18 @@ export function normalizeHolidays(holidays: (string | CalendarHoliday)[]): Map<s
  */
 export function isWorkingDay(
   date: Date,
-  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
-  holidays: (string | CalendarHoliday)[] = []
+  calendarOrConfig?: { working_days?: number[]; weekend_days?: number[] } | number[] | null,
+  holidays?: (string | CalendarHoliday)[] | null
 ): boolean {
+  if (!date || isNaN(date.getTime())) return false;
   const dayOfWeek = date.getUTCDay();
 
   let isWeekend = false;
   if (Array.isArray(calendarOrConfig)) {
-    // Array of weekend days
     isWeekend = calendarOrConfig.includes(dayOfWeek);
-  } else if (calendarOrConfig.weekend_days) {
+  } else if (calendarOrConfig && calendarOrConfig.weekend_days) {
     isWeekend = calendarOrConfig.weekend_days.includes(dayOfWeek);
-  } else if (calendarOrConfig.working_days) {
+  } else if (calendarOrConfig && calendarOrConfig.working_days) {
     isWeekend = !calendarOrConfig.working_days.includes(dayOfWeek);
   } else {
     isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // default Sat/Sun
@@ -74,12 +100,14 @@ export function isWorkingDay(
  */
 export function getNextWorkingDay(
   date: Date,
-  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
-  holidays: (string | CalendarHoliday)[] = []
+  calendarOrConfig?: { working_days?: number[]; weekend_days?: number[] } | number[] | null,
+  holidays?: (string | CalendarHoliday)[] | null
 ): Date {
-  const cursor = new Date(date.getTime());
-  while (!isWorkingDay(cursor, calendarOrConfig, holidays)) {
+  const cursor = date && !isNaN(date.getTime()) ? new Date(date.getTime()) : new Date();
+  let loopCount = 0;
+  while (!isWorkingDay(cursor, calendarOrConfig, holidays) && loopCount < 366) {
     cursor.setUTCDate(cursor.getUTCDate() + 1);
+    loopCount++;
   }
   return cursor;
 }
@@ -89,12 +117,12 @@ export function getNextWorkingDay(
  */
 export function calculate_working_end_date(
   tenantId: string,
-  startDate: Date | string,
+  startDate: Date | string | null | undefined,
   durationDays: number,
   weekendDays: number[] = [0, 6],
   holidays: (string | CalendarHoliday)[] = []
 ): string {
-  const start = typeof startDate === 'string' ? parseISODate(startDate) : startDate;
+  const start = typeof startDate === 'string' ? parseISODate(startDate) : startDate || new Date();
   if (durationDays <= 0) {
     return formatDateToISO(start);
   }
@@ -116,16 +144,17 @@ export function calculate_working_end_date(
  * Adds working days to a start date, skipping non-working days and holidays.
  */
 export function addWorkingDays(
-  startDate: Date,
+  startDate: Date | string | null | undefined,
   durationDays: number,
-  calendarOrConfig: { working_days?: number[]; weekend_days?: number[] } | number[],
-  holidays: (string | CalendarHoliday)[] = []
+  calendarOrConfig?: { working_days?: number[]; weekend_days?: number[] } | number[] | null,
+  holidays?: (string | CalendarHoliday)[] | null
 ): Date {
+  const start = typeof startDate === 'string' ? parseISODate(startDate) : startDate || new Date();
   if (durationDays <= 0) {
-    return new Date(startDate.getTime());
+    return new Date(start.getTime());
   }
 
-  let cursor = getNextWorkingDay(startDate, calendarOrConfig, holidays);
+  let cursor = getNextWorkingDay(start, calendarOrConfig, holidays);
   let daysRemaining = durationDays - 1;
 
   while (daysRemaining > 0) {

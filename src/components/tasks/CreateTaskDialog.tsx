@@ -357,7 +357,7 @@ export function CreateTaskDialog({
             >
               <option value="todo">To Do</option>
               <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
+              <option value="review">In Review</option>
               <option value="completed">Completed</option>
             </select>
           </div>

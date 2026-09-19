@@ -94,7 +94,7 @@ export async function createTaskAction(
       end_date: computedEndDate,
       duration_days: duration,
       priority: input.priority,
-      status: input.status,
+      status: input.status === 'in_review' ? 'review' : input.status,
       description: input.description?.trim() || null,
       is_milestone: input.is_milestone || duration === 0,
       progress: 0,
@@ -318,6 +318,7 @@ export async function updateTaskStatusAction(params: {
     }
 
     const { taskId, status, projectId } = validated.data;
+    const normalizedStatus = status === 'in_review' ? 'review' : status;
 
     const supabase = await createServerSupabaseClient();
     const {
@@ -336,7 +337,7 @@ export async function updateTaskStatusAction(params: {
     const { data, error } = await supabase
       .from('tasks')
       .update({
-        status,
+        status: normalizedStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', taskId)
