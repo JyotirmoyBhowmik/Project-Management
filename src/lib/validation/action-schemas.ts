@@ -40,6 +40,8 @@ export const TaskInputSchema = z.object({
   description: z.string().nullable().optional(),
   task_code: z.string().optional(),
   is_milestone: z.boolean().default(false),
+  parent_id: z.string().uuid().nullable().optional(),
+  parent_task_id: z.string().uuid().nullable().optional(),
   assignee_ids: z.array(z.string().uuid()).optional(),
 });
 

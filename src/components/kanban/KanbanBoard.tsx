@@ -211,6 +211,14 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
                             </span>
                           )}
                           {renderPriorityBadge(task.priority)}
+                          {task.is_milestone && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] py-0 px-1.5 border-purple-500/30 bg-purple-500/10 text-purple-400 font-semibold"
+                            >
+                              ◆ Milestone
+                            </Badge>
+                          )}
                           {task.is_critical && (
                             <Badge variant="critical" className="gap-1 text-[10px] py-0 px-1.5">
                               <Flame className="h-2.5 w-2.5" />
@@ -220,7 +228,7 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
                         </div>
                         <div className="flex items-center gap-1 text-[10px] font-mono text-[var(--muted-foreground)]">
                           <GripVertical className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100" />
-                          <span>{task.duration_days}d</span>
+                          <span>{task.is_milestone ? '0d' : `${task.duration_days}d`}</span>
                         </div>
                       </div>
 

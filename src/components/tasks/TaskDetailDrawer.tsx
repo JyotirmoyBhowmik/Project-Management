@@ -21,7 +21,10 @@ import {
   Sliders,
   Sparkles,
   Trash2,
+  Layers,
+  Plus,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Task, TaskComment, TaskActivityLog, WorkingCalendar, CalendarHoliday, UserProfile } from '@/types/database';
 import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
 import { addWorkingDays, formatDateToISO, parseISODate } from '@/lib/calendar/calendar-engine';
@@ -29,6 +32,7 @@ import { dbService } from '@/lib/supabase/db-service';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { quickCreateSubtaskAction } from '@/actions/tasks';
 import { TaskAttachmentsManager } from './TaskAttachmentsManager';
 import { DeleteTaskModal } from '@/components/modals/DeleteTaskModal';
 
@@ -80,6 +84,11 @@ export function TaskDetailDrawer({
   const [isPreviewComment, setIsPreviewComment] = React.useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = React.useState(false);
 
+  // Subtasks state
+  const [subtasks, setSubtasks] = React.useState<Task[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = React.useState('');
+  const [isAddingSubtask, setIsAddingSubtask] = React.useState(false);
+
   // @Mention Autocomplete state
   const [teamMembers, setTeamMembers] = React.useState<Array<{ id: string; user_id: string; role: string; profile: UserProfile }>>([]);
   const [mentionQuery, setMentionQuery] = React.useState<string | null>(null);
@@ -87,6 +96,23 @@ export function TaskDetailDrawer({
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
   const supabase = React.useMemo(() => createClient(), []);
+
+  const loadSubtasks = React.useCallback(async () => {
+    if (!task) return;
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .or(`parent_id.eq.${task.id},parent_task_id.eq.${task.id}`)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        setSubtasks(data as Task[]);
+      }
+    } catch (err) {
+      console.error('Failed to load subtasks', err);
+    }
+  }, [task, supabase]);
 
   // Sync state when task changes
   React.useEffect(() => {
@@ -99,8 +125,9 @@ export function TaskDetailDrawer({
       setDurationDays(task.duration_days || 1);
       setProgress(task.progress ?? task.progress_percent ?? 0);
       setIsMilestone(task.is_milestone || false);
+      loadSubtasks();
     }
-  }, [task]);
+  }, [task, loadSubtasks]);
 
   // Load comments, activity stream, and team members
   React.useEffect(() => {
@@ -170,6 +197,89 @@ export function TaskDetailDrawer({
       const endIso = formatDateToISO(e);
       handleSaveDetails({ start_date: newStart, end_date: endIso });
     }
+  };
+
+  const handleMilestoneToggle = (enabled: boolean) => {
+    setIsMilestone(enabled);
+    if (enabled) {
+      setDurationDays(0);
+      handleSaveDetails({ is_milestone: true, duration_days: 0, end_date: startDate });
+    } else {
+      setDurationDays(1);
+      if (startDate) {
+        const s = parseISODate(startDate);
+        const e = addWorkingDays(s, 1, calendar, holidays);
+        handleSaveDetails({ is_milestone: false, duration_days: 1, end_date: formatDateToISO(e) });
+      } else {
+        handleSaveDetails({ is_milestone: false, duration_days: 1 });
+      }
+    }
+  };
+
+  const handleToggleSubtaskStatus = async (subtask: Task) => {
+    const isCompleted = subtask.status === 'completed';
+    const nextStatus = isCompleted ? 'todo' : 'completed';
+    const nextProgress = isCompleted ? 0 : 100;
+
+    setSubtasks((prev) =>
+      prev.map((s) =>
+        s.id === subtask.id ? { ...s, status: nextStatus, progress: nextProgress } : s
+      )
+    );
+
+    await supabase
+      .from('tasks')
+      .update({
+        status: nextStatus,
+        progress: nextProgress,
+        progress_percent: nextProgress,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', subtask.id);
+  };
+
+  const handleCreateSubtask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubtaskTitle.trim() || !task || isAddingSubtask) return;
+    setIsAddingSubtask(true);
+    try {
+      const res = await quickCreateSubtaskAction({
+        parent_id: task.id,
+        title: newSubtaskTitle.trim(),
+        project_id: projectId,
+        tenant_id: tenantId,
+        start_date: task.start_date,
+        due_date: task.end_date,
+      });
+
+      if (res.success && res.task) {
+        setSubtasks((prev) => [...prev, res.task!]);
+        setNewSubtaskTitle('');
+        toast.success(`Subtask "${newSubtaskTitle.trim()}" added`);
+        if (onTaskUpdate) {
+          onTaskUpdate(task.id, {});
+        }
+      } else {
+        toast.error(res.error || 'Failed to create subtask');
+      }
+    } catch {
+      toast.error('Network error creating subtask');
+    } finally {
+      setIsAddingSubtask(false);
+    }
+  };
+
+  const subtasksCompletedCount = subtasks.filter((s) => s.status === 'completed').length;
+  const subtasksPercent =
+    subtasks.length > 0 ? Math.round((subtasksCompletedCount / subtasks.length) * 100) : null;
+
+  const handleSyncParentProgress = () => {
+    if (subtasksPercent === null) return;
+    setProgress(subtasksPercent);
+    handleSaveDetails({ progress: subtasksPercent, progress_percent: subtasksPercent });
+    toast.success(
+      `Progress updated to ${subtasksPercent}% (${subtasksCompletedCount}/${subtasks.length} subtasks completed)`
+    );
   };
 
   // Unified Chronological History Feed
@@ -469,13 +579,36 @@ export function TaskDetailDrawer({
                     </label>
                     <input
                       type="number"
-                      min={1}
+                      min={0}
                       max={365}
-                      value={durationDays}
-                      onChange={(e) => handleDurationChange(parseInt(e.target.value, 10) || 1)}
-                      className="w-full h-8 rounded-md border border-[var(--border)] bg-[var(--card)] px-2 text-xs font-mono"
+                      disabled={isMilestone}
+                      value={isMilestone ? 0 : durationDays}
+                      onChange={(e) => handleDurationChange(parseInt(e.target.value, 10) || 0)}
+                      className="w-full h-8 rounded-md border border-[var(--border)] bg-[var(--card)] px-2 text-xs font-mono disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                   </div>
+                </div>
+
+                {/* Milestone Toggle Switch */}
+                <div className="flex items-center justify-between p-2.5 rounded-lg border border-[var(--border)] bg-[var(--card)]">
+                  <div className="space-y-0.5">
+                    <div className="font-semibold text-xs text-[var(--foreground)] flex items-center gap-1.5">
+                      <span className="text-purple-400 font-bold">◆</span>
+                      <span>Milestone (Zero-Duration Target)</span>
+                    </div>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">
+                      Milestones mark key deliverables or checkpoint dates without working duration.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isMilestone}
+                      onChange={(e) => handleMilestoneToggle(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-8 h-4 bg-[var(--border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-[var(--border)] text-[11px] text-[var(--muted-foreground)] font-mono">
@@ -510,6 +643,103 @@ export function TaskDetailDrawer({
                   }}
                   className="w-full accent-[var(--primary)] cursor-pointer"
                 />
+              </div>
+
+              {/* Subtasks Checklist Section */}
+              <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--secondary)]/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-purple-400" />
+                    <span>Subtasks ({subtasks.length})</span>
+                  </h4>
+                  {subtasks.length > 0 && subtasksPercent !== null && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                        {subtasksCompletedCount}/{subtasks.length} ({subtasksPercent}%)
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSyncParentProgress}
+                        className="h-6 text-[10px] py-0 px-2 border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-950/20"
+                      >
+                        Sync Progress
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Subtask items list */}
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {subtasks.map((sub) => {
+                    const isDone = sub.status === 'completed';
+                    return (
+                      <div
+                        key={sub.id}
+                        onClick={() => handleToggleSubtaskStatus(sub)}
+                        className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                          isDone
+                            ? 'bg-emerald-500/5 border-emerald-500/20 text-[var(--muted-foreground)]'
+                            : 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--secondary)]/40'
+                        }`}
+                      >
+                        <div
+                          className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                            isDone
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'border-[var(--border)] bg-[var(--card)]'
+                          }`}
+                        >
+                          {isDone && <CheckCircle className="h-3 w-3" />}
+                        </div>
+                        <span
+                          className={`flex-1 truncate ${
+                            isDone ? 'line-through opacity-70' : 'font-medium'
+                          }`}
+                        >
+                          {sub.title}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] uppercase font-mono py-0 px-1"
+                        >
+                          {sub.status}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+
+                  {subtasks.length === 0 && (
+                    <p className="text-[11px] text-[var(--muted-foreground)] italic py-1">
+                      No subtasks defined for this work item.
+                    </p>
+                  )}
+                </div>
+
+                {/* Inline Add Subtask Input */}
+                <form
+                  onSubmit={handleCreateSubtask}
+                  className="flex items-center gap-2 pt-1 border-t border-[var(--border)]"
+                >
+                  <input
+                    type="text"
+                    placeholder="+ Add a subtask (press Enter)..."
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    disabled={isAddingSubtask}
+                    className="flex-1 h-7 text-xs bg-[var(--card)] border border-[var(--border)] rounded px-2.5 text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={!newSubtaskTitle.trim() || isAddingSubtask}
+                    className="h-7 text-xs px-2.5 gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Add</span>
+                  </Button>
+                </form>
               </div>
             </div>
           )}

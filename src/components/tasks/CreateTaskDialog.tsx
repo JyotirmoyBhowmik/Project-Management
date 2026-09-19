@@ -56,6 +56,7 @@ const createTaskFormSchema = z.object({
   assignee_ids: z.array(z.string()),
   description: z.string().optional(),
   is_milestone: z.boolean(),
+  parent_id: z.string().uuid().nullable().optional(),
 });
 
 type CreateTaskFormData = z.infer<typeof createTaskFormSchema>;
@@ -65,6 +66,8 @@ interface CreateTaskDialogProps {
   onClose: () => void;
   projectId: string;
   tenantId: string;
+  parentId?: string | null;
+  parentTaskTitle?: string;
   onTaskCreated?: (task: Task) => void;
 }
 
@@ -73,6 +76,8 @@ export function CreateTaskDialog({
   onClose,
   projectId,
   tenantId,
+  parentId = null,
+  parentTaskTitle,
   onTaskCreated,
 }: CreateTaskDialogProps) {
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -155,9 +160,10 @@ export function CreateTaskDialog({
         title: data.title,
         project_id: projectId,
         tenant_id: tenantId,
+        parent_id: parentId || undefined,
         start_date: data.start_date,
-        end_date: data.end_date,
-        duration_days: data.duration_days,
+        end_date: data.is_milestone ? data.start_date : data.end_date,
+        duration_days: data.is_milestone ? 0 : data.duration_days,
         priority: data.priority,
         status: data.status,
         description: data.description || null,
@@ -180,20 +186,17 @@ export function CreateTaskDialog({
         return;
       }
 
-      // Success
-      const createdCode = result.task.code || result.task.task_code || 'Task';
-      toast.success(`Task ${createdCode} created successfully.`, { id: toastId });
-
-      if (onTaskCreated) {
-        onTaskCreated(result.task);
-      }
-
+      toast.success(
+        parentId ? 'Subtask created successfully' : 'Task created successfully',
+        { id: toastId }
+      );
       reset();
       onClose();
+      if (onTaskCreated) onTaskCreated(result.task);
     } catch (err: any) {
-      const errMsg = err?.message || 'Unexpected network failure during task creation';
-      setServerError(errMsg);
-      toast.error(`Failed to create task: ${errMsg}`, { id: toastId });
+      const msg = err?.message || 'Unexpected application failure';
+      setServerError(msg);
+      toast.error(`Failed to create task: ${msg}`, { id: toastId });
     }
   };
 
@@ -210,8 +213,23 @@ export function CreateTaskDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create Work Item">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={parentId ? 'Create Hierarchical Subtask' : 'Create Work Item'}
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Parent Task Context Banner */}
+        {parentId && (
+          <div className="flex items-center gap-2 p-2.5 rounded-lg border border-purple-500/30 bg-purple-500/10 text-xs text-purple-300">
+            <Layers className="h-4 w-4 shrink-0 text-purple-400" />
+            <span>
+              Adding subtask under parent:{' '}
+              <strong className="text-purple-200">{parentTaskTitle || 'Parent Task'}</strong>
+            </span>
+          </div>
+        )}
+
         {/* Persistent In-Form Error Alert Banner */}
         {serverError && (
           <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">

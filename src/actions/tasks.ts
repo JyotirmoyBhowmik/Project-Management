@@ -105,6 +105,11 @@ export async function createTaskAction(
       updated_at: new Date().toISOString(),
     };
 
+    if (input.parent_id || input.parent_task_id) {
+      payload.parent_id = input.parent_id || input.parent_task_id;
+      payload.parent_task_id = input.parent_id || input.parent_task_id;
+    }
+
     if (input.task_code && input.task_code.trim()) {
       payload.task_code = input.task_code.trim().toUpperCase();
     }
@@ -417,5 +422,64 @@ export async function getTenantMembersAction(tenantId: string) {
       err,
     });
     return [];
+  }
+}
+
+export async function quickCreateSubtaskAction(params: {
+  parent_id: string;
+  title: string;
+  project_id: string;
+  tenant_id: string;
+  start_date?: string;
+  due_date?: string;
+}): Promise<ServerActionResponse<Task>> {
+  const correlationId = `act-quick-subtask-${Date.now()}`;
+  try {
+    if (!params.title?.trim()) {
+      return { success: false, error: 'Subtask title is required', correlation_id: correlationId };
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const today = new Date().toISOString().split('T')[0];
+    const startDate = params.start_date || today;
+    const endDate = params.due_date || startDate;
+
+    const payload: any = {
+      project_id: params.project_id,
+      tenant_id: params.tenant_id,
+      parent_id: params.parent_id,
+      parent_task_id: params.parent_id,
+      title: params.title.trim(),
+      start_date: startDate,
+      end_date: endDate,
+      duration_days: 1,
+      priority: 'medium',
+      status: 'todo',
+      progress: 0,
+      progress_percent: 0,
+      is_milestone: false,
+      created_by: user?.id || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Failed in quickCreateSubtaskAction', { fn: 'quickCreateSubtaskAction', err: error });
+      return { success: false, error: error.message, correlation_id: correlationId };
+    }
+
+    revalidatePath(`/projects/${params.project_id}`);
+    return { success: true, task: data, data, correlation_id: correlationId };
+  } catch (err: any) {
+    logger.error('Exception in quickCreateSubtaskAction', { fn: 'quickCreateSubtaskAction', err });
+    return { success: false, error: err?.message || 'Failed to create subtask', correlation_id: correlationId };
   }
 }

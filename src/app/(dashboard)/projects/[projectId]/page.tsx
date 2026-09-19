@@ -29,6 +29,7 @@ import {
   Loader2,
   FolderGit2,
   AlertCircle,
+  Flag,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { createClient } from '@/lib/supabase/client';
@@ -119,6 +120,17 @@ function ProjectWorkspaceContent() {
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = React.useState(false);
   const [isLockBaselineModalOpen, setIsLockBaselineModalOpen] = React.useState(false);
   const [exchangeMode, setExchangeMode] = React.useState<'import' | 'export' | null>(null);
+
+  // Milestone Filtering & Subtask Hierarchical Context
+  const [showMilestonesOnly, setShowMilestonesOnly] = React.useState(false);
+  const [selectedParentForSubtask, setSelectedParentForSubtask] = React.useState<{ id: string; title: string } | null>(null);
+
+  const displayedTasks = React.useMemo(() => {
+    if (showMilestonesOnly) {
+      return tasks.filter((t) => t.is_milestone || t.duration_days === 0);
+    }
+    return tasks;
+  }, [tasks, showMilestonesOnly]);
 
   // Baseline Form
   const [baselineName, setBaselineName] = React.useState('');
@@ -337,6 +349,20 @@ function ProjectWorkspaceContent() {
 
         {/* Global Project Actions */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Milestone Filter Toggle */}
+          <Button
+            variant={showMilestonesOnly ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowMilestonesOnly((prev) => !prev)}
+            className={`gap-1.5 text-xs font-medium transition-all ${
+              showMilestonesOnly ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600' : ''
+            }`}
+            title={showMilestonesOnly ? 'Showing Milestones Only (Click to show all tasks)' : 'Filter schedule to show milestones only'}
+          >
+            <Flag className={`h-3.5 w-3.5 ${showMilestonesOnly ? 'fill-current' : ''}`} />
+            <span>{showMilestonesOnly ? '◆ Milestones Only' : 'Milestone Filter'}</span>
+          </Button>
+
           {/* Baseline Snapshot Picker */}
           {baselines.length > 0 ? (
             <div className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/60 px-2.5 py-1">
@@ -376,7 +402,14 @@ function ProjectWorkspaceContent() {
             <span>Run CPM</span>
           </Button>
 
-          <Button size="sm" onClick={() => setIsAddTaskModalOpen(true)} className="gap-1.5 text-xs">
+          <Button
+            size="sm"
+            onClick={() => {
+              setSelectedParentForSubtask(null);
+              setIsAddTaskModalOpen(true);
+            }}
+            className="gap-1.5 text-xs"
+          >
             <Plus className="h-3.5 w-3.5" />
             <span>Add Task</span>
           </Button>
@@ -388,7 +421,7 @@ function ProjectWorkspaceContent() {
         <div className="flex gap-2 overflow-x-auto pb-px">
           {[
             { id: 'gantt', label: 'Interactive Gantt & CPM', icon: GanttChartSquare },
-            { id: 'kanban', label: `Kanban Board (${tasks.length})`, icon: Kanban },
+            { id: 'kanban', label: `Kanban Board (${displayedTasks.length})`, icon: Kanban },
             { id: 'grid', label: 'Hierarchical Grid', icon: Table },
             { id: 'graph', label: 'Graphify Network', icon: Sparkles },
             { id: 'sprint', label: `Agile Sprints (${sprints.length})`, icon: Flame },
@@ -431,14 +464,20 @@ function ProjectWorkspaceContent() {
                   Get started by adding your first task or milestone to generate the CPM schedule and Gantt timeline.
                 </p>
               </div>
-              <Button onClick={() => setIsAddTaskModalOpen(true)} className="gap-2 text-xs">
+              <Button
+                onClick={() => {
+                  setSelectedParentForSubtask(null);
+                  setIsAddTaskModalOpen(true);
+                }}
+                className="gap-2 text-xs"
+              >
                 <Plus className="h-4 w-4" />
                 <span>Add First Task</span>
               </Button>
             </div>
           ) : (
             <InteractiveGantt
-              tasks={tasks}
+              tasks={displayedTasks}
               dependencies={dependencies}
               baselineSnapshots={baselineSnapshots}
               calendar={calendar}
@@ -465,7 +504,10 @@ function ProjectWorkspaceContent() {
                 );
                 await refreshProjectData();
               }}
-              onAddTaskClick={() => setIsAddTaskModalOpen(true)}
+              onAddTaskClick={() => {
+                setSelectedParentForSubtask(null);
+                setIsAddTaskModalOpen(true);
+              }}
               onAddTask={async (task) => {
                 if (!projectId || !tenantId) return;
                 const calculatedEnd = new Date(task.start_date);
@@ -498,7 +540,7 @@ function ProjectWorkspaceContent() {
 
         {activeView === 'kanban' && (
           <KanbanBoard
-            tasks={tasks}
+            tasks={displayedTasks}
             onTaskUpdate={(taskId, updates) => {
               setTasks((prev) =>
                 prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
@@ -510,7 +552,7 @@ function ProjectWorkspaceContent() {
 
         {activeView === 'grid' && (
           <HierarchicalGrid
-            tasks={tasks}
+            tasks={displayedTasks}
             onTaskUpdate={async (taskId, updates) => {
               setTasks((prev) =>
                 prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
@@ -519,12 +561,16 @@ function ProjectWorkspaceContent() {
               await refreshProjectData();
             }}
             onSelectTask={(t) => setSelectedTaskForDrawer(t)}
+            onAddSubtask={(parentId, parentTitle) => {
+              setSelectedParentForSubtask({ id: parentId, title: parentTitle });
+              setIsAddTaskModalOpen(true);
+            }}
           />
         )}
 
         {activeView === 'graph' && (
           <GraphCanvas
-            tasks={tasks}
+            tasks={displayedTasks}
             dependencies={dependencies}
             phases={phases}
             documents={documents}
@@ -549,7 +595,7 @@ function ProjectWorkspaceContent() {
 
         {activeView === 'sprint' && (
           <SprintPlanningView
-            tasks={tasks}
+            tasks={displayedTasks}
             sprints={sprints}
             projectId={projectId}
             tenantId={tenantId || ''}
@@ -561,7 +607,7 @@ function ProjectWorkspaceContent() {
         {activeView === 'wiki' && (
           <WikiWorkspace
             documents={documents}
-            tasks={tasks}
+            tasks={displayedTasks}
             projectId={projectId}
             tenantId={tenantId || ''}
             onRefresh={refreshProjectData}
@@ -570,12 +616,12 @@ function ProjectWorkspaceContent() {
         )}
 
         {activeView === 'calendar' && (
-          <ProjectCalendarView tasks={tasks} calendar={calendar} holidays={holidays} />
+          <ProjectCalendarView tasks={displayedTasks} calendar={calendar} holidays={holidays} />
         )}
 
         {activeView === 'resource' && (
           <ResourceHeatmapView
-            tasks={tasks}
+            tasks={displayedTasks}
             calendar={calendar}
             holidays={holidays}
             tenantId={tenantId || ''}
@@ -607,14 +653,20 @@ function ProjectWorkspaceContent() {
         }}
       />
 
-      {/* Create Task Dialog */}
+      {/* Create Task / Subtask Dialog */}
       <CreateTaskDialog
         isOpen={isAddTaskModalOpen}
-        onClose={() => setIsAddTaskModalOpen(false)}
+        onClose={() => {
+          setIsAddTaskModalOpen(false);
+          setSelectedParentForSubtask(null);
+        }}
         projectId={projectId}
         tenantId={tenantId || ''}
+        parentId={selectedParentForSubtask?.id}
+        parentTaskTitle={selectedParentForSubtask?.title}
         onTaskCreated={(newTask) => {
           setTasks((prev) => [...prev, newTask]);
+          setSelectedParentForSubtask(null);
           refreshProjectData();
         }}
       />

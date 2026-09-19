@@ -7,7 +7,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createAdminClient } from '@/lib/supabase/server';
 import { TenantMembership, CrossTenantUser } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
 import {
@@ -574,5 +574,118 @@ export async function updateGlobalUserAction(
   } catch (err: any) {
     logger.error('Exception in updateGlobalUserAction', { fn: 'updateGlobalUserAction', err });
     return { success: false, error: err?.message || 'Failed to update global user', correlation_id: correlationId };
+  }
+}
+
+export async function deleteGlobalUserAction(userId: string): Promise<ActionResponse<void>> {
+  const correlationId = `act-del-user-${Date.now()}`;
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user: caller } } = await supabase.auth.getUser();
+
+    if (!caller) {
+      return { success: false, error: 'Unauthorized: Session required', correlation_id: correlationId };
+    }
+
+    // Verify caller is SuperAdmin
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('is_superadmin, email')
+      .eq('id', caller.id)
+      .maybeSingle();
+
+    const isCallerSuperAdmin =
+      callerProfile?.is_superadmin === true ||
+      caller.email === 'admin@jyotirmoyb.com';
+
+    if (!isCallerSuperAdmin) {
+      return {
+        success: false,
+        error: 'Forbidden: Only Platform SuperAdmins can delete global user accounts',
+        correlation_id: correlationId,
+      };
+    }
+
+    // Prevent self-deletion
+    if (caller.id === userId) {
+      return {
+        success: false,
+        error: 'Self-deletion forbidden: You cannot delete your own SuperAdmin account',
+        correlation_id: correlationId,
+      };
+    }
+
+    // Fetch target user metadata for audit logging
+    const { data: targetProfile } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, is_superadmin')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!targetProfile) {
+      return { success: false, error: 'Target user not found', correlation_id: correlationId };
+    }
+
+    // 1. Unlink references in tasks, projects, and audit logs
+    await Promise.all([
+      supabase.from('tasks').update({ assignee_id: null }).eq('assignee_id', userId),
+      supabase.from('tasks').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('tasks').update({ deleted_by: null }).eq('deleted_by', userId),
+      supabase.from('projects').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('projects').update({ deleted_by: null }).eq('deleted_by', userId),
+      supabase.from('audit_logs').update({ actor_id: null }).eq('actor_id', userId),
+    ]);
+
+    // 2. Cascade delete memberships and assignments
+    await Promise.all([
+      supabase.from('task_assignees').delete().eq('user_id', userId),
+      supabase.from('task_assignments').delete().eq('user_id', userId),
+      supabase.from('project_members').delete().eq('user_id', userId),
+      supabase.from('project_guest_access').delete().eq('user_id', userId),
+      supabase.from('team_members').delete().eq('user_id', userId),
+      supabase.from('user_notifications').delete().eq('user_id', userId),
+      supabase.from('tenant_memberships').delete().eq('user_id', userId),
+    ]);
+
+    // 3. Delete from public.profiles and public.user_profiles
+    await Promise.all([
+      supabase.from('user_profiles').delete().eq('id', userId),
+      supabase.from('profiles').delete().eq('id', userId),
+    ]);
+
+    // 4. Attempt deletion from auth.users via admin client if configured
+    try {
+      const adminClient = createAdminClient();
+      await adminClient.auth.admin.deleteUser(userId);
+    } catch (adminErr: any) {
+      logger.warn('Could not delete auth.users entry via admin client', {
+        fn: 'deleteGlobalUserAction',
+        ctx: { userId, error: adminErr?.message },
+      });
+    }
+
+    // 5. Audit log
+    await supabase.from('audit_logs').insert({
+      actor_id: caller.id,
+      action: 'GLOBAL_USER_DELETED',
+      entity_type: 'profile',
+      entity_id: userId,
+      details: {
+        deleted_user_email: targetProfile.email,
+        deleted_user_name: targetProfile.full_name,
+        was_superadmin: targetProfile.is_superadmin,
+      },
+    });
+
+    try {
+      revalidatePath('/admin/superadmin');
+      revalidatePath('/admin/multisite/users');
+      revalidatePath('/settings/members');
+    } catch {}
+
+    return { success: true, correlation_id: correlationId };
+  } catch (err: any) {
+    logger.error('Exception in deleteGlobalUserAction', { fn: 'deleteGlobalUserAction', err });
+    return { success: false, error: err?.message || 'Failed to delete user', correlation_id: correlationId };
   }
 }

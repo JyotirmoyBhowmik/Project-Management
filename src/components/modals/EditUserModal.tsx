@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/dialog';
 import { Tenant, UserTenantRole } from '@/types/database';
-import { updateGlobalUserAction } from '@/actions/members';
+import { updateGlobalUserAction, deleteGlobalUserAction } from '@/actions/members';
 import { toast } from 'sonner';
 
 interface EditUserModalProps {
@@ -56,12 +56,15 @@ export function EditUserModal({
   const [newTenantId, setNewTenantId] = React.useState<string>('');
   const [newTenantRole, setNewTenantRole] = React.useState<UserTenantRole>('member');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isDeletingUser, setIsDeletingUser] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   React.useEffect(() => {
     if (user) {
       setFullName(user.full_name || '');
       setEmail(user.email || '');
       setIsSuperAdmin(Boolean(user.is_superadmin));
+      setConfirmDelete(false);
       setMemberships(
         (user.memberships || []).map((m) => ({
           tenant_id: m.tenant_id,
@@ -96,6 +99,26 @@ export function EditUserModal({
     ]);
     setNewTenantId('');
     setNewTenantRole('member');
+  };
+
+  const handleDeleteUser = async () => {
+    if (!user) return;
+    setIsDeletingUser(true);
+    try {
+      const res = await deleteGlobalUserAction(user.id);
+      if (res.success) {
+        toast.success(`User ${user.full_name || user.email} was permanently deleted`);
+        onUserUpdated();
+        onClose();
+      } else {
+        toast.error(res.error || 'Failed to delete user');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error occurred while deleting user');
+    } finally {
+      setIsDeletingUser(false);
+      setConfirmDelete(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -298,6 +321,70 @@ export function EditUserModal({
                 <span>Add</span>
               </Button>
             </div>
+          )}
+        </div>
+
+        {/* Danger Zone: User Account Deletion */}
+        <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/5 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+              Danger Zone: Account Lifecycle
+            </span>
+          </div>
+          <p className="text-[11px] text-[var(--muted-foreground)]">
+            Permanently revoke all workspace access, remove user assignments, and delete this profile from the platform directory.
+          </p>
+
+          {confirmDelete ? (
+            <div className="p-3 rounded-lg border border-red-500/30 bg-red-950/20 space-y-2.5 animate-in fade-in duration-150">
+              <p className="text-xs font-semibold text-red-300">
+                Are you sure you want to permanently delete {user.full_name || user.email}? This action cannot be undone.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteUser}
+                  disabled={isDeletingUser}
+                  className="h-7 text-xs bg-red-600 hover:bg-red-700 gap-1"
+                >
+                  {isDeletingUser ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Deleting User...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3 h-3" />
+                      <span>Confirm Permanent Delete</span>
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={isDeletingUser}
+                  className="h-7 text-xs"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmDelete(true)}
+              className="h-7 text-xs border-red-500/30 text-red-400 hover:text-red-300 hover:bg-red-950/30 gap-1"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Delete User Account</span>
+            </Button>
           )}
         </div>
 
