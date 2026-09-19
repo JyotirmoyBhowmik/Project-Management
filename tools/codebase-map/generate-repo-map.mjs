@@ -419,7 +419,7 @@ async function main() {
   console.log(`✅ Emitted REPO_MAP.md (${(fs.statSync(repoMapPath).size / 1024).toFixed(1)} KB)`);
 
   // --------------------------------------------------------------------------
-  // 2. Write graph.json
+  // 2. Write graph.json (Root, Tools, and Public directories)
   // --------------------------------------------------------------------------
   const graphData = {
     meta: {
@@ -433,17 +433,56 @@ async function main() {
     edges,
   };
 
-  const graphJsonPath = path.join(__dirname, 'graph.json');
-  fs.writeFileSync(graphJsonPath, JSON.stringify(graphData, null, 2), 'utf-8');
-  console.log(`✅ Emitted tools/codebase-map/graph.json (${(fs.statSync(graphJsonPath).size / 1024).toFixed(1)} KB)`);
+  const graphJsonStr = JSON.stringify(graphData, null, 2);
 
-  // Also write into public folder so Next.js or browser can optionally fetch it directly
+  // Root
+  const rootGraphJsonPath = path.join(ROOT_DIR, 'graph.json');
+  fs.writeFileSync(rootGraphJsonPath, graphJsonStr, 'utf-8');
+  console.log(`✅ Emitted root graph.json (${(fs.statSync(rootGraphJsonPath).size / 1024).toFixed(1)} KB)`);
+
+  // Tools
+  const toolsGraphJsonPath = path.join(__dirname, 'graph.json');
+  fs.writeFileSync(toolsGraphJsonPath, graphJsonStr, 'utf-8');
+  console.log(`✅ Emitted tools/codebase-map/graph.json (${(fs.statSync(toolsGraphJsonPath).size / 1024).toFixed(1)} KB)`);
+
+  // Public folder
   const publicGraphDir = path.join(ROOT_DIR, 'public/codebase-map');
   if (!fs.existsSync(publicGraphDir)) {
     fs.mkdirSync(publicGraphDir, { recursive: true });
   }
-  fs.writeFileSync(path.join(publicGraphDir, 'graph.json'), JSON.stringify(graphData, null, 2), 'utf-8');
-  console.log(`✅ Mirrored to public/codebase-map/graph.json`);
+  const publicGraphJsonPath = path.join(publicGraphDir, 'graph.json');
+  fs.writeFileSync(publicGraphJsonPath, graphJsonStr, 'utf-8');
+  console.log(`✅ Mirrored to public/codebase-map/graph.json (${(fs.statSync(publicGraphJsonPath).size / 1024).toFixed(1)} KB)`);
+
+  // --------------------------------------------------------------------------
+  // 3. Write interactive index.html (with embedded data fallback)
+  // --------------------------------------------------------------------------
+  const templatePath = path.join(__dirname, 'index.html');
+  let htmlTemplate = '';
+  if (fs.existsSync(templatePath)) {
+    htmlTemplate = fs.readFileSync(templatePath, 'utf-8');
+  }
+
+  // Inject embedded graph data into HTML template for offline/standalone execution
+  const embeddedScript = `<script>window.__EMBEDDED_GRAPH_DATA__ = ${JSON.stringify(graphData)};</script>\n  <script>`;
+  let standaloneHtml = htmlTemplate;
+  if (htmlTemplate.includes('<script>')) {
+    standaloneHtml = htmlTemplate.replace('<script>', embeddedScript);
+  }
+
+  // Write to workspace root
+  const rootHtmlPath = path.join(ROOT_DIR, 'index.html');
+  fs.writeFileSync(rootHtmlPath, standaloneHtml, 'utf-8');
+  console.log(`✅ Emitted root index.html (${(fs.statSync(rootHtmlPath).size / 1024).toFixed(1)} KB)`);
+
+  const rootCodebaseMapHtmlPath = path.join(ROOT_DIR, 'codebase-map.html');
+  fs.writeFileSync(rootCodebaseMapHtmlPath, standaloneHtml, 'utf-8');
+  console.log(`✅ Emitted root codebase-map.html (${(fs.statSync(rootCodebaseMapHtmlPath).size / 1024).toFixed(1)} KB)`);
+
+  // Write to public/codebase-map
+  const publicHtmlPath = path.join(publicGraphDir, 'index.html');
+  fs.writeFileSync(publicHtmlPath, standaloneHtml, 'utf-8');
+  console.log(`✅ Mirrored to public/codebase-map/index.html (${(fs.statSync(publicHtmlPath).size / 1024).toFixed(1)} KB)`);
 
   console.log('✨ Codebase mapping completed successfully!');
 }

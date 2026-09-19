@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generatedAt": "2026-09-19T17:47:30.761Z",
-    "totalFiles": 156,
-    "totalEdges": 390,
-    "totalLines": 38900,
-    "totalSymbols": 880
+    "generatedAt": "2026-09-19T20:52:49.337Z",
+    "totalFiles": 164,
+    "totalEdges": 415,
+    "totalLines": 42871,
+    "totalSymbols": 947
   },
   "nodes": [
     {
@@ -43,7 +43,7 @@
       "path": "src/actions/automations.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 246,
+      "lines": 250,
       "symbolsCount": 7,
       "symbols": [
         {
@@ -79,13 +79,36 @@
         {
           "name": "createWebhookAction",
           "kind": "function",
-          "line": 200,
+          "line": 204,
           "isExported": true
         },
         {
           "name": "getTenantWebhooksAction",
           "kind": "function",
-          "line": 230,
+          "line": 234,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "src/actions/config.ts",
+      "label": "config.ts",
+      "path": "src/actions/config.ts",
+      "type": "action",
+      "extension": ".ts",
+      "lines": 225,
+      "symbolsCount": 2,
+      "symbols": [
+        {
+          "name": "getGlobalAppConfigAction",
+          "kind": "function",
+          "line": 22,
+          "isExported": true
+        },
+        {
+          "name": "updateGlobalAppConfigAction",
+          "kind": "function",
+          "line": 93,
           "isExported": true
         }
       ]
@@ -178,8 +201,8 @@
       "path": "src/actions/members.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 579,
-      "symbolsCount": 9,
+      "lines": 692,
+      "symbolsCount": 10,
       "symbols": [
         {
           "name": "getWorkspaceMembersAction",
@@ -233,6 +256,12 @@
           "name": "updateGlobalUserAction",
           "kind": "function",
           "line": 483,
+          "isExported": true
+        },
+        {
+          "name": "deleteGlobalUserAction",
+          "kind": "function",
+          "line": 580,
           "isExported": true
         }
       ]
@@ -290,8 +319,8 @@
       "path": "src/actions/tasks.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 422,
-      "symbolsCount": 4,
+      "lines": 487,
+      "symbolsCount": 5,
       "symbols": [
         {
           "name": "createTaskAction",
@@ -302,19 +331,25 @@
         {
           "name": "updateTaskScheduleAction",
           "kind": "function",
-          "line": 206,
+          "line": 211,
           "isExported": true
         },
         {
           "name": "updateTaskStatusAction",
           "kind": "function",
-          "line": 298,
+          "line": 303,
           "isExported": true
         },
         {
           "name": "getTenantMembersAction",
           "kind": "function",
-          "line": 386,
+          "line": 392,
+          "isExported": true
+        },
+        {
+          "name": "quickCreateSubtaskAction",
+          "kind": "function",
+          "line": 429,
           "isExported": true
         }
       ]
@@ -372,7 +407,7 @@
       "path": "src/actions/trash.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 178,
+      "lines": 255,
       "symbolsCount": 4,
       "symbols": [
         {
@@ -396,7 +431,7 @@
         {
           "name": "getTrashItemsAction",
           "kind": "function",
-          "line": 98,
+          "line": 127,
           "isExported": true
         }
       ]
@@ -407,43 +442,37 @@
       "path": "src/actions/wiki.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 173,
-      "symbolsCount": 6,
+      "lines": 224,
+      "symbolsCount": 5,
       "symbols": [
         {
           "name": "createDocumentAction",
           "kind": "function",
-          "line": 18,
+          "line": 19,
           "isExported": true
         },
         {
           "name": "updateDocumentContentAction",
           "kind": "function",
-          "line": 51,
+          "line": 72,
           "isExported": true
         },
         {
           "name": "getDocumentTreeAction",
           "kind": "function",
-          "line": 82,
+          "line": 123,
           "isExported": true
         },
         {
           "name": "linkTaskToDocAction",
           "kind": "function",
-          "line": 125,
+          "line": 193,
           "isExported": true
         },
         {
           "name": "unlinkTaskFromDocAction",
           "kind": "function",
-          "line": 140,
-          "isExported": true
-        },
-        {
-          "name": "getTaskLinkedDocsAction",
-          "kind": "function",
-          "line": 157,
+          "line": 208,
           "isExported": true
         }
       ]
@@ -454,43 +483,43 @@
       "path": "src/app/(auth)/login/page.tsx",
       "type": "page",
       "extension": ".tsx",
-      "lines": 632,
+      "lines": 652,
       "symbolsCount": 6,
       "symbols": [
         {
           "name": "LoginPageContent",
           "kind": "function",
-          "line": 35,
+          "line": 36,
           "isExported": false
         },
         {
           "name": "handleResolveWorkspace",
           "kind": "component_or_fn",
-          "line": 76,
+          "line": 78,
           "isExported": false
         },
         {
           "name": "checkDomainSSO",
           "kind": "component_or_fn",
-          "line": 104,
+          "line": 106,
           "isExported": false
         },
         {
           "name": "handleSSOLogin",
           "kind": "component_or_fn",
-          "line": 129,
+          "line": 131,
           "isExported": false
         },
         {
           "name": "handleLogin",
           "kind": "component_or_fn",
-          "line": 164,
+          "line": 166,
           "isExported": false
         },
         {
           "name": "LoginPage",
           "kind": "function",
-          "line": 619,
+          "line": 639,
           "isExported": true
         }
       ]
@@ -651,6 +680,23 @@
       ]
     },
     {
+      "id": "src/app/(dashboard)/admin/system/config/page.tsx",
+      "label": "page.tsx",
+      "path": "src/app/(dashboard)/admin/system/config/page.tsx",
+      "type": "page",
+      "extension": ".tsx",
+      "lines": 14,
+      "symbolsCount": 1,
+      "symbols": [
+        {
+          "name": "GlobalConfigPage",
+          "kind": "function",
+          "line": 11,
+          "isExported": true
+        }
+      ]
+    },
+    {
       "id": "src/app/(dashboard)/admin/tenant/help/page.tsx",
       "label": "page.tsx",
       "path": "src/app/(dashboard)/admin/tenant/help/page.tsx",
@@ -800,49 +846,49 @@
       "path": "src/app/(dashboard)/projects/[projectId]/page.tsx",
       "type": "page",
       "extension": ".tsx",
-      "lines": 681,
+      "lines": 748,
       "symbolsCount": 7,
       "symbols": [
         {
           "name": "ProjectWorkspaceContent",
           "kind": "function",
-          "line": 71,
+          "line": 74,
           "isExported": false
         },
         {
           "name": "ViewType",
           "kind": "type",
-          "line": 83,
+          "line": 87,
           "isExported": false
         },
         {
           "name": "loadSnapshots",
           "kind": "function",
-          "line": 185,
+          "line": 200,
           "isExported": false
         },
         {
           "name": "handleRunCPM",
           "kind": "component_or_fn",
-          "line": 199,
+          "line": 214,
           "isExported": false
         },
         {
           "name": "handleLockBaseline",
           "kind": "component_or_fn",
-          "line": 234,
+          "line": 253,
           "isExported": false
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 392,
+          "line": 440,
           "isExported": false
         },
         {
           "name": "ProjectWorkspacePage",
           "kind": "function",
-          "line": 668,
+          "line": 735,
           "isExported": true
         }
       ]
@@ -1455,14 +1501,73 @@
       "path": "src/app/providers.tsx",
       "type": "config",
       "extension": ".tsx",
-      "lines": 33,
+      "lines": 36,
       "symbolsCount": 1,
       "symbols": [
         {
           "name": "Providers",
           "kind": "function",
-          "line": 9,
+          "line": 10,
           "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "src/components/admin/GlobalConfigManager.tsx",
+      "label": "GlobalConfigManager.tsx",
+      "path": "src/components/admin/GlobalConfigManager.tsx",
+      "type": "component",
+      "extension": ".tsx",
+      "lines": 709,
+      "symbolsCount": 8,
+      "symbols": [
+        {
+          "name": "GlobalConfigManager",
+          "kind": "function",
+          "line": 52,
+          "isExported": true
+        },
+        {
+          "name": "handleSave",
+          "kind": "component_or_fn",
+          "line": 68,
+          "isExported": false
+        },
+        {
+          "name": "handleReset",
+          "kind": "component_or_fn",
+          "line": 79,
+          "isExported": false
+        },
+        {
+          "name": "updateFeatureFlag",
+          "kind": "component_or_fn",
+          "line": 85,
+          "isExported": false
+        },
+        {
+          "name": "ActiveIconComponent",
+          "kind": "component_or_fn",
+          "line": 95,
+          "isExported": false
+        },
+        {
+          "name": "Icon",
+          "kind": "component_or_fn",
+          "line": 155,
+          "isExported": false
+        },
+        {
+          "name": "IconComp",
+          "kind": "component_or_fn",
+          "line": 238,
+          "isExported": false
+        },
+        {
+          "name": "Icon",
+          "kind": "component_or_fn",
+          "line": 457,
+          "isExported": false
         }
       ]
     },
@@ -1472,67 +1577,67 @@
       "path": "src/components/admin/SuperAdminPanel.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 935,
+      "lines": 944,
       "symbolsCount": 10,
       "symbols": [
         {
           "name": "SuperAdminPanel",
           "kind": "function",
-          "line": 37,
+          "line": 38,
           "isExported": true
         },
         {
           "name": "showNotification",
           "kind": "component_or_fn",
-          "line": 94,
+          "line": 95,
           "isExported": false
         },
         {
           "name": "handleSelectThemeToEdit",
           "kind": "component_or_fn",
-          "line": 99,
+          "line": 100,
           "isExported": false
         },
         {
           "name": "handleUpdateToken",
           "kind": "component_or_fn",
-          "line": 107,
+          "line": 108,
           "isExported": false
         },
         {
           "name": "handleSaveTheme",
           "kind": "component_or_fn",
-          "line": 114,
+          "line": 115,
           "isExported": false
         },
         {
           "name": "handleProvisionTenant",
           "kind": "component_or_fn",
-          "line": 123,
+          "line": 124,
           "isExported": false
         },
         {
           "name": "toggleTenantStatus",
           "kind": "component_or_fn",
-          "line": 164,
+          "line": 165,
           "isExported": false
         },
         {
           "name": "handleUpdateQuota",
           "kind": "component_or_fn",
-          "line": 176,
+          "line": 177,
           "isExported": false
         },
         {
           "name": "toggleFeatureFlag",
           "kind": "component_or_fn",
-          "line": 203,
+          "line": 204,
           "isExported": false
         },
         {
           "name": "handleCloneTenant",
           "kind": "component_or_fn",
-          "line": 224,
+          "line": 225,
           "isExported": false
         }
       ]
@@ -1650,55 +1755,61 @@
       "path": "src/components/agile/SprintPlanningView.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 497,
-      "symbolsCount": 8,
+      "lines": 778,
+      "symbolsCount": 9,
       "symbols": [
         {
           "name": "SprintPlanningViewProps",
           "kind": "interface",
-          "line": 37,
+          "line": 41,
           "isExported": false
         },
         {
           "name": "SprintPlanningView",
           "kind": "function",
-          "line": 46,
+          "line": 50,
           "isExported": true
         },
         {
           "name": "handleDragStart",
           "kind": "component_or_fn",
-          "line": 95,
+          "line": 112,
           "isExported": false
         },
         {
           "name": "handleDrop",
           "kind": "component_or_fn",
-          "line": 99,
+          "line": 116,
+          "isExported": false
+        },
+        {
+          "name": "handleMoveTask",
+          "kind": "component_or_fn",
+          "line": 140,
           "isExported": false
         },
         {
           "name": "handleCreateSprint",
           "kind": "component_or_fn",
-          "line": 117,
+          "line": 159,
           "isExported": false
         },
         {
           "name": "handleStartSprint",
           "kind": "component_or_fn",
-          "line": 142,
+          "line": 188,
           "isExported": false
         },
         {
           "name": "handleCompleteSprint",
           "kind": "component_or_fn",
-          "line": 153,
+          "line": 199,
           "isExported": false
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 244,
+          "line": 305,
           "isExported": false
         }
       ]
@@ -1709,7 +1820,7 @@
       "path": "src/components/calendar/ProjectCalendarView.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 151,
+      "lines": 160,
       "symbolsCount": 4,
       "symbols": [
         {
@@ -1727,13 +1838,13 @@
         {
           "name": "prevMonth",
           "kind": "component_or_fn",
-          "line": 18,
+          "line": 25,
           "isExported": false
         },
         {
           "name": "nextMonth",
           "kind": "component_or_fn",
-          "line": 22,
+          "line": 29,
           "isExported": false
         }
       ]
@@ -1862,55 +1973,55 @@
       "path": "src/components/graphify/GraphCanvas.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 638,
+      "lines": 834,
       "symbolsCount": 8,
       "symbols": [
         {
           "name": "GraphNode",
           "kind": "interface",
-          "line": 30,
+          "line": 33,
           "isExported": true
         },
         {
           "name": "GraphEdge",
           "kind": "interface",
-          "line": 42,
+          "line": 47,
           "isExported": true
         },
         {
           "name": "GraphCanvasProps",
           "kind": "interface",
-          "line": 52,
+          "line": 57,
           "isExported": false
         },
         {
           "name": "STATUS_COLORS",
           "kind": "component_or_fn",
-          "line": 64,
+          "line": 69,
           "isExported": false
         },
         {
           "name": "GraphCanvas",
           "kind": "function",
-          "line": 73,
+          "line": 78,
           "isExported": true
         },
         {
           "name": "handleMouseDown",
           "kind": "component_or_fn",
-          "line": 273,
+          "line": 382,
           "isExported": false
         },
         {
           "name": "handleMouseMove",
           "kind": "component_or_fn",
-          "line": 280,
+          "line": 389,
           "isExported": false
         },
         {
           "name": "handleMouseUp",
           "kind": "component_or_fn",
-          "line": 292,
+          "line": 401,
           "isExported": false
         }
       ]
@@ -1921,31 +2032,73 @@
       "path": "src/components/grid/HierarchicalGrid.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 259,
-      "symbolsCount": 4,
+      "lines": 555,
+      "symbolsCount": 11,
       "symbols": [
         {
           "name": "HierarchicalGridProps",
           "kind": "interface",
-          "line": 19,
+          "line": 29,
+          "isExported": false
+        },
+        {
+          "name": "WbsTaskNode",
+          "kind": "interface",
+          "line": 37,
           "isExported": false
         },
         {
           "name": "HierarchicalGrid",
           "kind": "function",
-          "line": 26,
+          "line": 44,
           "isExported": true
+        },
+        {
+          "name": "buildNodes",
+          "kind": "function",
+          "line": 75,
+          "isExported": false
         },
         {
           "name": "toggleExpand",
           "kind": "component_or_fn",
-          "line": 34,
+          "line": 115,
+          "isExported": false
+        },
+        {
+          "name": "handleExpandAll",
+          "kind": "component_or_fn",
+          "line": 119,
+          "isExported": false
+        },
+        {
+          "name": "handleCollapseAll",
+          "kind": "component_or_fn",
+          "line": 127,
           "isExported": false
         },
         {
           "name": "renderPriorityBadge",
           "kind": "component_or_fn",
-          "line": 38,
+          "line": 135,
+          "isExported": false
+        },
+        {
+          "name": "matchTask",
+          "kind": "function",
+          "line": 168,
+          "isExported": false
+        },
+        {
+          "name": "filterNodeList",
+          "kind": "function",
+          "line": 176,
+          "isExported": false
+        },
+        {
+          "name": "renderTaskRow",
+          "kind": "component_or_fn",
+          "line": 220,
           "isExported": false
         }
       ]
@@ -1956,7 +2109,7 @@
       "path": "src/components/kanban/KanbanBoard.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 278,
+      "lines": 288,
       "symbolsCount": 5,
       "symbols": [
         {
@@ -2014,37 +2167,37 @@
       "path": "src/components/layout/Header.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 435,
+      "lines": 467,
       "symbolsCount": 5,
       "symbols": [
         {
           "name": "Header",
           "kind": "function",
-          "line": 35,
+          "line": 36,
           "isExported": true
         },
         {
           "name": "handleMarkAsRead",
           "kind": "component_or_fn",
-          "line": 76,
+          "line": 78,
           "isExported": false
         },
         {
           "name": "handleTenantSwitch",
           "kind": "component_or_fn",
-          "line": 81,
+          "line": 83,
           "isExported": false
         },
         {
           "name": "handleSignOut",
           "kind": "component_or_fn",
-          "line": 96,
+          "line": 98,
           "isExported": false
         },
         {
           "name": "closeAllMenus",
           "kind": "component_or_fn",
-          "line": 106,
+          "line": 108,
           "isExported": false
         }
       ]
@@ -2055,25 +2208,25 @@
       "path": "src/components/layout/Sidebar.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 222,
+      "lines": 245,
       "symbolsCount": 3,
       "symbols": [
         {
           "name": "Sidebar",
           "kind": "function",
-          "line": 29,
+          "line": 31,
           "isExported": true
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 133,
+          "line": 147,
           "isExported": false
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 164,
+          "line": 178,
           "isExported": false
         }
       ]
@@ -2142,8 +2295,8 @@
       "path": "src/components/modals/EditUserModal.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 324,
-      "symbolsCount": 6,
+      "lines": 411,
+      "symbolsCount": 7,
       "symbols": [
         {
           "name": "EditUserModalProps",
@@ -2160,25 +2313,31 @@
         {
           "name": "handleRoleChange",
           "kind": "component_or_fn",
-          "line": 77,
+          "line": 80,
           "isExported": false
         },
         {
           "name": "handleRemoveMembership",
           "kind": "component_or_fn",
-          "line": 83,
+          "line": 86,
           "isExported": false
         },
         {
           "name": "handleAddMembership",
           "kind": "component_or_fn",
-          "line": 87,
+          "line": 90,
+          "isExported": false
+        },
+        {
+          "name": "handleDeleteUser",
+          "kind": "component_or_fn",
+          "line": 104,
           "isExported": false
         },
         {
           "name": "handleSubmit",
           "kind": "component_or_fn",
-          "line": 101,
+          "line": 124,
           "isExported": false
         }
       ]
@@ -2288,25 +2447,25 @@
       "path": "src/components/resource/ResourceHeatmapView.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 398,
+      "lines": 404,
       "symbolsCount": 3,
       "symbols": [
         {
           "name": "ResourceHeatmapViewProps",
           "kind": "interface",
-          "line": 32,
+          "line": 33,
           "isExported": false
         },
         {
           "name": "ResourceHeatmapView",
           "kind": "function",
-          "line": 41,
+          "line": 42,
           "isExported": true
         },
         {
           "name": "toggleUser",
           "kind": "component_or_fn",
-          "line": 103,
+          "line": 109,
           "isExported": false
         }
       ]
@@ -2317,37 +2476,37 @@
       "path": "src/components/tasks/CreateTaskDialog.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 468,
+      "lines": 486,
       "symbolsCount": 5,
       "symbols": [
         {
           "name": "CreateTaskFormData",
           "kind": "type",
-          "line": 61,
+          "line": 62,
           "isExported": false
         },
         {
           "name": "CreateTaskDialogProps",
           "kind": "interface",
-          "line": 63,
+          "line": 64,
           "isExported": false
         },
         {
           "name": "CreateTaskDialog",
           "kind": "function",
-          "line": 71,
+          "line": 74,
           "isExported": true
         },
         {
           "name": "onSubmit",
           "kind": "component_or_fn",
-          "line": 147,
+          "line": 152,
           "isExported": false
         },
         {
           "name": "handleToggleAssignee",
           "kind": "component_or_fn",
-          "line": 200,
+          "line": 203,
           "isExported": false
         }
       ]
@@ -2411,73 +2570,121 @@
       "path": "src/components/tasks/TaskDetailDrawer.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 736,
-      "symbolsCount": 11,
+      "lines": 1035,
+      "symbolsCount": 19,
       "symbols": [
         {
           "name": "TaskDetailDrawerProps",
           "kind": "interface",
-          "line": 35,
+          "line": 39,
+          "isExported": false
+        },
+        {
+          "name": "ErrorBoundaryState",
+          "kind": "interface",
+          "line": 53,
+          "isExported": false
+        },
+        {
+          "name": "DrawerErrorBoundary",
+          "kind": "class",
+          "line": 57,
           "isExported": false
         },
         {
           "name": "TaskDetailDrawer",
           "kind": "function",
-          "line": 49,
+          "line": 99,
           "isExported": true
         },
         {
           "name": "loadData",
           "kind": "function",
-          "line": 111,
+          "line": 184,
           "isExported": false
         },
         {
           "name": "handleKeyDown",
           "kind": "component_or_fn",
-          "line": 137,
+          "line": 210,
           "isExported": false
         },
         {
           "name": "handleSaveDetails",
           "kind": "component_or_fn",
-          "line": 147,
+          "line": 220,
           "isExported": false
         },
         {
           "name": "handleDurationChange",
           "kind": "component_or_fn",
-          "line": 152,
+          "line": 225,
           "isExported": false
         },
         {
           "name": "handleStartDateChange",
           "kind": "component_or_fn",
-          "line": 165,
+          "line": 238,
+          "isExported": false
+        },
+        {
+          "name": "handleMilestoneToggle",
+          "kind": "component_or_fn",
+          "line": 248,
+          "isExported": false
+        },
+        {
+          "name": "handleToggleSubtaskStatus",
+          "kind": "component_or_fn",
+          "line": 265,
+          "isExported": false
+        },
+        {
+          "name": "handleCreateSubtask",
+          "kind": "component_or_fn",
+          "line": 287,
+          "isExported": false
+        },
+        {
+          "name": "handleSyncParentProgress",
+          "kind": "component_or_fn",
+          "line": 322,
+          "isExported": false
+        },
+        {
+          "name": "formatSafeDateTime",
+          "kind": "function",
+          "line": 331,
+          "isExported": false
+        },
+        {
+          "name": "formatSafeTime",
+          "kind": "function",
+          "line": 341,
           "isExported": false
         },
         {
           "name": "FeedItem",
           "kind": "type",
-          "line": 177,
+          "line": 353,
           "isExported": false
         },
         {
           "name": "handleCommentChange",
           "kind": "component_or_fn",
-          "line": 198,
+          "line": 374,
           "isExported": false
         },
         {
           "name": "insertMention",
           "kind": "component_or_fn",
-          "line": 218,
+          "line": 394,
           "isExported": false
         },
         {
           "name": "submitComment",
           "kind": "component_or_fn",
-          "line": 228,
+          "line": 404,
           "isExported": false
         }
       ]
@@ -2656,49 +2863,127 @@
       "path": "src/components/wiki/WikiWorkspace.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 310,
-      "symbolsCount": 7,
+      "lines": 901,
+      "symbolsCount": 20,
       "symbols": [
         {
           "name": "WikiWorkspaceProps",
           "kind": "interface",
-          "line": 39,
+          "line": 49,
+          "isExported": false
+        },
+        {
+          "name": "findDocRecursive",
+          "kind": "function",
+          "line": 61,
+          "isExported": false
+        },
+        {
+          "name": "collectAllDocIds",
+          "kind": "function",
+          "line": 75,
+          "isExported": false
+        },
+        {
+          "name": "traverse",
+          "kind": "function",
+          "line": 77,
+          "isExported": false
+        },
+        {
+          "name": "buildDocPath",
+          "kind": "function",
+          "line": 92,
+          "isExported": false
+        },
+        {
+          "name": "filterDocTree",
+          "kind": "function",
+          "line": 107,
+          "isExported": false
+        },
+        {
+          "name": "checkNode",
+          "kind": "function",
+          "line": 119,
+          "isExported": false
+        },
+        {
+          "name": "filterNodes",
+          "kind": "function",
+          "line": 137,
           "isExported": false
         },
         {
           "name": "WikiWorkspace",
           "kind": "function",
-          "line": 48,
+          "line": 152,
           "isExported": true
         },
         {
           "name": "toggleExpand",
           "kind": "component_or_fn",
-          "line": 77,
+          "line": 215,
+          "isExported": false
+        },
+        {
+          "name": "handleExpandAll",
+          "kind": "component_or_fn",
+          "line": 225,
+          "isExported": false
+        },
+        {
+          "name": "handleCollapseAll",
+          "kind": "component_or_fn",
+          "line": 229,
           "isExported": false
         },
         {
           "name": "handleCreateDoc",
           "kind": "component_or_fn",
-          "line": 86,
+          "line": 245,
           "isExported": false
         },
         {
           "name": "handleSaveDoc",
           "kind": "component_or_fn",
-          "line": 108,
+          "line": 275,
+          "isExported": false
+        },
+        {
+          "name": "handleDeleteDoc",
+          "kind": "component_or_fn",
+          "line": 297,
           "isExported": false
         },
         {
           "name": "handleLinkTask",
           "kind": "component_or_fn",
-          "line": 129,
+          "line": 325,
+          "isExported": false
+        },
+        {
+          "name": "handleUnlinkTask",
+          "kind": "component_or_fn",
+          "line": 339,
+          "isExported": false
+        },
+        {
+          "name": "insertFormatting",
+          "kind": "component_or_fn",
+          "line": 351,
           "isExported": false
         },
         {
           "name": "renderDocumentWithEmbeddedTasks",
           "kind": "component_or_fn",
-          "line": 143,
+          "line": 358,
+          "isExported": false
+        },
+        {
+          "name": "renderDocTreeItem",
+          "kind": "component_or_fn",
+          "line": 437,
           "isExported": false
         }
       ]
@@ -2709,7 +2994,7 @@
       "path": "src/lib/calendar/calendar-engine.ts",
       "type": "lib",
       "extension": ".ts",
-      "lines": 213,
+      "lines": 242,
       "symbolsCount": 10,
       "symbols": [
         {
@@ -2727,49 +3012,96 @@
         {
           "name": "parseISODate",
           "kind": "function",
-          "line": 25,
+          "line": 40,
           "isExported": true
         },
         {
           "name": "normalizeHolidays",
           "kind": "function",
-          "line": 30,
+          "line": 53,
           "isExported": true
         },
         {
           "name": "isWorkingDay",
           "kind": "function",
-          "line": 46,
+          "line": 72,
           "isExported": true
         },
         {
           "name": "getNextWorkingDay",
           "kind": "function",
-          "line": 75,
+          "line": 101,
           "isExported": true
         },
         {
           "name": "calculate_working_end_date",
           "kind": "function",
-          "line": 90,
+          "line": 118,
           "isExported": true
         },
         {
           "name": "addWorkingDays",
           "kind": "function",
-          "line": 118,
+          "line": 146,
           "isExported": true
         },
         {
           "name": "calculateWorkingDays",
           "kind": "function",
-          "line": 144,
+          "line": 173,
           "isExported": true
         },
         {
           "name": "generateDayGrid",
           "kind": "function",
-          "line": 170,
+          "line": 199,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "src/lib/context/app-config-context.tsx",
+      "label": "app-config-context.tsx",
+      "path": "src/lib/context/app-config-context.tsx",
+      "type": "lib",
+      "extension": ".tsx",
+      "lines": 164,
+      "symbolsCount": 6,
+      "symbols": [
+        {
+          "name": "APP_ICON_MAP",
+          "kind": "component_or_fn",
+          "line": 34,
+          "isExported": true
+        },
+        {
+          "name": "AppConfigContextValue",
+          "kind": "interface",
+          "line": 51,
+          "isExported": false
+        },
+        {
+          "name": "AppConfigContext",
+          "kind": "component_or_fn",
+          "line": 60,
+          "isExported": false
+        },
+        {
+          "name": "AppConfigProvider",
+          "kind": "function",
+          "line": 62,
+          "isExported": true
+        },
+        {
+          "name": "IconComponent",
+          "kind": "component_or_fn",
+          "line": 129,
+          "isExported": false
+        },
+        {
+          "name": "useAppConfig",
+          "kind": "function",
+          "line": 150,
           "isExported": true
         }
       ]
@@ -3727,7 +4059,7 @@
       "path": "src/lib/validation/action-schemas.ts",
       "type": "lib",
       "extension": ".ts",
-      "lines": 246,
+      "lines": 248,
       "symbolsCount": 31,
       "symbols": [
         {
@@ -3745,175 +4077,240 @@
         {
           "name": "TaskInput",
           "kind": "type",
-          "line": 46,
+          "line": 48,
           "isExported": true
         },
         {
           "name": "UpdateTaskScheduleSchema",
           "kind": "component_or_fn",
-          "line": 48,
+          "line": 50,
           "isExported": true
         },
         {
           "name": "UpdateTaskScheduleInput",
           "kind": "type",
-          "line": 56,
+          "line": 58,
           "isExported": true
         },
         {
           "name": "UpdateTaskStatusSchema",
           "kind": "component_or_fn",
-          "line": 58,
+          "line": 60,
           "isExported": true
         },
         {
           "name": "UpdateTaskStatusInput",
           "kind": "type",
-          "line": 64,
+          "line": 66,
           "isExported": true
         },
         {
           "name": "LogTimeSchema",
           "kind": "component_or_fn",
-          "line": 70,
+          "line": 72,
           "isExported": true
         },
         {
           "name": "LogTimeInput",
           "kind": "type",
-          "line": 80,
+          "line": 82,
           "isExported": true
         },
         {
           "name": "CreateSprintSchema",
           "kind": "component_or_fn",
-          "line": 86,
+          "line": 88,
           "isExported": true
         },
         {
           "name": "CreateSprintInput",
           "kind": "type",
-          "line": 95,
+          "line": 97,
           "isExported": true
         },
         {
           "name": "CreateAutomationSchema",
           "kind": "component_or_fn",
-          "line": 101,
+          "line": 103,
           "isExported": true
         },
         {
           "name": "CreateAutomationInput",
           "kind": "type",
-          "line": 122,
+          "line": 124,
           "isExported": true
         },
         {
           "name": "CreateDocSchema",
           "kind": "component_or_fn",
-          "line": 128,
+          "line": 130,
           "isExported": true
         },
         {
           "name": "CreateDocInput",
           "kind": "type",
-          "line": 136,
+          "line": 138,
           "isExported": true
         },
         {
           "name": "TenantSSOConfigSchema",
           "kind": "component_or_fn",
-          "line": 142,
+          "line": 144,
           "isExported": true
         },
         {
           "name": "TenantSSOConfigInput",
           "kind": "type",
-          "line": 153,
+          "line": 155,
           "isExported": true
         },
         {
           "name": "TenantDirectorySyncConfigSchema",
           "kind": "component_or_fn",
-          "line": 155,
+          "line": 157,
           "isExported": true
         },
         {
           "name": "TenantDirectorySyncConfigInput",
           "kind": "type",
-          "line": 170,
+          "line": 172,
           "isExported": true
         },
         {
           "name": "ProvisionMemberSchema",
           "kind": "component_or_fn",
-          "line": 176,
+          "line": 178,
           "isExported": true
         },
         {
           "name": "ProvisionMemberInput",
           "kind": "type",
-          "line": 185,
+          "line": 187,
           "isExported": true
         },
         {
           "name": "UpdateMemberRoleSchema",
           "kind": "component_or_fn",
-          "line": 187,
+          "line": 189,
           "isExported": true
         },
         {
           "name": "UpdateMemberRoleInput",
           "kind": "type",
-          "line": 193,
+          "line": 195,
           "isExported": true
         },
         {
           "name": "DeleteTaskSchema",
           "kind": "component_or_fn",
-          "line": 199,
+          "line": 201,
           "isExported": true
         },
         {
           "name": "DeleteTaskInput",
           "kind": "type",
-          "line": 207,
+          "line": 209,
           "isExported": true
         },
         {
           "name": "DeleteProjectSchema",
           "kind": "component_or_fn",
-          "line": 209,
+          "line": 211,
           "isExported": true
         },
         {
           "name": "DeleteProjectInput",
           "kind": "type",
-          "line": 216,
+          "line": 218,
           "isExported": true
         },
         {
           "name": "PurgeTenantSchema",
           "kind": "component_or_fn",
-          "line": 218,
+          "line": 220,
           "isExported": true
         },
         {
           "name": "PurgeTenantInput",
           "kind": "type",
-          "line": 224,
+          "line": 226,
           "isExported": true
         },
         {
           "name": "UpdateGlobalUserSchema",
           "kind": "component_or_fn",
-          "line": 230,
+          "line": 232,
           "isExported": true
         },
         {
           "name": "UpdateGlobalUserInput",
           "kind": "type",
-          "line": 244,
+          "line": 246,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "src/lib/validation/config-schemas.ts",
+      "label": "config-schemas.ts",
+      "path": "src/lib/validation/config-schemas.ts",
+      "type": "lib",
+      "extension": ".ts",
+      "lines": 148,
+      "symbolsCount": 9,
+      "symbols": [
+        {
+          "name": "SupportedAppIcons",
+          "kind": "component_or_fn",
+          "line": 9,
+          "isExported": true
+        },
+        {
+          "name": "SupportedAppIcon",
+          "kind": "type",
+          "line": 26,
+          "isExported": true
+        },
+        {
+          "name": "ControlFeaturesSchema",
+          "kind": "component_or_fn",
+          "line": 28,
+          "isExported": true
+        },
+        {
+          "name": "ControlFeatures",
+          "kind": "type",
+          "line": 47,
+          "isExported": true
+        },
+        {
+          "name": "SecurityControlsSchema",
+          "kind": "component_or_fn",
+          "line": 49,
+          "isExported": true
+        },
+        {
+          "name": "SecurityControls",
+          "kind": "type",
+          "line": 73,
+          "isExported": true
+        },
+        {
+          "name": "GlobalAppConfigSchema",
+          "kind": "component_or_fn",
+          "line": 75,
+          "isExported": true
+        },
+        {
+          "name": "GlobalAppConfig",
+          "kind": "type",
+          "line": 114,
+          "isExported": true
+        },
+        {
+          "name": "DEFAULT_GLOBAL_APP_CONFIG",
+          "kind": "component_or_fn",
+          "line": 116,
           "isExported": true
         }
       ]
@@ -5439,263 +5836,6 @@
       ]
     },
     {
-      "id": "supabase/migrations/00005_superadmin_rls_triggers.sql",
-      "label": "00005_superadmin_rls_triggers.sql",
-      "path": "supabase/migrations/00005_superadmin_rls_triggers.sql",
-      "type": "database",
-      "extension": ".sql",
-      "lines": 320,
-      "symbolsCount": 41,
-      "symbols": [
-        {
-          "name": "public.is_superadmin",
-          "kind": "function",
-          "line": 16,
-          "isExported": true
-        },
-        {
-          "name": "public.is_superadmin",
-          "kind": "function",
-          "line": 20,
-          "isExported": true
-        },
-        {
-          "name": "public.current_app_user_id",
-          "kind": "function",
-          "line": 24,
-          "isExported": true
-        },
-        {
-          "name": "public.get_user_tenant_role",
-          "kind": "function",
-          "line": 28,
-          "isExported": true
-        },
-        {
-          "name": "public.is_tenant_member",
-          "kind": "function",
-          "line": 36,
-          "isExported": true
-        },
-        {
-          "name": "tenants_superadmin_all on public.tenants",
-          "kind": "policy",
-          "line": 57,
-          "isExported": true
-        },
-        {
-          "name": "tenants_member_select on public.tenants",
-          "kind": "policy",
-          "line": 58,
-          "isExported": true
-        },
-        {
-          "name": "profiles_superadmin_all on public.profiles",
-          "kind": "policy",
-          "line": 65,
-          "isExported": true
-        },
-        {
-          "name": "profiles_select_authenticated on public.profiles",
-          "kind": "policy",
-          "line": 66,
-          "isExported": true
-        },
-        {
-          "name": "profiles_update_own on public.profiles",
-          "kind": "policy",
-          "line": 67,
-          "isExported": true
-        },
-        {
-          "name": "profiles_insert_own on public.profiles",
-          "kind": "policy",
-          "line": 68,
-          "isExported": true
-        },
-        {
-          "name": "memberships_superadmin_all on public.tenant_memberships",
-          "kind": "policy",
-          "line": 74,
-          "isExported": true
-        },
-        {
-          "name": "memberships_own_select on public.tenant_memberships",
-          "kind": "policy",
-          "line": 75,
-          "isExported": true
-        },
-        {
-          "name": "memberships_tenant_admin_manage on public.tenant_memberships",
-          "kind": "policy",
-          "line": 76,
-          "isExported": true
-        },
-        {
-          "name": "projects_superadmin_all on public.projects",
-          "kind": "policy",
-          "line": 83,
-          "isExported": true
-        },
-        {
-          "name": "projects_member_select on public.projects",
-          "kind": "policy",
-          "line": 84,
-          "isExported": true
-        },
-        {
-          "name": "projects_member_mutate on public.projects",
-          "kind": "policy",
-          "line": 85,
-          "isExported": true
-        },
-        {
-          "name": "tasks_superadmin_all on public.tasks",
-          "kind": "policy",
-          "line": 92,
-          "isExported": true
-        },
-        {
-          "name": "tasks_member_select on public.tasks",
-          "kind": "policy",
-          "line": 93,
-          "isExported": true
-        },
-        {
-          "name": "tasks_member_mutate on public.tasks",
-          "kind": "policy",
-          "line": 94,
-          "isExported": true
-        },
-        {
-          "name": "deps_superadmin_all on public.task_dependencies",
-          "kind": "policy",
-          "line": 100,
-          "isExported": true
-        },
-        {
-          "name": "deps_member_select on public.task_dependencies",
-          "kind": "policy",
-          "line": 101,
-          "isExported": true
-        },
-        {
-          "name": "deps_member_mutate on public.task_dependencies",
-          "kind": "policy",
-          "line": 102,
-          "isExported": true
-        },
-        {
-          "name": "cal_superadmin_all on public.working_calendars",
-          "kind": "policy",
-          "line": 108,
-          "isExported": true
-        },
-        {
-          "name": "cal_member_select on public.working_calendars",
-          "kind": "policy",
-          "line": 109,
-          "isExported": true
-        },
-        {
-          "name": "cal_admin_mutate on public.working_calendars",
-          "kind": "policy",
-          "line": 110,
-          "isExported": true
-        },
-        {
-          "name": "hol_superadmin_all on public.calendar_holidays",
-          "kind": "policy",
-          "line": 117,
-          "isExported": true
-        },
-        {
-          "name": "hol_member_select on public.calendar_holidays",
-          "kind": "policy",
-          "line": 118,
-          "isExported": true
-        },
-        {
-          "name": "hol_admin_mutate on public.calendar_holidays",
-          "kind": "policy",
-          "line": 119,
-          "isExported": true
-        },
-        {
-          "name": "audit_superadmin_all on public.audit_logs",
-          "kind": "policy",
-          "line": 129,
-          "isExported": true
-        },
-        {
-          "name": "audit_tenant_admin_select on public.audit_logs",
-          "kind": "policy",
-          "line": 130,
-          "isExported": true
-        },
-        {
-          "name": "audit_insert_system on public.audit_logs",
-          "kind": "policy",
-          "line": 136,
-          "isExported": true
-        },
-        {
-          "name": "baselines_superadmin_all on public.project_baselines",
-          "kind": "policy",
-          "line": 142,
-          "isExported": true
-        },
-        {
-          "name": "baselines_member_select on public.project_baselines",
-          "kind": "policy",
-          "line": 143,
-          "isExported": true
-        },
-        {
-          "name": "baselines_member_mutate on public.project_baselines",
-          "kind": "policy",
-          "line": 144,
-          "isExported": true
-        },
-        {
-          "name": "snapshots_superadmin_all on public.task_baseline_snapshots",
-          "kind": "policy",
-          "line": 150,
-          "isExported": true
-        },
-        {
-          "name": "snapshots_select on public.task_baseline_snapshots",
-          "kind": "policy",
-          "line": 151,
-          "isExported": true
-        },
-        {
-          "name": "snapshots_insert on public.task_baseline_snapshots",
-          "kind": "policy",
-          "line": 152,
-          "isExported": true
-        },
-        {
-          "name": "public.handle_new_user",
-          "kind": "function",
-          "line": 157,
-          "isExported": true
-        },
-        {
-          "name": "public.log_entity_mutation",
-          "kind": "function",
-          "line": 186,
-          "isExported": true
-        },
-        {
-          "name": "public.lock_project_baseline",
-          "kind": "function",
-          "line": 267,
-          "isExported": true
-        }
-      ]
-    },
-    {
       "id": "supabase/migrations/00006_seed_demo_data.sql",
       "label": "00006_seed_demo_data.sql",
       "path": "supabase/migrations/00006_seed_demo_data.sql",
@@ -6523,6 +6663,290 @@
       ]
     },
     {
+      "id": "supabase/migrations/00017_superadmin_rls_triggers.sql",
+      "label": "00017_superadmin_rls_triggers.sql",
+      "path": "supabase/migrations/00017_superadmin_rls_triggers.sql",
+      "type": "database",
+      "extension": ".sql",
+      "lines": 320,
+      "symbolsCount": 41,
+      "symbols": [
+        {
+          "name": "public.is_superadmin",
+          "kind": "function",
+          "line": 16,
+          "isExported": true
+        },
+        {
+          "name": "public.is_superadmin",
+          "kind": "function",
+          "line": 20,
+          "isExported": true
+        },
+        {
+          "name": "public.current_app_user_id",
+          "kind": "function",
+          "line": 24,
+          "isExported": true
+        },
+        {
+          "name": "public.get_user_tenant_role",
+          "kind": "function",
+          "line": 28,
+          "isExported": true
+        },
+        {
+          "name": "public.is_tenant_member",
+          "kind": "function",
+          "line": 36,
+          "isExported": true
+        },
+        {
+          "name": "tenants_superadmin_all on public.tenants",
+          "kind": "policy",
+          "line": 57,
+          "isExported": true
+        },
+        {
+          "name": "tenants_member_select on public.tenants",
+          "kind": "policy",
+          "line": 58,
+          "isExported": true
+        },
+        {
+          "name": "profiles_superadmin_all on public.profiles",
+          "kind": "policy",
+          "line": 65,
+          "isExported": true
+        },
+        {
+          "name": "profiles_select_authenticated on public.profiles",
+          "kind": "policy",
+          "line": 66,
+          "isExported": true
+        },
+        {
+          "name": "profiles_update_own on public.profiles",
+          "kind": "policy",
+          "line": 67,
+          "isExported": true
+        },
+        {
+          "name": "profiles_insert_own on public.profiles",
+          "kind": "policy",
+          "line": 68,
+          "isExported": true
+        },
+        {
+          "name": "memberships_superadmin_all on public.tenant_memberships",
+          "kind": "policy",
+          "line": 74,
+          "isExported": true
+        },
+        {
+          "name": "memberships_own_select on public.tenant_memberships",
+          "kind": "policy",
+          "line": 75,
+          "isExported": true
+        },
+        {
+          "name": "memberships_tenant_admin_manage on public.tenant_memberships",
+          "kind": "policy",
+          "line": 76,
+          "isExported": true
+        },
+        {
+          "name": "projects_superadmin_all on public.projects",
+          "kind": "policy",
+          "line": 83,
+          "isExported": true
+        },
+        {
+          "name": "projects_member_select on public.projects",
+          "kind": "policy",
+          "line": 84,
+          "isExported": true
+        },
+        {
+          "name": "projects_member_mutate on public.projects",
+          "kind": "policy",
+          "line": 85,
+          "isExported": true
+        },
+        {
+          "name": "tasks_superadmin_all on public.tasks",
+          "kind": "policy",
+          "line": 92,
+          "isExported": true
+        },
+        {
+          "name": "tasks_member_select on public.tasks",
+          "kind": "policy",
+          "line": 93,
+          "isExported": true
+        },
+        {
+          "name": "tasks_member_mutate on public.tasks",
+          "kind": "policy",
+          "line": 94,
+          "isExported": true
+        },
+        {
+          "name": "deps_superadmin_all on public.task_dependencies",
+          "kind": "policy",
+          "line": 100,
+          "isExported": true
+        },
+        {
+          "name": "deps_member_select on public.task_dependencies",
+          "kind": "policy",
+          "line": 101,
+          "isExported": true
+        },
+        {
+          "name": "deps_member_mutate on public.task_dependencies",
+          "kind": "policy",
+          "line": 102,
+          "isExported": true
+        },
+        {
+          "name": "cal_superadmin_all on public.working_calendars",
+          "kind": "policy",
+          "line": 108,
+          "isExported": true
+        },
+        {
+          "name": "cal_member_select on public.working_calendars",
+          "kind": "policy",
+          "line": 109,
+          "isExported": true
+        },
+        {
+          "name": "cal_admin_mutate on public.working_calendars",
+          "kind": "policy",
+          "line": 110,
+          "isExported": true
+        },
+        {
+          "name": "hol_superadmin_all on public.calendar_holidays",
+          "kind": "policy",
+          "line": 117,
+          "isExported": true
+        },
+        {
+          "name": "hol_member_select on public.calendar_holidays",
+          "kind": "policy",
+          "line": 118,
+          "isExported": true
+        },
+        {
+          "name": "hol_admin_mutate on public.calendar_holidays",
+          "kind": "policy",
+          "line": 119,
+          "isExported": true
+        },
+        {
+          "name": "audit_superadmin_all on public.audit_logs",
+          "kind": "policy",
+          "line": 129,
+          "isExported": true
+        },
+        {
+          "name": "audit_tenant_admin_select on public.audit_logs",
+          "kind": "policy",
+          "line": 130,
+          "isExported": true
+        },
+        {
+          "name": "audit_insert_system on public.audit_logs",
+          "kind": "policy",
+          "line": 136,
+          "isExported": true
+        },
+        {
+          "name": "baselines_superadmin_all on public.project_baselines",
+          "kind": "policy",
+          "line": 142,
+          "isExported": true
+        },
+        {
+          "name": "baselines_member_select on public.project_baselines",
+          "kind": "policy",
+          "line": 143,
+          "isExported": true
+        },
+        {
+          "name": "baselines_member_mutate on public.project_baselines",
+          "kind": "policy",
+          "line": 144,
+          "isExported": true
+        },
+        {
+          "name": "snapshots_superadmin_all on public.task_baseline_snapshots",
+          "kind": "policy",
+          "line": 150,
+          "isExported": true
+        },
+        {
+          "name": "snapshots_select on public.task_baseline_snapshots",
+          "kind": "policy",
+          "line": 151,
+          "isExported": true
+        },
+        {
+          "name": "snapshots_insert on public.task_baseline_snapshots",
+          "kind": "policy",
+          "line": 152,
+          "isExported": true
+        },
+        {
+          "name": "public.handle_new_user",
+          "kind": "function",
+          "line": 157,
+          "isExported": true
+        },
+        {
+          "name": "public.log_entity_mutation",
+          "kind": "function",
+          "line": 186,
+          "isExported": true
+        },
+        {
+          "name": "public.lock_project_baseline",
+          "kind": "function",
+          "line": 267,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "supabase/migrations/00018_system_configurations.sql",
+      "label": "00018_system_configurations.sql",
+      "path": "supabase/migrations/00018_system_configurations.sql",
+      "type": "database",
+      "extension": ".sql",
+      "lines": 122,
+      "symbolsCount": 1,
+      "symbols": [
+        {
+          "name": "public.system_configurations",
+          "kind": "table",
+          "line": 9,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "supabase/migrations/00019_add_in_review_enum_value.sql",
+      "label": "00019_add_in_review_enum_value.sql",
+      "path": "supabase/migrations/00019_add_in_review_enum_value.sql",
+      "type": "database",
+      "extension": ".sql",
+      "lines": 12,
+      "symbolsCount": 0,
+      "symbols": []
+    },
+    {
       "id": "supabase/seed.sql",
       "label": "seed.sql",
       "path": "supabase/seed.sql",
@@ -6893,12 +7317,77 @@
       "symbols": []
     },
     {
+      "id": "tests/unit/wbs-and-tree-hierarchy.test.ts",
+      "label": "wbs-and-tree-hierarchy.test.ts",
+      "path": "tests/unit/wbs-and-tree-hierarchy.test.ts",
+      "type": "test",
+      "extension": ".ts",
+      "lines": 250,
+      "symbolsCount": 9,
+      "symbols": [
+        {
+          "name": "MockTask",
+          "kind": "interface",
+          "line": 10,
+          "isExported": false
+        },
+        {
+          "name": "buildWbsHierarchy",
+          "kind": "function",
+          "line": 16,
+          "isExported": false
+        },
+        {
+          "name": "WbsNode",
+          "kind": "interface",
+          "line": 28,
+          "isExported": false
+        },
+        {
+          "name": "buildNodes",
+          "kind": "function",
+          "line": 35,
+          "isExported": false
+        },
+        {
+          "name": "MockDoc",
+          "kind": "interface",
+          "line": 86,
+          "isExported": false
+        },
+        {
+          "name": "findDocPath",
+          "kind": "function",
+          "line": 92,
+          "isExported": false
+        },
+        {
+          "name": "filterTree",
+          "kind": "function",
+          "line": 104,
+          "isExported": false
+        },
+        {
+          "name": "scan",
+          "kind": "function",
+          "line": 109,
+          "isExported": false
+        },
+        {
+          "name": "prune",
+          "kind": "function",
+          "line": 124,
+          "isExported": false
+        }
+      ]
+    },
+    {
       "id": "tools/codebase-map/generate-repo-map.mjs",
       "label": "generate-repo-map.mjs",
       "path": "tools/codebase-map/generate-repo-map.mjs",
       "type": "tooling",
       "extension": ".mjs",
-      "lines": 455,
+      "lines": 494,
       "symbolsCount": 12,
       "symbols": [
         {
@@ -7028,6 +7517,44 @@
       "line": 12
     },
     {
+      "source": "src/actions/config.ts",
+      "target": "src/lib/supabase/server.ts",
+      "type": "imports",
+      "specifiers": [
+        "createServerSupabaseClient"
+      ],
+      "line": 9
+    },
+    {
+      "source": "src/actions/config.ts",
+      "target": "src/lib/validation/config-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "GlobalAppConfigSchema",
+        "DEFAULT_GLOBAL_APP_CONFIG",
+        "GlobalAppConfig"
+      ],
+      "line": 10
+    },
+    {
+      "source": "src/actions/config.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "ServerActionResponse"
+      ],
+      "line": 15
+    },
+    {
+      "source": "src/actions/config.ts",
+      "target": "src/lib/logger/logger.ts",
+      "type": "imports",
+      "specifiers": [
+        "logger"
+      ],
+      "line": 16
+    },
+    {
       "source": "src/actions/identity.ts",
       "target": "src/lib/supabase/server.ts",
       "type": "imports",
@@ -7107,7 +7634,8 @@
       "target": "src/lib/supabase/server.ts",
       "type": "imports",
       "specifiers": [
-        "createServerSupabaseClient"
+        "createServerSupabaseClient",
+        "createAdminClient"
       ],
       "line": 10
     },
@@ -7312,7 +7840,7 @@
       "specifiers": [
         "createServerSupabaseClient"
       ],
-      "line": 9
+      "line": 10
     },
     {
       "source": "src/actions/wiki.ts",
@@ -7320,10 +7848,10 @@
       "type": "imports",
       "specifiers": [
         "ProjectDocument",
-        "DocumentTaskLink",
-        "Task"
+        "Task",
+        "UserProfile"
       ],
-      "line": 10
+      "line": 11
     },
     {
       "source": "src/actions/wiki.ts",
@@ -7332,7 +7860,7 @@
       "specifiers": [
         "logger"
       ],
-      "line": 11
+      "line": 12
     },
     {
       "source": "src/actions/wiki.ts",
@@ -7343,7 +7871,7 @@
         "CreateDocInput",
         "ActionResponse"
       ],
-      "line": 12
+      "line": 13
     },
     {
       "source": "src/app/(auth)/login/page.tsx",
@@ -7419,12 +7947,21 @@
     },
     {
       "source": "src/app/(auth)/login/page.tsx",
+      "target": "src/lib/context/app-config-context.tsx",
+      "type": "imports",
+      "specifiers": [
+        "useAppConfig"
+      ],
+      "line": 33
+    },
+    {
+      "source": "src/app/(auth)/login/page.tsx",
       "target": "src/lib/utils.ts",
       "type": "imports",
       "specifiers": [
         "cn"
       ],
-      "line": 33
+      "line": 34
     },
     {
       "source": "src/app/(dashboard)/admin/multisite/diagnostics/page.tsx",
@@ -7580,6 +8117,15 @@
         "SuperAdminPanel"
       ],
       "line": 4
+    },
+    {
+      "source": "src/app/(dashboard)/admin/system/config/page.tsx",
+      "target": "src/components/admin/GlobalConfigManager.tsx",
+      "type": "imports",
+      "specifiers": [
+        "GlobalConfigManager"
+      ],
+      "line": 9
     },
     {
       "source": "src/app/(dashboard)/admin/tenant/page.tsx",
@@ -7829,7 +8375,16 @@
       "specifiers": [
         "useTenantStore"
       ],
-      "line": 33
+      "line": 34
+    },
+    {
+      "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
+      "target": "src/lib/context/app-config-context.tsx",
+      "type": "imports",
+      "specifiers": [
+        "useAppConfig"
+      ],
+      "line": 35
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7838,7 +8393,7 @@
       "specifiers": [
         "createClient"
       ],
-      "line": 34
+      "line": 36
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7847,7 +8402,7 @@
       "specifiers": [
         "dbService"
       ],
-      "line": 35
+      "line": 37
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7867,7 +8422,7 @@
         "ProjectDocument",
         "ProjectPhase"
       ],
-      "line": 36
+      "line": 38
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7876,7 +8431,7 @@
       "specifiers": [
         "Tabs"
       ],
-      "line": 50
+      "line": 52
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7885,7 +8440,7 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 51
+      "line": 53
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7894,7 +8449,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 52
+      "line": 54
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7903,7 +8458,7 @@
       "specifiers": [
         "Modal"
       ],
-      "line": 53
+      "line": 55
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7912,7 +8467,7 @@
       "specifiers": [
         "Input"
       ],
-      "line": 54
+      "line": 56
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7921,7 +8476,7 @@
       "specifiers": [
         "InteractiveGantt"
       ],
-      "line": 55
+      "line": 57
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7930,7 +8485,7 @@
       "specifiers": [
         "KanbanBoard"
       ],
-      "line": 56
+      "line": 58
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7939,7 +8494,7 @@
       "specifiers": [
         "HierarchicalGrid"
       ],
-      "line": 57
+      "line": 59
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7948,7 +8503,7 @@
       "specifiers": [
         "ProjectCalendarView"
       ],
-      "line": 58
+      "line": 60
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7957,7 +8512,7 @@
       "specifiers": [
         "ResourceHeatmapView"
       ],
-      "line": 59
+      "line": 61
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7966,7 +8521,7 @@
       "specifiers": [
         "GraphCanvas"
       ],
-      "line": 60
+      "line": 62
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7975,7 +8530,7 @@
       "specifiers": [
         "SprintPlanningView"
       ],
-      "line": 61
+      "line": 63
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7984,7 +8539,7 @@
       "specifiers": [
         "WikiWorkspace"
       ],
-      "line": 62
+      "line": 64
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -7993,7 +8548,7 @@
       "specifiers": [
         "ImportExportModal"
       ],
-      "line": 63
+      "line": 65
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -8002,7 +8557,7 @@
       "specifiers": [
         "TaskDetailDrawer"
       ],
-      "line": 64
+      "line": 66
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -8011,7 +8566,7 @@
       "specifiers": [
         "CreateTaskDialog"
       ],
-      "line": 65
+      "line": 67
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -8020,7 +8575,7 @@
       "specifiers": [
         "useProjectPresence"
       ],
-      "line": 66
+      "line": 68
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -8029,7 +8584,7 @@
       "specifiers": [
         "calculateCPM"
       ],
-      "line": 67
+      "line": 69
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -8038,7 +8593,7 @@
       "specifiers": [
         "getProjectSprintsAction"
       ],
-      "line": 68
+      "line": 70
     },
     {
       "source": "src/app/(dashboard)/projects/[projectId]/page.tsx",
@@ -8047,7 +8602,7 @@
       "specifiers": [
         "getDocumentTreeAction"
       ],
-      "line": 69
+      "line": 71
     },
     {
       "source": "src/app/(dashboard)/settings/automations/page.tsx",
@@ -8841,6 +9396,63 @@
       "line": 6
     },
     {
+      "source": "src/app/providers.tsx",
+      "target": "src/lib/context/app-config-context.tsx",
+      "type": "imports",
+      "specifiers": [
+        "AppConfigProvider"
+      ],
+      "line": 7
+    },
+    {
+      "source": "src/components/admin/GlobalConfigManager.tsx",
+      "target": "src/components/ui/button.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Button"
+      ],
+      "line": 42
+    },
+    {
+      "source": "src/components/admin/GlobalConfigManager.tsx",
+      "target": "src/components/ui/input.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Input"
+      ],
+      "line": 43
+    },
+    {
+      "source": "src/components/admin/GlobalConfigManager.tsx",
+      "target": "src/components/ui/badge.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Badge"
+      ],
+      "line": 44
+    },
+    {
+      "source": "src/components/admin/GlobalConfigManager.tsx",
+      "target": "src/lib/context/app-config-context.tsx",
+      "type": "imports",
+      "specifiers": [
+        "useAppConfig",
+        "APP_ICON_MAP"
+      ],
+      "line": 45
+    },
+    {
+      "source": "src/components/admin/GlobalConfigManager.tsx",
+      "target": "src/lib/validation/config-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "DEFAULT_GLOBAL_APP_CONFIG",
+        "SupportedAppIcons",
+        "GlobalAppConfig"
+      ],
+      "line": 46
+    },
+    {
       "source": "src/components/admin/SuperAdminPanel.tsx",
       "target": "src/lib/supabase/db-service.ts",
       "type": "imports",
@@ -8925,6 +9537,15 @@
         "EditUserModal"
       ],
       "line": 35
+    },
+    {
+      "source": "src/components/admin/SuperAdminPanel.tsx",
+      "target": "src/components/admin/GlobalConfigManager.tsx",
+      "type": "imports",
+      "specifiers": [
+        "GlobalConfigManager"
+      ],
+      "line": 36
     },
     {
       "source": "src/components/admin/TenantAdminPanel.tsx",
@@ -9023,7 +9644,7 @@
         "ProjectSprint",
         "AgileSprintMetrics"
       ],
-      "line": 23
+      "line": 26
     },
     {
       "source": "src/components/agile/SprintPlanningView.tsx",
@@ -9032,7 +9653,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 24
+      "line": 27
     },
     {
       "source": "src/components/agile/SprintPlanningView.tsx",
@@ -9041,7 +9662,7 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 25
+      "line": 28
     },
     {
       "source": "src/components/agile/SprintPlanningView.tsx",
@@ -9050,7 +9671,7 @@
       "specifiers": [
         "Modal"
       ],
-      "line": 26
+      "line": 29
     },
     {
       "source": "src/components/agile/SprintPlanningView.tsx",
@@ -9059,7 +9680,7 @@
       "specifiers": [
         "Input"
       ],
-      "line": 27
+      "line": 30
     },
     {
       "source": "src/components/agile/SprintPlanningView.tsx",
@@ -9072,7 +9693,16 @@
         "assignTaskToSprintAction",
         "getSprintMetricsAction"
       ],
-      "line": 28
+      "line": 31
+    },
+    {
+      "source": "src/components/agile/SprintPlanningView.tsx",
+      "target": "src/lib/calendar/calendar-engine.ts",
+      "type": "imports",
+      "specifiers": [
+        "formatDateToISO"
+      ],
+      "line": 38
     },
     {
       "source": "src/components/calendar/ProjectCalendarView.tsx",
@@ -9262,7 +9892,7 @@
         "ProjectDocument",
         "UserProfile"
       ],
-      "line": 26
+      "line": 29
     },
     {
       "source": "src/components/graphify/GraphCanvas.tsx",
@@ -9271,7 +9901,7 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 27
+      "line": 30
     },
     {
       "source": "src/components/graphify/GraphCanvas.tsx",
@@ -9280,7 +9910,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 28
+      "line": 31
     },
     {
       "source": "src/components/grid/HierarchicalGrid.tsx",
@@ -9289,7 +9919,7 @@
       "specifiers": [
         "Task"
       ],
-      "line": 15
+      "line": 23
     },
     {
       "source": "src/components/grid/HierarchicalGrid.tsx",
@@ -9298,7 +9928,25 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 16
+      "line": 24
+    },
+    {
+      "source": "src/components/grid/HierarchicalGrid.tsx",
+      "target": "src/components/ui/button.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Button"
+      ],
+      "line": 25
+    },
+    {
+      "source": "src/components/grid/HierarchicalGrid.tsx",
+      "target": "src/components/ui/input.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Input"
+      ],
+      "line": 26
     },
     {
       "source": "src/components/grid/HierarchicalGrid.tsx",
@@ -9307,7 +9955,7 @@
       "specifiers": [
         "useTenantMetadata"
       ],
-      "line": 17
+      "line": 27
     },
     {
       "source": "src/components/kanban/KanbanBoard.tsx",
@@ -9374,12 +10022,21 @@
     },
     {
       "source": "src/components/layout/Header.tsx",
+      "target": "src/lib/context/app-config-context.tsx",
+      "type": "imports",
+      "specifiers": [
+        "useAppConfig"
+      ],
+      "line": 30
+    },
+    {
+      "source": "src/components/layout/Header.tsx",
       "target": "src/components/ui/badge.tsx",
       "type": "imports",
       "specifiers": [
         "Badge"
       ],
-      "line": 30
+      "line": 31
     },
     {
       "source": "src/components/layout/Header.tsx",
@@ -9388,7 +10045,7 @@
       "specifiers": [
         "createClient"
       ],
-      "line": 31
+      "line": 32
     },
     {
       "source": "src/components/layout/Header.tsx",
@@ -9397,7 +10054,7 @@
       "specifiers": [
         "dbService"
       ],
-      "line": 32
+      "line": 33
     },
     {
       "source": "src/components/layout/Header.tsx",
@@ -9407,7 +10064,7 @@
         "UserNotification",
         "Tenant"
       ],
-      "line": 33
+      "line": 34
     },
     {
       "source": "src/components/layout/Sidebar.tsx",
@@ -9416,7 +10073,16 @@
       "specifiers": [
         "useTenantStore"
       ],
-      "line": 26
+      "line": 27
+    },
+    {
+      "source": "src/components/layout/Sidebar.tsx",
+      "target": "src/lib/context/app-config-context.tsx",
+      "type": "imports",
+      "specifiers": [
+        "useAppConfig"
+      ],
+      "line": 28
     },
     {
       "source": "src/components/layout/Sidebar.tsx",
@@ -9425,7 +10091,7 @@
       "specifiers": [
         "cn"
       ],
-      "line": 27
+      "line": 29
     },
     {
       "source": "src/components/modals/DeleteProjectModal.tsx",
@@ -9559,7 +10225,8 @@
       "target": "src/actions/members.ts",
       "type": "imports",
       "specifiers": [
-        "updateGlobalUserAction"
+        "updateGlobalUserAction",
+        "deleteGlobalUserAction"
       ],
       "line": 15
     },
@@ -9689,12 +10356,22 @@
     },
     {
       "source": "src/components/resource/ResourceHeatmapView.tsx",
+      "target": "src/lib/calendar/calendar-engine.ts",
+      "type": "imports",
+      "specifiers": [
+        "parseISODate",
+        "formatDateToISO"
+      ],
+      "line": 29
+    },
+    {
+      "source": "src/components/resource/ResourceHeatmapView.tsx",
       "target": "src/components/ui/badge.tsx",
       "type": "imports",
       "specifiers": [
         "Badge"
       ],
-      "line": 29
+      "line": 30
     },
     {
       "source": "src/components/resource/ResourceHeatmapView.tsx",
@@ -9703,7 +10380,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 30
+      "line": 31
     },
     {
       "source": "src/components/tasks/CreateTaskDialog.tsx",
@@ -9809,7 +10486,7 @@
         "CalendarHoliday",
         "UserProfile"
       ],
-      "line": 25
+      "line": 28
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9818,7 +10495,7 @@
       "specifiers": [
         "useTenantMetadata"
       ],
-      "line": 26
+      "line": 29
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9829,7 +10506,7 @@
         "formatDateToISO",
         "parseISODate"
       ],
-      "line": 27
+      "line": 30
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9838,7 +10515,7 @@
       "specifiers": [
         "dbService"
       ],
-      "line": 28
+      "line": 31
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9847,7 +10524,7 @@
       "specifiers": [
         "createClient"
       ],
-      "line": 29
+      "line": 32
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9856,7 +10533,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 30
+      "line": 33
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9865,7 +10542,16 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 31
+      "line": 34
+    },
+    {
+      "source": "src/components/tasks/TaskDetailDrawer.tsx",
+      "target": "src/actions/tasks.ts",
+      "type": "imports",
+      "specifiers": [
+        "quickCreateSubtaskAction"
+      ],
+      "line": 35
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9874,7 +10560,7 @@
       "specifiers": [
         "TaskAttachmentsManager"
       ],
-      "line": 32
+      "line": 36
     },
     {
       "source": "src/components/tasks/TaskDetailDrawer.tsx",
@@ -9883,7 +10569,7 @@
       "specifiers": [
         "DeleteTaskModal"
       ],
-      "line": 33
+      "line": 37
     },
     {
       "source": "src/components/ui/badge.tsx",
@@ -9947,7 +10633,7 @@
         "ProjectDocument",
         "Task"
       ],
-      "line": 27
+      "line": 36
     },
     {
       "source": "src/components/wiki/WikiWorkspace.tsx",
@@ -9956,7 +10642,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 28
+      "line": 37
     },
     {
       "source": "src/components/wiki/WikiWorkspace.tsx",
@@ -9965,7 +10651,7 @@
       "specifiers": [
         "Input"
       ],
-      "line": 29
+      "line": 38
     },
     {
       "source": "src/components/wiki/WikiWorkspace.tsx",
@@ -9974,7 +10660,7 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 30
+      "line": 39
     },
     {
       "source": "src/components/wiki/WikiWorkspace.tsx",
@@ -9986,7 +10672,16 @@
         "linkTaskToDocAction",
         "unlinkTaskFromDocAction"
       ],
-      "line": 31
+      "line": 40
+    },
+    {
+      "source": "src/components/wiki/WikiWorkspace.tsx",
+      "target": "src/actions/trash.ts",
+      "type": "imports",
+      "specifiers": [
+        "softDeleteEntityAction"
+      ],
+      "line": 46
     },
     {
       "source": "src/lib/calendar/calendar-engine.ts",
@@ -9997,6 +10692,27 @@
         "Tenant"
       ],
       "line": 6
+    },
+    {
+      "source": "src/lib/context/app-config-context.tsx",
+      "target": "src/lib/validation/config-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "DEFAULT_GLOBAL_APP_CONFIG",
+        "GlobalAppConfig",
+        "ControlFeatures"
+      ],
+      "line": 26
+    },
+    {
+      "source": "src/lib/context/app-config-context.tsx",
+      "target": "src/actions/config.ts",
+      "type": "imports",
+      "specifiers": [
+        "getGlobalAppConfigAction",
+        "updateGlobalAppConfigAction"
+      ],
+      "line": 31
     },
     {
       "source": "src/lib/context/tenant-metadata-context.tsx",
@@ -10800,6 +11516,15 @@
         "UpdateGlobalUserSchema"
       ],
       "line": 14
+    },
+    {
+      "source": "tests/unit/wbs-and-tree-hierarchy.test.ts",
+      "target": "src/lib/validation/config-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "GlobalAppConfigSchema"
+      ],
+      "line": 7
     }
   ]
 }

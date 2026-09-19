@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Enterprise PMS - Codebase Architecture & Dependency Graph</title>
+  <title>Enterprise PMS - Codebase Architecture, Graph & Treemap Visualizer</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
     :root {
@@ -18,6 +18,7 @@
       --success: #10b981;
       --warning: #f59e0b;
       --purple: #a855f7;
+      --pink: #ec4899;
       --cyan: #06b6d4;
     }
 
@@ -37,41 +38,36 @@
       display: flex;
     }
 
-    #graph-container {
+    #main-content {
       flex: 1;
       height: 100%;
       position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
-    svg {
-      width: 100%;
-      height: 100%;
-      cursor: grab;
-    }
-
-    svg:active {
-      cursor: grabbing;
-    }
-
-    /* Overlay Header & Controls */
+    /* Top Bar */
     .top-bar {
       position: absolute;
-      top: 16px;
+      top: 14px;
       left: 16px;
-      z-index: 10;
+      right: 400px;
+      z-index: 100;
       display: flex;
       align-items: center;
       gap: 12px;
-      background: rgba(17, 24, 39, 0.85);
-      backdrop-filter: blur(8px);
+      background: rgba(17, 24, 39, 0.92);
+      backdrop-filter: blur(12px);
       padding: 10px 16px;
       border-radius: 12px;
       border: 1px solid var(--card-border);
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      flex-wrap: wrap;
     }
 
     .brand-title {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       letter-spacing: -0.02em;
       color: #fff;
@@ -90,6 +86,40 @@
       border: 1px solid rgba(59, 130, 246, 0.3);
     }
 
+    /* View Switcher */
+    .view-switcher {
+      display: flex;
+      background: #1f2937;
+      padding: 2px;
+      border-radius: 8px;
+      border: 1px solid #374151;
+    }
+
+    .view-btn {
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+
+    .view-btn:hover {
+      color: #fff;
+    }
+
+    .view-btn.active {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+    }
+
     .search-box {
       background: rgba(31, 41, 55, 0.8);
       border: 1px solid var(--card-border);
@@ -98,25 +128,26 @@
       font-size: 12px;
       color: #fff;
       outline: none;
-      width: 220px;
+      width: 200px;
       transition: all 0.2s;
     }
 
     .search-box:focus {
       border-color: var(--primary);
-      width: 280px;
+      width: 240px;
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
     }
 
     .filter-pills {
       display: flex;
-      gap: 6px;
+      gap: 5px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .filter-btn {
-      font-size: 11px;
-      padding: 4px 10px;
+      font-size: 10px;
+      padding: 3px 8px;
       border-radius: 6px;
       border: 1px solid var(--card-border);
       background: rgba(31, 41, 55, 0.6);
@@ -125,13 +156,42 @@
       transition: all 0.15s;
     }
 
+    .filter-btn:hover {
+      color: #fff;
+      border-color: #4b5563;
+    }
+
     .filter-btn.active {
       background: var(--primary);
       color: #fff;
       border-color: var(--primary);
     }
 
-    /* Node & Link Styles */
+    /* View Containers */
+    .view-panel {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: none;
+    }
+
+    .view-panel.active {
+      display: block;
+    }
+
+    /* Graph View */
+    #graph-view svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #graph-view svg:active {
+      cursor: grabbing;
+    }
+
     .links line {
       stroke: #374151;
       stroke-opacity: 0.5;
@@ -172,6 +232,158 @@
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     }
 
+    /* Treemap View */
+    #treemap-view {
+      padding-top: 80px;
+      padding-left: 20px;
+      padding-right: 20px;
+      padding-bottom: 20px;
+      overflow: hidden;
+    }
+
+    #treemap-svg {
+      width: 100%;
+      height: 100%;
+      border-radius: 12px;
+      background: #0d121f;
+      border: 1px solid var(--card-border);
+    }
+
+    .treemap-cell {
+      cursor: pointer;
+      transition: filter 0.15s ease, stroke-width 0.15s ease;
+    }
+
+    .treemap-cell:hover {
+      filter: brightness(1.25);
+      stroke: #fff !important;
+      stroke-width: 2px !important;
+    }
+
+    .treemap-cell.selected {
+      stroke: #fbbf24 !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6));
+    }
+
+    .treemap-folder-header {
+      font-size: 11px;
+      font-weight: 700;
+      fill: #94a3b8;
+      pointer-events: none;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .treemap-label {
+      font-size: 10px;
+      font-weight: 600;
+      fill: #fff;
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    }
+
+    .treemap-sublabel {
+      font-size: 9px;
+      fill: rgba(255, 255, 255, 0.7);
+      pointer-events: none;
+    }
+
+    /* Architecture Tree View */
+    #tree-view {
+      padding-top: 80px;
+      padding-left: 24px;
+      padding-right: 24px;
+      padding-bottom: 24px;
+      overflow-y: auto;
+    }
+
+    .tree-section {
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .tree-section-header {
+      padding: 12px 16px;
+      background: #172033;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .tree-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tree-section-body {
+      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 8px;
+    }
+
+    .tree-node-card {
+      background: rgba(31, 41, 55, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tree-node-card:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .tree-node-card.selected {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.1);
+    }
+
+    .tree-node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tree-node-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .tree-node-path {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tree-node-footer {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
     /* Inspector Sidebar */
     .sidebar {
       width: 380px;
@@ -180,8 +392,8 @@
       border-left: 1px solid var(--card-border);
       display: flex;
       flex-direction: column;
-      z-index: 20;
-      box-shadow: -10px 0 25px rgba(0, 0, 0, 0.4);
+      z-index: 200;
+      box-shadow: -10px 0 25px rgba(0, 0, 0, 0.5);
     }
 
     .sidebar-header {
@@ -205,7 +417,6 @@
       padding: 16px;
       overflow-y: auto;
       flex: 1;
-      space-y: 16px;
     }
 
     .metric-grid {
@@ -285,17 +496,18 @@
       position: absolute;
       bottom: 16px;
       left: 16px;
-      background: rgba(17, 24, 39, 0.85);
+      background: rgba(17, 24, 39, 0.88);
       backdrop-filter: blur(8px);
-      padding: 10px 14px;
+      padding: 8px 14px;
       border-radius: 10px;
       border: 1px solid var(--card-border);
       font-size: 11px;
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      max-width: 600px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      max-width: 620px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      z-index: 50;
     }
 
     .legend-item {
@@ -312,49 +524,83 @@
   </style>
 </head>
 <body>
-  <div id="graph-container">
+  <div id="main-content">
+    <!-- Top Bar Navigation & Controls -->
     <div class="top-bar">
       <div class="brand-title">
-        <span>⚡ Codebase Map</span>
-        <span class="badge-pill" id="stats-badge">Indexing...</span>
+        <span>⚡ Architecture Visualizer</span>
+        <span class="badge-pill" id="stats-badge">Loading...</span>
       </div>
-      <input type="text" id="search-input" class="search-box" placeholder="Search files, actions, symbols...">
+
+      <!-- View Mode Tabs -->
+      <div class="view-switcher">
+        <button class="view-btn active" id="btn-view-graph" onclick="switchView('graph')">
+          <span>🕸️</span> Dependency Graph
+        </button>
+        <button class="view-btn" id="btn-view-treemap" onclick="switchView('treemap')">
+          <span>🗺️</span> Codebase Treemap
+        </button>
+        <button class="view-btn" id="btn-view-tree" onclick="switchView('tree')">
+          <span>🌳</span> Architecture Tree
+        </button>
+      </div>
+
+      <input type="text" id="search-input" class="search-box" placeholder="Search files, symbols, types...">
+
+      <!-- Category Filter Pills -->
       <div class="filter-pills" id="filter-container">
         <button class="filter-btn active" data-type="all">All</button>
         <button class="filter-btn" data-type="action">Actions</button>
         <button class="filter-btn" data-type="component">Components</button>
         <button class="filter-btn" data-type="lib">Lib</button>
         <button class="filter-btn" data-type="page">Pages</button>
+        <button class="filter-btn" data-type="api">API</button>
         <button class="filter-btn" data-type="database">Database</button>
+        <button class="filter-btn" data-type="type">Types</button>
       </div>
     </div>
 
-    <svg id="canvas">
-      <defs>
-        <marker id="arrow" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,-5L10,0L0,5" fill="#4b5563" />
-        </marker>
-        <marker id="arrow-highlight" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0,-5L10,0L0,5" fill="#60a5fa" />
-        </marker>
-      </defs>
-      <g id="zoom-layer">
-        <g class="links"></g>
-        <g class="nodes"></g>
-      </g>
-    </svg>
+    <!-- View 1: Dependency Graph -->
+    <div class="view-panel active" id="graph-view">
+      <svg id="canvas">
+        <defs>
+          <marker id="arrow" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,-5L10,0L0,5" fill="#4b5563" />
+          </marker>
+          <marker id="arrow-highlight" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,-5L10,0L0,5" fill="#60a5fa" />
+          </marker>
+        </defs>
+        <g id="zoom-layer">
+          <g class="links"></g>
+          <g class="nodes"></g>
+        </g>
+      </svg>
+    </div>
 
+    <!-- View 2: Codebase Treemap -->
+    <div class="view-panel" id="treemap-view">
+      <svg id="treemap-svg"></svg>
+    </div>
+
+    <!-- View 3: Architecture Tree -->
+    <div class="view-panel" id="tree-view">
+      <div id="tree-content"></div>
+    </div>
+
+    <!-- Bottom Floating Legend -->
     <div class="legend" id="legend"></div>
   </div>
 
+  <!-- Inspector Sidebar -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-title" id="side-title">Select a Module</div>
       <span class="badge-pill" id="side-category">-</span>
     </div>
     <div class="sidebar-body" id="side-body">
-      <p style="font-size: 12px; color: var(--text-muted);">
-        Click any node in the interactive force-directed graph to inspect its AST symbols, line metrics, and dependency links.
+      <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+        Click any node in the <strong>Dependency Graph</strong>, any block in the <strong>Codebase Treemap</strong>, or an item in the <strong>Architecture Tree</strong> to inspect its declared symbols, line metrics, and dependency links.
       </p>
     </div>
   </div>
@@ -378,6 +624,7 @@
     let svg, g, linkElements, nodeElements;
     let selectedNodeId = null;
     let activeFilter = 'all';
+    let currentView = 'graph';
 
     // Populate Legend
     const legendEl = document.getElementById('legend');
@@ -389,26 +636,59 @@
     });
 
     async function loadData() {
-      try {
-        const res = await fetch('graph.json');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        graphData = await res.json();
-      } catch (e) {
-        console.warn('Direct fetch failed, checking fallback...', e);
-        // Fallback placeholder if opened directly as file://
+      // 1. Check embedded data first
+      if (window.__EMBEDDED_GRAPH_DATA__ && window.__EMBEDDED_GRAPH_DATA__.nodes?.length > 0) {
+        graphData = window.__EMBEDDED_GRAPH_DATA__;
+      } else {
+        // 2. Fallback to HTTP fetch
+        try {
+          const res = await fetch('graph.json');
+          if (res.ok) {
+            graphData = await res.json();
+          }
+        } catch (e) {
+          console.warn('Direct fetch failed, checking secondary paths...', e);
+        }
+      }
+
+      if (!graphData || !graphData.nodes) {
         graphData = {
-          meta: { totalFiles: 0, totalEdges: 0, totalLines: 0 },
+          meta: { totalFiles: 0, totalEdges: 0, totalLines: 0, totalSymbols: 0 },
           nodes: [],
           edges: []
         };
       }
+
+      document.getElementById('stats-badge').innerText = 
+        `${graphData.nodes.length} files • ${graphData.edges.length} links • ${(graphData.meta?.totalLines || 0).toLocaleString()} loc`;
+
       initGraph();
+      initTreemap();
+      initTreeView();
     }
 
-    function initGraph() {
-      document.getElementById('stats-badge').innerText = 
-        `${graphData.nodes.length} files • ${graphData.edges.length} dependencies`;
+    // View Switching
+    window.switchView = function(viewName) {
+      currentView = viewName;
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
 
+      const btn = document.getElementById(`btn-view-${viewName}`);
+      const panel = document.getElementById(`${viewName}-view`);
+      if (btn) btn.classList.add('active');
+      if (panel) panel.classList.add('active');
+
+      if (viewName === 'treemap') {
+        renderTreemap();
+      } else if (viewName === 'tree') {
+        renderTreeView();
+      }
+    };
+
+    // --------------------------------------------------------------------------
+    // 1. Graph View Implementation
+    // --------------------------------------------------------------------------
+    function initGraph() {
       const width = window.innerWidth - 380;
       const height = window.innerHeight;
 
@@ -424,14 +704,15 @@
       svg.call(zoom);
 
       simulation = d3.forceSimulation(graphData.nodes)
-        .force('link', d3.forceLink(graphData.edges).id(d => d.id).distance(80))
-        .force('charge', d3.forceManyBody().strength(-150))
+        .force('link', d3.forceLink(graphData.edges).id(d => d.id).distance(90))
+        .force('charge', d3.forceManyBody().strength(-160))
         .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collide', d3.forceCollide().radius(d => Math.max(8, Math.sqrt(d.lines || 10) * 1.5) + 6));
+        .force('collide', d3.forceCollide().radius(d => Math.max(8, Math.sqrt(d.lines || 10) * 1.5) + 8));
 
       renderElements();
 
       simulation.on('tick', () => {
+        if (!linkElements || !nodeElements) return;
         linkElements
           .attr('x1', d => d.source.x)
           .attr('y1', d => d.source.y)
@@ -457,14 +738,12 @@
     }
 
     function renderElements() {
-      // Links
       linkElements = g.select('.links')
         .selectAll('line')
         .data(graphData.edges)
         .join('line')
         .attr('marker-end', 'url(#arrow)');
 
-      // Nodes
       nodeElements = g.select('.nodes')
         .selectAll('g')
         .data(graphData.nodes)
@@ -481,7 +760,7 @@
       nodeElements.selectAll('*').remove();
 
       nodeElements.append('circle')
-        .attr('r', d => Math.max(8, Math.min(24, Math.sqrt(d.lines || 10) * 1.5)))
+        .attr('r', d => Math.max(7, Math.min(26, Math.sqrt(d.lines || 10) * 1.5)))
         .attr('fill', d => TYPE_COLORS[d.type] || '#6b7280');
 
       nodeElements.append('text')
@@ -493,31 +772,250 @@
     function applyFilterAndSearch() {
       const query = document.getElementById('search-input').value.toLowerCase().trim();
 
-      nodeElements.style('display', d => {
+      if (nodeElements) {
+        nodeElements.style('display', d => {
+          const matchesType = (activeFilter === 'all' || d.type === activeFilter);
+          const matchesQuery = !query || 
+            d.path.toLowerCase().includes(query) || 
+            d.symbols?.some(s => s.name.toLowerCase().includes(query));
+          return (matchesType && matchesQuery) ? 'block' : 'none';
+        });
+      }
+
+      if (linkElements) {
+        linkElements.style('display', l => {
+          const srcVisible = (activeFilter === 'all' || l.source.type === activeFilter);
+          const tgtVisible = (activeFilter === 'all' || l.target.type === activeFilter);
+          return (srcVisible && tgtVisible) ? 'block' : 'none';
+        });
+      }
+
+      if (currentView === 'treemap') {
+        renderTreemap();
+      } else if (currentView === 'tree') {
+        renderTreeView();
+      }
+    }
+
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. Codebase Treemap Implementation
+    // --------------------------------------------------------------------------
+    function initTreemap() {
+      // Lazy render on tab activation or window resize
+      window.addEventListener('resize', () => {
+        if (currentView === 'treemap') renderTreemap();
+      });
+    }
+
+    function renderTreemap() {
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      const container = document.getElementById('treemap-view');
+      const width = container.clientWidth - 40;
+      const height = container.clientHeight - 100;
+      if (width <= 0 || height <= 0) return;
+
+      const svgEl = d3.select('#treemap-svg')
+        .attr('width', width)
+        .attr('height', height);
+
+      svgEl.selectAll('*').remove();
+
+      // Filter nodes according to search and filter
+      const filteredNodes = graphData.nodes.filter(d => {
         const matchesType = (activeFilter === 'all' || d.type === activeFilter);
         const matchesQuery = !query || 
           d.path.toLowerCase().includes(query) || 
           d.symbols?.some(s => s.name.toLowerCase().includes(query));
-        return (matchesType && matchesQuery) ? 'block' : 'none';
+        return matchesType && matchesQuery;
       });
 
-      linkElements.style('display', l => {
-        const srcVisible = (activeFilter === 'all' || l.source.type === activeFilter);
-        const tgtVisible = (activeFilter === 'all' || l.target.type === activeFilter);
-        return (srcVisible && tgtVisible) ? 'block' : 'none';
+      if (filteredNodes.length === 0) {
+        svgEl.append('text')
+          .attr('x', width / 2)
+          .attr('y', height / 2)
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#9ca3af')
+          .text('No matching files for active filters');
+        return;
+      }
+
+      // Build hierarchical tree by path
+      const rootData = { name: 'root', children: [] };
+      filteredNodes.forEach(node => {
+        const parts = node.path.split('/');
+        let cur = rootData;
+        for (let i = 0; i < parts.length - 1; i++) {
+          let child = cur.children.find(c => c.name === parts[i] && c.children);
+          if (!child) {
+            child = { name: parts[i], children: [] };
+            cur.children.push(child);
+          }
+          cur = child;
+        }
+        cur.children.push({
+          name: parts[parts.length - 1],
+          value: Math.max(node.lines || 10, 15),
+          nodeData: node
+        });
       });
+
+      const root = d3.hierarchy(rootData)
+        .sum(d => d.value)
+        .sort((a, b) => b.value - a.value);
+
+      d3.treemap()
+        .size([width, height])
+        .paddingInner(3)
+        .paddingOuter(6)
+        .paddingTop(18)
+        .round(true)(root);
+
+      const cell = svgEl.selectAll('g')
+        .data(root.leaves())
+        .join('g')
+        .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+      cell.append('rect')
+        .attr('class', d => `treemap-cell ${selectedNodeId === d.data.nodeData.id ? 'selected' : ''}`)
+        .attr('width', d => Math.max(0, d.x1 - d.x0))
+        .attr('height', d => Math.max(0, d.y1 - d.y0))
+        .attr('rx', 4)
+        .attr('fill', d => {
+          const color = TYPE_COLORS[d.data.nodeData.type] || '#4b5563';
+          return color;
+        })
+        .attr('fill-opacity', 0.8)
+        .attr('stroke', d => TYPE_COLORS[d.data.nodeData.type] || '#1f2937')
+        .attr('stroke-width', 1)
+        .on('click', (event, d) => {
+          event.stopPropagation();
+          selectNode(d.data.nodeData);
+          renderTreemap();
+        });
+
+      // Label
+      cell.append('text')
+        .attr('class', 'treemap-label')
+        .attr('x', 6)
+        .attr('y', 14)
+        .text(d => {
+          const w = d.x1 - d.x0;
+          return w > 50 ? d.data.name : '';
+        });
+
+      cell.append('text')
+        .attr('class', 'treemap-sublabel')
+        .attr('x', 6)
+        .attr('y', 26)
+        .text(d => {
+          const w = d.x1 - d.x0;
+          const h = d.y1 - d.y0;
+          return (w > 65 && h > 34) ? `${d.data.nodeData.lines} loc` : '';
+        });
     }
 
+    // --------------------------------------------------------------------------
+    // 3. Architecture Tree View Implementation
+    // --------------------------------------------------------------------------
+    function initTreeView() {
+      renderTreeView();
+    }
+
+    function renderTreeView() {
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      const treeContainer = document.getElementById('tree-content');
+      if (!treeContainer) return;
+
+      const categories = ['action', 'lib', 'component', 'page', 'api', 'type', 'database', 'tooling', 'test', 'config'];
+      let html = '';
+
+      categories.forEach(cat => {
+        if (activeFilter !== 'all' && activeFilter !== cat) return;
+
+        const nodes = graphData.nodes.filter(n => {
+          if (n.type !== cat) return false;
+          if (!query) return true;
+          return n.path.toLowerCase().includes(query) || n.symbols?.some(s => s.name.toLowerCase().includes(query));
+        });
+
+        if (nodes.length === 0) return;
+
+        const totalLines = nodes.reduce((sum, n) => sum + (n.lines || 0), 0);
+        const color = TYPE_COLORS[cat] || '#6b7280';
+
+        html += `
+          <div class="tree-section">
+            <div class="tree-section-header">
+              <div class="tree-section-title">
+                <div class="legend-dot" style="background:${color}"></div>
+                <span>${cat.toUpperCase()}</span>
+                <span class="badge-pill">${nodes.length} files • ${totalLines.toLocaleString()} loc</span>
+              </div>
+            </div>
+            <div class="tree-section-body">
+        `;
+
+        nodes.forEach(node => {
+          const isSelected = selectedNodeId === node.id;
+          html += `
+            <div class="tree-node-card ${isSelected ? 'selected' : ''}" onclick="selectNodeById('${node.id}')">
+              <div class="tree-node-header">
+                <span class="tree-node-name">${node.label}</span>
+                <span class="badge-pill" style="border-color:${color}; color:${color}; font-size:9px;">${node.lines} LOC</span>
+              </div>
+              <div class="tree-node-path">${node.path}</div>
+              <div class="tree-node-footer">
+                <span style="font-size:10px; color:var(--text-muted);">${node.symbolsCount || 0} symbols</span>
+              </div>
+            </div>
+          `;
+        });
+
+        html += `
+            </div>
+          </div>
+        `;
+      });
+
+      if (!html) {
+        html = `<p style="padding:20px; color:var(--text-muted); text-align:center;">No files found matching the current search criteria.</p>`;
+      }
+
+      treeContainer.innerHTML = html;
+    }
+
+    // --------------------------------------------------------------------------
+    // 4. Sidebar Inspector & Navigation
+    // --------------------------------------------------------------------------
     function selectNode(node) {
       selectedNodeId = node.id;
-      nodeElements.select('circle').classed('selected', d => d.id === node.id);
+      if (nodeElements) {
+        nodeElements.select('circle').classed('selected', d => d.id === node.id);
+      }
 
-      // Highlight incident edges
-      linkElements
-        .classed('highlighted', l => l.source.id === node.id || l.target.id === node.id)
-        .attr('marker-end', l => (l.source.id === node.id || l.target.id === node.id) ? 'url(#arrow-highlight)' : 'url(#arrow)');
+      if (linkElements) {
+        linkElements
+          .classed('highlighted', l => l.source.id === node.id || l.target.id === node.id)
+          .attr('marker-end', l => (l.source.id === node.id || l.target.id === node.id) ? 'url(#arrow-highlight)' : 'url(#arrow)');
+      }
 
-      // Populate sidebar
       document.getElementById('side-title').innerText = node.label;
       document.getElementById('side-category').innerText = node.type.toUpperCase();
       document.getElementById('side-category').style.background = `${TYPE_COLORS[node.type]}33`;
@@ -536,9 +1034,17 @@
             <div class="metric-label">Symbols Extracted</div>
             <div class="metric-value">${node.symbolsCount || 0}</div>
           </div>
+          <div class="metric-card">
+            <div class="metric-label">Imports</div>
+            <div class="metric-value">${importsList.length}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Imported By</div>
+            <div class="metric-value">${importedByList.length}</div>
+          </div>
         </div>
 
-        <div style="font-size: 11px; font-family: monospace; color: var(--text-muted); word-break: break-all; margin-bottom: 12px;">
+        <div style="font-size: 11px; font-family: monospace; color: var(--text-muted); word-break: break-all; margin-bottom: 12px; background:#172033; padding:8px 10px; border-radius:6px; border:1px solid var(--card-border);">
           ${node.path}
         </div>
       `;
@@ -564,7 +1070,7 @@
       } else {
         importsList.forEach(e => {
           const targetId = typeof e.target === 'object' ? e.target.id : e.target;
-          html += `<li class="dep-item" onclick="focusNode('${targetId}')"><span>${targetId}</span></li>`;
+          html += `<li class="dep-item" onclick="focusNode('${targetId}')"><span>${targetId}</span> ↳</li>`;
         });
       }
       html += `</ul>`;
@@ -576,7 +1082,7 @@
       } else {
         importedByList.forEach(e => {
           const srcId = typeof e.source === 'object' ? e.source.id : e.source;
-          html += `<li class="dep-item" onclick="focusNode('${srcId}')"><span>${srcId}</span></li>`;
+          html += `<li class="dep-item" onclick="focusNode('${srcId}')"><span>${srcId}</span> ↲</li>`;
         });
       }
       html += `</ul>`;
@@ -584,27 +1090,31 @@
       document.getElementById('side-body').innerHTML = html;
     }
 
-    window.focusNode = function(id) {
+    window.selectNodeById = function(id) {
       const node = graphData.nodes.find(n => n.id === id);
-      if (node) selectNode(node);
+      if (node) {
+        selectNode(node);
+        if (currentView === 'tree') renderTreeView();
+      }
     };
 
-    function dragstarted(event, d) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    }
-
-    function dragged(event, d) {
-      d.fx = event.x;
-      d.fy = event.y;
-    }
-
-    function dragended(event, d) {
-      if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    }
+    window.focusNode = function(id) {
+      const node = graphData.nodes.find(n => n.id === id);
+      if (node) {
+        selectNode(node);
+        if (currentView === 'graph') {
+          // Center on node if coordinates exist
+          if (node.x && node.y) {
+            const width = window.innerWidth - 380;
+            const height = window.innerHeight;
+            svg.transition().duration(500).call(
+              d3.zoom().transform,
+              d3.zoomIdentity.translate(width / 2 - node.x, height / 2 - node.y)
+            );
+          }
+        }
+      }
+    };
 
     loadData();
   </script>

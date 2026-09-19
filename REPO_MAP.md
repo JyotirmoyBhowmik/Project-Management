@@ -1,22 +1,28 @@
 # Repository Map - Enterprise PMS
 
-> Generated on 2026-09-19T17:47:30.736Z | **156** source files | **38,900** lines of code | **880** indexed symbols | **390** dependency relations
+> Generated on 2026-09-19T20:52:49.301Z | **164** source files | **42,871** lines of code | **947** indexed symbols | **415** dependency relations
 
 Compact AST symbol map (classes, functions, interfaces, types, components) with 1-based relative line numbers. Elides implementation bodies to optimize for AI token budget.
 
 ---
 
-## ACTION (9 files)
+## ACTION (10 files)
 
-### `src/actions/automations.ts` (246 lines)
+### `src/actions/automations.ts` (250 lines)
 ```typescript
 L18: export function createAutomationAction
 L53: export function toggleAutomationAction
 L70: export function deleteAutomationAction
 L87: export function getTenantAutomationsAction
 L120: export function dispatchAutomationTriggerAction
-L200: export function createWebhookAction
-L230: export function getTenantWebhooksAction
+L204: export function createWebhookAction
+L234: export function getTenantWebhooksAction
+```
+
+### `src/actions/config.ts` (225 lines)
+```typescript
+L22: export function getGlobalAppConfigAction
+L93: export function updateGlobalAppConfigAction
 ```
 
 ### `src/actions/identity.ts` (380 lines)
@@ -37,7 +43,7 @@ L179: export function deleteProjectAction
 L292: export function purgeTenantAction
 ```
 
-### `src/actions/members.ts` (579 lines)
+### `src/actions/members.ts` (692 lines)
 ```typescript
 L27: export function getWorkspaceMembersAction
 L87: export function provisionMemberAction
@@ -48,6 +54,7 @@ L355: export function removeMemberAction
 L397: export function getCrossTenantUsersAction
 L447: export function toggleGlobalUserLockAction
 L483: export function updateGlobalUserAction
+L580: export function deleteGlobalUserAction
 ```
 
 ### `src/actions/sprints.ts` (287 lines)
@@ -60,12 +67,13 @@ L155: export function getProjectSprintsAction
 L186: export function getSprintMetricsAction
 ```
 
-### `src/actions/tasks.ts` (422 lines)
+### `src/actions/tasks.ts` (487 lines)
 ```typescript
 L26: export function createTaskAction
-L206: export function updateTaskScheduleAction
-L298: export function updateTaskStatusAction
-L386: export function getTenantMembersAction
+L211: export function updateTaskScheduleAction
+L303: export function updateTaskStatusAction
+L392: export function getTenantMembersAction
+L429: export function quickCreateSubtaskAction
 ```
 
 ### `src/actions/timesheets.ts` (320 lines)
@@ -78,38 +86,47 @@ L255: export function setTenantRateAction
 L287: export function setProjectBudgetAction
 ```
 
-### `src/actions/trash.ts` (178 lines)
+### `src/actions/trash.ts` (255 lines)
 ```typescript
 L14: export function softDeleteEntityAction
 L48: export function restoreEntityAction
 L73: export function permanentDeleteEntityAction
-L98: export function getTrashItemsAction
+L127: export function getTrashItemsAction
 ```
 
-### `src/actions/wiki.ts` (173 lines)
+### `src/actions/wiki.ts` (224 lines)
 ```typescript
-L18: export function createDocumentAction
-L51: export function updateDocumentContentAction
-L82: export function getDocumentTreeAction
-L125: export function linkTaskToDocAction
-L140: export function unlinkTaskFromDocAction
-L157: export function getTaskLinkedDocsAction
+L19: export function createDocumentAction
+L72: export function updateDocumentContentAction
+L123: export function getDocumentTreeAction
+L193: export function linkTaskToDocAction
+L208: export function unlinkTaskFromDocAction
 ```
 
-## LIB (30 files)
+## LIB (32 files)
 
-### `src/lib/calendar/calendar-engine.ts` (213 lines)
+### `src/lib/calendar/calendar-engine.ts` (242 lines)
 ```typescript
 L8: export interface CalendarDayInfo { ... }
 L18: export function formatDateToISO
-L25: export function parseISODate
-L30: export function normalizeHolidays
-L46: export function isWorkingDay
-L75: export function getNextWorkingDay
-L90: export function calculate_working_end_date
-L118: export function addWorkingDays
-L144: export function calculateWorkingDays
-L170: export function generateDayGrid
+L40: export function parseISODate
+L53: export function normalizeHolidays
+L72: export function isWorkingDay
+L101: export function getNextWorkingDay
+L118: export function calculate_working_end_date
+L146: export function addWorkingDays
+L173: export function calculateWorkingDays
+L199: export function generateDayGrid
+```
+
+### `src/lib/context/app-config-context.tsx` (164 lines)
+```typescript
+L34: export component_or_fn APP_ICON_MAP
+L51: interface AppConfigContextValue { ... }
+L60: component_or_fn AppConfigContext
+L62: export function AppConfigProvider
+L129: component_or_fn IconComponent
+L150: export function useAppConfig
 ```
 
 ### `src/lib/context/tenant-metadata-context.tsx` (254 lines)
@@ -467,39 +484,52 @@ L196: export function useDynamicTheme
 L9: export function cn
 ```
 
-### `src/lib/validation/action-schemas.ts` (246 lines)
+### `src/lib/validation/action-schemas.ts` (248 lines)
 ```typescript
 L10: export interface ActionResponse { ... }
 L23: export component_or_fn TaskInputSchema
-L46: export type TaskInput
-L48: export component_or_fn UpdateTaskScheduleSchema
-L56: export type UpdateTaskScheduleInput
-L58: export component_or_fn UpdateTaskStatusSchema
-L64: export type UpdateTaskStatusInput
-L70: export component_or_fn LogTimeSchema
-L80: export type LogTimeInput
-L86: export component_or_fn CreateSprintSchema
-L95: export type CreateSprintInput
-L101: export component_or_fn CreateAutomationSchema
-L122: export type CreateAutomationInput
-L128: export component_or_fn CreateDocSchema
-L136: export type CreateDocInput
-L142: export component_or_fn TenantSSOConfigSchema
-L153: export type TenantSSOConfigInput
-L155: export component_or_fn TenantDirectorySyncConfigSchema
-L170: export type TenantDirectorySyncConfigInput
-L176: export component_or_fn ProvisionMemberSchema
-L185: export type ProvisionMemberInput
-L187: export component_or_fn UpdateMemberRoleSchema
-L193: export type UpdateMemberRoleInput
-L199: export component_or_fn DeleteTaskSchema
-L207: export type DeleteTaskInput
-L209: export component_or_fn DeleteProjectSchema
-L216: export type DeleteProjectInput
-L218: export component_or_fn PurgeTenantSchema
-L224: export type PurgeTenantInput
-L230: export component_or_fn UpdateGlobalUserSchema
-L244: export type UpdateGlobalUserInput
+L48: export type TaskInput
+L50: export component_or_fn UpdateTaskScheduleSchema
+L58: export type UpdateTaskScheduleInput
+L60: export component_or_fn UpdateTaskStatusSchema
+L66: export type UpdateTaskStatusInput
+L72: export component_or_fn LogTimeSchema
+L82: export type LogTimeInput
+L88: export component_or_fn CreateSprintSchema
+L97: export type CreateSprintInput
+L103: export component_or_fn CreateAutomationSchema
+L124: export type CreateAutomationInput
+L130: export component_or_fn CreateDocSchema
+L138: export type CreateDocInput
+L144: export component_or_fn TenantSSOConfigSchema
+L155: export type TenantSSOConfigInput
+L157: export component_or_fn TenantDirectorySyncConfigSchema
+L172: export type TenantDirectorySyncConfigInput
+L178: export component_or_fn ProvisionMemberSchema
+L187: export type ProvisionMemberInput
+L189: export component_or_fn UpdateMemberRoleSchema
+L195: export type UpdateMemberRoleInput
+L201: export component_or_fn DeleteTaskSchema
+L209: export type DeleteTaskInput
+L211: export component_or_fn DeleteProjectSchema
+L218: export type DeleteProjectInput
+L220: export component_or_fn PurgeTenantSchema
+L226: export type PurgeTenantInput
+L232: export component_or_fn UpdateGlobalUserSchema
+L246: export type UpdateGlobalUserInput
+```
+
+### `src/lib/validation/config-schemas.ts` (148 lines)
+```typescript
+L9: export component_or_fn SupportedAppIcons
+L26: export type SupportedAppIcon
+L28: export component_or_fn ControlFeaturesSchema
+L47: export type ControlFeatures
+L49: export component_or_fn SecurityControlsSchema
+L73: export type SecurityControls
+L75: export component_or_fn GlobalAppConfigSchema
+L114: export type GlobalAppConfig
+L116: export component_or_fn DEFAULT_GLOBAL_APP_CONFIG
 ```
 
 ### `src/lib/validation/schemas.ts` (196 lines)
@@ -530,20 +560,32 @@ L191: export component_or_fn AuthRepairSchema
 L195: export type ValidatedAuthRepair
 ```
 
-## COMPONENT (29 files)
+## COMPONENT (30 files)
 
-### `src/components/admin/SuperAdminPanel.tsx` (935 lines)
+### `src/components/admin/GlobalConfigManager.tsx` (709 lines)
 ```typescript
-L37: export function SuperAdminPanel
-L94: component_or_fn showNotification
-L99: component_or_fn handleSelectThemeToEdit
-L107: component_or_fn handleUpdateToken
-L114: component_or_fn handleSaveTheme
-L123: component_or_fn handleProvisionTenant
-L164: component_or_fn toggleTenantStatus
-L176: component_or_fn handleUpdateQuota
-L203: component_or_fn toggleFeatureFlag
-L224: component_or_fn handleCloneTenant
+L52: export function GlobalConfigManager
+L68: component_or_fn handleSave
+L79: component_or_fn handleReset
+L85: component_or_fn updateFeatureFlag
+L95: component_or_fn ActiveIconComponent
+L155: component_or_fn Icon
+L238: component_or_fn IconComp
+L457: component_or_fn Icon
+```
+
+### `src/components/admin/SuperAdminPanel.tsx` (944 lines)
+```typescript
+L38: export function SuperAdminPanel
+L95: component_or_fn showNotification
+L100: component_or_fn handleSelectThemeToEdit
+L108: component_or_fn handleUpdateToken
+L115: component_or_fn handleSaveTheme
+L124: component_or_fn handleProvisionTenant
+L165: component_or_fn toggleTenantStatus
+L177: component_or_fn handleUpdateQuota
+L204: component_or_fn toggleFeatureFlag
+L225: component_or_fn handleCloneTenant
 ```
 
 ### `src/components/admin/TenantAdminPanel.tsx` (1023 lines)
@@ -566,24 +608,25 @@ L333: component_or_fn PERMISSION_KEYS
 L343: component_or_fn ROLES
 ```
 
-### `src/components/agile/SprintPlanningView.tsx` (497 lines)
+### `src/components/agile/SprintPlanningView.tsx` (778 lines)
 ```typescript
-L37: interface SprintPlanningViewProps { ... }
-L46: export function SprintPlanningView
-L95: component_or_fn handleDragStart
-L99: component_or_fn handleDrop
-L117: component_or_fn handleCreateSprint
-L142: component_or_fn handleStartSprint
-L153: component_or_fn handleCompleteSprint
-L244: component_or_fn Icon
+L41: interface SprintPlanningViewProps { ... }
+L50: export function SprintPlanningView
+L112: component_or_fn handleDragStart
+L116: component_or_fn handleDrop
+L140: component_or_fn handleMoveTask
+L159: component_or_fn handleCreateSprint
+L188: component_or_fn handleStartSprint
+L199: component_or_fn handleCompleteSprint
+L305: component_or_fn Icon
 ```
 
-### `src/components/calendar/ProjectCalendarView.tsx` (151 lines)
+### `src/components/calendar/ProjectCalendarView.tsx` (160 lines)
 ```typescript
 L9: interface ProjectCalendarViewProps { ... }
 L15: export function ProjectCalendarView
-L18: component_or_fn prevMonth
-L22: component_or_fn nextMonth
+L25: component_or_fn prevMonth
+L29: component_or_fn nextMonth
 ```
 
 ### `src/components/exchange/ImportExportModal.tsx` (439 lines)
@@ -610,27 +653,34 @@ L400: component_or_fn handleTaskClick
 L405: component_or_fn handleCreateTask
 ```
 
-### `src/components/graphify/GraphCanvas.tsx` (638 lines)
+### `src/components/graphify/GraphCanvas.tsx` (834 lines)
 ```typescript
-L30: export interface GraphNode { ... }
-L42: export interface GraphEdge { ... }
-L52: interface GraphCanvasProps { ... }
-L64: component_or_fn STATUS_COLORS
-L73: export function GraphCanvas
-L273: component_or_fn handleMouseDown
-L280: component_or_fn handleMouseMove
-L292: component_or_fn handleMouseUp
+L33: export interface GraphNode { ... }
+L47: export interface GraphEdge { ... }
+L57: interface GraphCanvasProps { ... }
+L69: component_or_fn STATUS_COLORS
+L78: export function GraphCanvas
+L382: component_or_fn handleMouseDown
+L389: component_or_fn handleMouseMove
+L401: component_or_fn handleMouseUp
 ```
 
-### `src/components/grid/HierarchicalGrid.tsx` (259 lines)
+### `src/components/grid/HierarchicalGrid.tsx` (555 lines)
 ```typescript
-L19: interface HierarchicalGridProps { ... }
-L26: export function HierarchicalGrid
-L34: component_or_fn toggleExpand
-L38: component_or_fn renderPriorityBadge
+L29: interface HierarchicalGridProps { ... }
+L37: interface WbsTaskNode { ... }
+L44: export function HierarchicalGrid
+L75: function buildNodes
+L115: component_or_fn toggleExpand
+L119: component_or_fn handleExpandAll
+L127: component_or_fn handleCollapseAll
+L135: component_or_fn renderPriorityBadge
+L168: function matchTask
+L176: function filterNodeList
+L220: component_or_fn renderTaskRow
 ```
 
-### `src/components/kanban/KanbanBoard.tsx` (278 lines)
+### `src/components/kanban/KanbanBoard.tsx` (288 lines)
 ```typescript
 L23: interface KanbanBoardProps { ... }
 L29: export function KanbanBoard
@@ -644,20 +694,20 @@ L81: component_or_fn renderPriorityBadge
 L8: export function Breadcrumbs
 ```
 
-### `src/components/layout/Header.tsx` (435 lines)
+### `src/components/layout/Header.tsx` (467 lines)
 ```typescript
-L35: export function Header
-L76: component_or_fn handleMarkAsRead
-L81: component_or_fn handleTenantSwitch
-L96: component_or_fn handleSignOut
-L106: component_or_fn closeAllMenus
+L36: export function Header
+L78: component_or_fn handleMarkAsRead
+L83: component_or_fn handleTenantSwitch
+L98: component_or_fn handleSignOut
+L108: component_or_fn closeAllMenus
 ```
 
-### `src/components/layout/Sidebar.tsx` (222 lines)
+### `src/components/layout/Sidebar.tsx` (245 lines)
 ```typescript
-L29: export function Sidebar
-L133: component_or_fn Icon
-L164: component_or_fn Icon
+L31: export function Sidebar
+L147: component_or_fn Icon
+L178: component_or_fn Icon
 ```
 
 ### `src/components/modals/DeleteProjectModal.tsx` (153 lines)
@@ -674,14 +724,15 @@ L34: export function DeleteTaskModal
 L48: component_or_fn handleDelete
 ```
 
-### `src/components/modals/EditUserModal.tsx` (324 lines)
+### `src/components/modals/EditUserModal.tsx` (411 lines)
 ```typescript
 L18: interface EditUserModalProps { ... }
 L43: export function EditUserModal
-L77: component_or_fn handleRoleChange
-L83: component_or_fn handleRemoveMembership
-L87: component_or_fn handleAddMembership
-L101: component_or_fn handleSubmit
+L80: component_or_fn handleRoleChange
+L86: component_or_fn handleRemoveMembership
+L90: component_or_fn handleAddMembership
+L104: component_or_fn handleDeleteUser
+L124: component_or_fn handleSubmit
 ```
 
 ### `src/components/modals/ExportProjectModal.tsx` (183 lines)
@@ -707,20 +758,20 @@ L25: export function PurgeTenantModal
 L42: component_or_fn handlePurge
 ```
 
-### `src/components/resource/ResourceHeatmapView.tsx` (398 lines)
+### `src/components/resource/ResourceHeatmapView.tsx` (404 lines)
 ```typescript
-L32: interface ResourceHeatmapViewProps { ... }
-L41: export function ResourceHeatmapView
-L103: component_or_fn toggleUser
+L33: interface ResourceHeatmapViewProps { ... }
+L42: export function ResourceHeatmapView
+L109: component_or_fn toggleUser
 ```
 
-### `src/components/tasks/CreateTaskDialog.tsx` (468 lines)
+### `src/components/tasks/CreateTaskDialog.tsx` (486 lines)
 ```typescript
-L61: type CreateTaskFormData
-L63: interface CreateTaskDialogProps { ... }
-L71: export function CreateTaskDialog
-L147: component_or_fn onSubmit
-L200: component_or_fn handleToggleAssignee
+L62: type CreateTaskFormData
+L64: interface CreateTaskDialogProps { ... }
+L74: export function CreateTaskDialog
+L152: component_or_fn onSubmit
+L203: component_or_fn handleToggleAssignee
 ```
 
 ### `src/components/tasks/TaskAttachmentsManager.tsx` (301 lines)
@@ -734,19 +785,30 @@ L139: component_or_fn formatFileSize
 L145: component_or_fn getFileIcon
 ```
 
-### `src/components/tasks/TaskDetailDrawer.tsx` (736 lines)
+### `src/components/tasks/TaskDetailDrawer.tsx` (1035 lines)
 ```typescript
-L35: interface TaskDetailDrawerProps { ... }
-L49: export function TaskDetailDrawer
-L111: function loadData
-L137: component_or_fn handleKeyDown
-L147: component_or_fn handleSaveDetails
-L152: component_or_fn handleDurationChange
-L165: component_or_fn handleStartDateChange
-L177: type FeedItem
-L198: component_or_fn handleCommentChange
-L218: component_or_fn insertMention
-L228: component_or_fn submitComment
+L39: interface TaskDetailDrawerProps { ... }
+L53: interface ErrorBoundaryState { ... }
+L57: class DrawerErrorBoundary
+  L66: getDerivedStateFromError(...)
+  L70: componentDidCatch(...)
+  L74: render(...)
+L99: export function TaskDetailDrawer
+L184: function loadData
+L210: component_or_fn handleKeyDown
+L220: component_or_fn handleSaveDetails
+L225: component_or_fn handleDurationChange
+L238: component_or_fn handleStartDateChange
+L248: component_or_fn handleMilestoneToggle
+L265: component_or_fn handleToggleSubtaskStatus
+L287: component_or_fn handleCreateSubtask
+L322: component_or_fn handleSyncParentProgress
+L331: function formatSafeDateTime
+L341: function formatSafeTime
+L353: type FeedItem
+L374: component_or_fn handleCommentChange
+L394: component_or_fn insertMention
+L404: component_or_fn submitComment
 ```
 
 ### `src/components/ui/badge.tsx` (30 lines)
@@ -790,27 +852,40 @@ L13: export interface TabsProps { ... }
 L20: export function Tabs
 ```
 
-### `src/components/wiki/WikiWorkspace.tsx` (310 lines)
+### `src/components/wiki/WikiWorkspace.tsx` (901 lines)
 ```typescript
-L39: interface WikiWorkspaceProps { ... }
-L48: export function WikiWorkspace
-L77: component_or_fn toggleExpand
-L86: component_or_fn handleCreateDoc
-L108: component_or_fn handleSaveDoc
-L129: component_or_fn handleLinkTask
-L143: component_or_fn renderDocumentWithEmbeddedTasks
+L49: interface WikiWorkspaceProps { ... }
+L61: function findDocRecursive
+L75: function collectAllDocIds
+L77: function traverse
+L92: function buildDocPath
+L107: function filterDocTree
+L119: function checkNode
+L137: function filterNodes
+L152: export function WikiWorkspace
+L215: component_or_fn toggleExpand
+L225: component_or_fn handleExpandAll
+L229: component_or_fn handleCollapseAll
+L245: component_or_fn handleCreateDoc
+L275: component_or_fn handleSaveDoc
+L297: component_or_fn handleDeleteDoc
+L325: component_or_fn handleLinkTask
+L339: component_or_fn handleUnlinkTask
+L351: component_or_fn insertFormatting
+L358: component_or_fn renderDocumentWithEmbeddedTasks
+L437: component_or_fn renderDocTreeItem
 ```
 
-## PAGE (22 files)
+## PAGE (23 files)
 
-### `src/app/(auth)/login/page.tsx` (632 lines)
+### `src/app/(auth)/login/page.tsx` (652 lines)
 ```typescript
-L35: function LoginPageContent
-L76: component_or_fn handleResolveWorkspace
-L104: component_or_fn checkDomainSSO
-L129: component_or_fn handleSSOLogin
-L164: component_or_fn handleLogin
-L619: export function LoginPage
+L36: function LoginPageContent
+L78: component_or_fn handleResolveWorkspace
+L106: component_or_fn checkDomainSSO
+L131: component_or_fn handleSSOLogin
+L166: component_or_fn handleLogin
+L639: export function LoginPage
 ```
 
 ### `src/app/(dashboard)/admin/multisite/diagnostics/page.tsx` (284 lines)
@@ -854,6 +929,11 @@ L131: component_or_fn Icon
 L6: export function SuperAdminPage
 ```
 
+### `src/app/(dashboard)/admin/system/config/page.tsx` (14 lines)
+```typescript
+L11: export function GlobalConfigPage
+```
+
 ### `src/app/(dashboard)/admin/tenant/help/page.tsx` (187 lines)
 ```typescript
 L26: export function TenantAdminManualPage
@@ -891,15 +971,15 @@ L83: component_or_fn handleCreateProject
 L115: component_or_fn getStatusBadgeVariant
 ```
 
-### `src/app/(dashboard)/projects/[projectId]/page.tsx` (681 lines)
+### `src/app/(dashboard)/projects/[projectId]/page.tsx` (748 lines)
 ```typescript
-L71: function ProjectWorkspaceContent
-L83: type ViewType
-L185: function loadSnapshots
-L199: component_or_fn handleRunCPM
-L234: component_or_fn handleLockBaseline
-L392: component_or_fn Icon
-L668: export function ProjectWorkspacePage
+L74: function ProjectWorkspaceContent
+L87: type ViewType
+L200: function loadSnapshots
+L214: component_or_fn handleRunCPM
+L253: component_or_fn handleLockBaseline
+L440: component_or_fn Icon
+L735: export function ProjectWorkspacePage
 ```
 
 ### `src/app/(dashboard)/settings/automations/page.tsx` (438 lines)
@@ -1121,7 +1201,7 @@ L708: export interface DirectorySyncLog { ... }
 L720: export interface CrossTenantUser { ... }
 ```
 
-## DATABASE (18 files)
+## DATABASE (19 files)
 
 ### `supabase/fix_and_seed.sql` (1017 lines)
 ```typescript
@@ -1297,51 +1377,6 @@ L139: export function encrypt_tenant_secret
 L146: export function decrypt_tenant_secret
 ```
 
-### `supabase/migrations/00005_superadmin_rls_triggers.sql` (320 lines)
-```typescript
-L16: export function public.is_superadmin
-L20: export function public.is_superadmin
-L24: export function public.current_app_user_id
-L28: export function public.get_user_tenant_role
-L36: export function public.is_tenant_member
-L57: export policy tenants_superadmin_all on public.tenants
-L58: export policy tenants_member_select on public.tenants
-L65: export policy profiles_superadmin_all on public.profiles
-L66: export policy profiles_select_authenticated on public.profiles
-L67: export policy profiles_update_own on public.profiles
-L68: export policy profiles_insert_own on public.profiles
-L74: export policy memberships_superadmin_all on public.tenant_memberships
-L75: export policy memberships_own_select on public.tenant_memberships
-L76: export policy memberships_tenant_admin_manage on public.tenant_memberships
-L83: export policy projects_superadmin_all on public.projects
-L84: export policy projects_member_select on public.projects
-L85: export policy projects_member_mutate on public.projects
-L92: export policy tasks_superadmin_all on public.tasks
-L93: export policy tasks_member_select on public.tasks
-L94: export policy tasks_member_mutate on public.tasks
-L100: export policy deps_superadmin_all on public.task_dependencies
-L101: export policy deps_member_select on public.task_dependencies
-L102: export policy deps_member_mutate on public.task_dependencies
-L108: export policy cal_superadmin_all on public.working_calendars
-L109: export policy cal_member_select on public.working_calendars
-L110: export policy cal_admin_mutate on public.working_calendars
-L117: export policy hol_superadmin_all on public.calendar_holidays
-L118: export policy hol_member_select on public.calendar_holidays
-L119: export policy hol_admin_mutate on public.calendar_holidays
-L129: export policy audit_superadmin_all on public.audit_logs
-L130: export policy audit_tenant_admin_select on public.audit_logs
-L136: export policy audit_insert_system on public.audit_logs
-L142: export policy baselines_superadmin_all on public.project_baselines
-L143: export policy baselines_member_select on public.project_baselines
-L144: export policy baselines_member_mutate on public.project_baselines
-L150: export policy snapshots_superadmin_all on public.task_baseline_snapshots
-L151: export policy snapshots_select on public.task_baseline_snapshots
-L152: export policy snapshots_insert on public.task_baseline_snapshots
-L157: export function public.handle_new_user
-L186: export function public.log_entity_mutation
-L267: export function public.lock_project_baseline
-```
-
 ### `supabase/migrations/00007_schema_refinements.sql` (392 lines)
 ```typescript
 L52: export table tenants_v2
@@ -1496,6 +1531,56 @@ L66: export function public.seed_tenant_defaults
 L113: export function public.handle_new_tenant_seeding
 ```
 
+### `supabase/migrations/00017_superadmin_rls_triggers.sql` (320 lines)
+```typescript
+L16: export function public.is_superadmin
+L20: export function public.is_superadmin
+L24: export function public.current_app_user_id
+L28: export function public.get_user_tenant_role
+L36: export function public.is_tenant_member
+L57: export policy tenants_superadmin_all on public.tenants
+L58: export policy tenants_member_select on public.tenants
+L65: export policy profiles_superadmin_all on public.profiles
+L66: export policy profiles_select_authenticated on public.profiles
+L67: export policy profiles_update_own on public.profiles
+L68: export policy profiles_insert_own on public.profiles
+L74: export policy memberships_superadmin_all on public.tenant_memberships
+L75: export policy memberships_own_select on public.tenant_memberships
+L76: export policy memberships_tenant_admin_manage on public.tenant_memberships
+L83: export policy projects_superadmin_all on public.projects
+L84: export policy projects_member_select on public.projects
+L85: export policy projects_member_mutate on public.projects
+L92: export policy tasks_superadmin_all on public.tasks
+L93: export policy tasks_member_select on public.tasks
+L94: export policy tasks_member_mutate on public.tasks
+L100: export policy deps_superadmin_all on public.task_dependencies
+L101: export policy deps_member_select on public.task_dependencies
+L102: export policy deps_member_mutate on public.task_dependencies
+L108: export policy cal_superadmin_all on public.working_calendars
+L109: export policy cal_member_select on public.working_calendars
+L110: export policy cal_admin_mutate on public.working_calendars
+L117: export policy hol_superadmin_all on public.calendar_holidays
+L118: export policy hol_member_select on public.calendar_holidays
+L119: export policy hol_admin_mutate on public.calendar_holidays
+L129: export policy audit_superadmin_all on public.audit_logs
+L130: export policy audit_tenant_admin_select on public.audit_logs
+L136: export policy audit_insert_system on public.audit_logs
+L142: export policy baselines_superadmin_all on public.project_baselines
+L143: export policy baselines_member_select on public.project_baselines
+L144: export policy baselines_member_mutate on public.project_baselines
+L150: export policy snapshots_superadmin_all on public.task_baseline_snapshots
+L151: export policy snapshots_select on public.task_baseline_snapshots
+L152: export policy snapshots_insert on public.task_baseline_snapshots
+L157: export function public.handle_new_user
+L186: export function public.log_entity_mutation
+L267: export function public.lock_project_baseline
+```
+
+### `supabase/migrations/00018_system_configurations.sql` (122 lines)
+```typescript
+L9: export table public.system_configurations
+```
+
 ### `supabase/seed.sql` (549 lines)
 ```typescript
 L17: export table tenants_v2
@@ -1506,7 +1591,7 @@ L61: export table tenant_teams
 
 ## TOOLING (1 files)
 
-### `tools/codebase-map/generate-repo-map.mjs` (455 lines)
+### `tools/codebase-map/generate-repo-map.mjs` (494 lines)
 ```typescript
 L15: component_or_fn ROOT_DIR
 L18: component_or_fn IGNORED_DIRS
@@ -1522,7 +1607,7 @@ L261: function resolveImportPath
 L303: function main
 ```
 
-## TEST (11 files)
+## TEST (12 files)
 
 ### `tests/integration/api-contracts.test.ts` (82 lines)
 ```typescript
@@ -1588,11 +1673,24 @@ L13: function extractAndNormalizeDomain
 L53: component_or_fn checkDomainAllowed
 ```
 
+### `tests/unit/wbs-and-tree-hierarchy.test.ts` (250 lines)
+```typescript
+L10: interface MockTask { ... }
+L16: function buildWbsHierarchy
+L28: interface WbsNode { ... }
+L35: function buildNodes
+L86: interface MockDoc { ... }
+L92: function findDocPath
+L104: function filterTree
+L109: function scan
+L124: function prune
+```
+
 ## CONFIG (2 files)
 
-### `src/app/providers.tsx` (33 lines)
+### `src/app/providers.tsx` (36 lines)
 ```typescript
-L9: export function Providers
+L10: export function Providers
 ```
 
 ### `src/middleware.ts` (119 lines)
