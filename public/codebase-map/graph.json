@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generatedAt": "2026-09-19T12:43:04.812Z",
-    "totalFiles": 130,
+    "generatedAt": "2026-09-19T13:05:37.637Z",
+    "totalFiles": 131,
     "totalEdges": 313,
-    "totalLines": 32221,
-    "totalSymbols": 761
+    "totalLines": 32314,
+    "totalSymbols": 765
   },
   "nodes": [
     {
@@ -143,7 +143,7 @@
       "path": "src/actions/tasks.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 399,
+      "lines": 422,
       "symbolsCount": 4,
       "symbols": [
         {
@@ -155,19 +155,19 @@
         {
           "name": "updateTaskScheduleAction",
           "kind": "function",
-          "line": 183,
+          "line": 206,
           "isExported": true
         },
         {
           "name": "updateTaskStatusAction",
           "kind": "function",
-          "line": 275,
+          "line": 298,
           "isExported": true
         },
         {
           "name": "getTenantMembersAction",
           "kind": "function",
-          "line": 363,
+          "line": 386,
           "isExported": true
         }
       ]
@@ -5595,6 +5595,41 @@
           "name": "Doc links tenant read on public.document_task_links",
           "kind": "policy",
           "line": 392,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "supabase/migrations/00013_fix_task_assignees_foreign_key_and_sync.sql",
+      "label": "00013_fix_task_assignees_foreign_key_and_sync.sql",
+      "path": "supabase/migrations/00013_fix_task_assignees_foreign_key_and_sync.sql",
+      "type": "database",
+      "extension": ".sql",
+      "lines": 70,
+      "symbolsCount": 4,
+      "symbols": [
+        {
+          "name": "assignees_select_policy on public.task_assignees",
+          "kind": "policy",
+          "line": 56,
+          "isExported": true
+        },
+        {
+          "name": "assignees_insert_policy on public.task_assignees",
+          "kind": "policy",
+          "line": 59,
+          "isExported": true
+        },
+        {
+          "name": "assignees_update_policy on public.task_assignees",
+          "kind": "policy",
+          "line": 62,
+          "isExported": true
+        },
+        {
+          "name": "assignees_delete_policy on public.task_assignees",
+          "kind": "policy",
+          "line": 65,
           "isExported": true
         }
       ]

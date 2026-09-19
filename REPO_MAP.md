@@ -1,6 +1,6 @@
 # Repository Map - Enterprise PMS
 
-> Generated on 2026-09-19T12:43:04.786Z | **130** source files | **32,221** lines of code | **761** indexed symbols | **313** dependency relations
+> Generated on 2026-09-19T13:05:37.612Z | **131** source files | **32,314** lines of code | **765** indexed symbols | **313** dependency relations
 
 Compact AST symbol map (classes, functions, interfaces, types, components) with 1-based relative line numbers. Elides implementation bodies to optimize for AI token budget.
 
@@ -29,12 +29,12 @@ L155: export function getProjectSprintsAction
 L186: export function getSprintMetricsAction
 ```
 
-### `src/actions/tasks.ts` (399 lines)
+### `src/actions/tasks.ts` (422 lines)
 ```typescript
 L26: export function createTaskAction
-L183: export function updateTaskScheduleAction
-L275: export function updateTaskStatusAction
-L363: export function getTenantMembersAction
+L206: export function updateTaskScheduleAction
+L298: export function updateTaskStatusAction
+L386: export function getTenantMembersAction
 ```
 
 ### `src/actions/timesheets.ts` (320 lines)
@@ -955,7 +955,7 @@ L645: export interface DocumentTaskLink { ... }
 L654: export interface SoftDeletedItem { ... }
 ```
 
-## DATABASE (15 files)
+## DATABASE (16 files)
 
 ### `supabase/fix_and_seed.sql` (1017 lines)
 ```typescript
@@ -1298,6 +1298,14 @@ L353: export policy Webhooks admin mutate on public.tenant_webhooks
 L367: export policy Documents tenant read on public.project_documents
 L383: export policy Documents member mutate on public.project_documents
 L392: export policy Doc links tenant read on public.document_task_links
+```
+
+### `supabase/migrations/00013_fix_task_assignees_foreign_key_and_sync.sql` (70 lines)
+```typescript
+L56: export policy assignees_select_policy on public.task_assignees
+L59: export policy assignees_insert_policy on public.task_assignees
+L62: export policy assignees_update_policy on public.task_assignees
+L65: export policy assignees_delete_policy on public.task_assignees
 ```
 
 ### `supabase/seed.sql` (549 lines)

@@ -110,45 +110,68 @@ export async function createTaskAction(
     }
 
     // 5. Execute Supabase Insert
-    const { data, error } = await supabase
+    const { data: insertedTask, error: insertError } = await supabase
       .from('tasks')
       .insert(payload)
-      .select('*, assignees:task_assignees(*, user:profiles(*))')
+      .select()
       .single();
 
-    if (error) {
+    if (insertError) {
       logger.error('Database error in createTaskAction', {
         fn: 'createTaskAction',
-        ctx: { code: error.code, message: error.message, details: error.details },
+        ctx: { code: insertError.code, message: insertError.message, details: insertError.details },
       });
       return {
         success: false,
-        error: error.message || 'Database rejected task creation',
-        details: error.details || error.hint || error.code,
+        error: insertError.message || 'Database rejected task creation',
+        details: insertError.details || insertError.hint || insertError.code,
         correlation_id: correlationId,
       };
     }
 
     // 6. Handle optional initial assignees
-    if (input.assignee_ids && input.assignee_ids.length > 0 && data?.id) {
+    if (input.assignee_ids && input.assignee_ids.length > 0 && insertedTask?.id) {
       const assigneeRows = input.assignee_ids.map((uid) => ({
-        task_id: data.id,
+        task_id: insertedTask.id,
         user_id: uid,
         allocated_hours_per_day: 8,
         allocation_percent: 100,
         role: 'Assignee',
+        tenant_id: input.tenant_id,
       }));
-      await supabase.from('task_assignees').insert(assigneeRows);
+      const { error: assignError } = await supabase.from('task_assignees').insert(assigneeRows);
+      if (assignError) {
+        logger.warn('Warning inserting task assignees in createTaskAction', {
+          fn: 'createTaskAction',
+          ctx: { taskId: insertedTask.id, error: assignError.message },
+        });
+      }
     }
 
-    // 7. Format return task (ensure code is mapped from task_code)
+    // 7. Fetch fully hydrated task with assignees
+    let finalTaskData = insertedTask;
+    try {
+      const { data: hydratedTask, error: hydrateError } = await supabase
+        .from('tasks')
+        .select('*, assignees:task_assignees(*, user:profiles(*))')
+        .eq('id', insertedTask.id)
+        .single();
+
+      if (!hydrateError && hydratedTask) {
+        finalTaskData = hydratedTask;
+      }
+    } catch {
+      // Fall back gracefully to insertedTask
+    }
+
+    // 8. Format return task (ensure code is mapped from task_code)
     const formattedTask: Task = {
-      ...data,
-      code: data.task_code || data.code,
-      task_code: data.task_code || data.code,
+      ...finalTaskData,
+      code: finalTaskData.task_code || finalTaskData.code,
+      task_code: finalTaskData.task_code || finalTaskData.code,
     };
 
-    // 8. Revalidate routes
+    // 9. Revalidate routes
     try {
       revalidatePath(`/projects/${input.project_id}`);
       revalidatePath('/');
