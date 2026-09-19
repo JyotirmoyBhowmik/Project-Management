@@ -4,7 +4,8 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_16-emerald?style=flat&logo=supabase)](https://supabase.com/)
-[![Tests](https://img.shields.io/badge/Tests-51%20passing-brightgreen?style=flat&logo=vitest)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-112%20passing-brightgreen?style=flat&logo=vitest)](https://vitest.dev/)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?style=flat&logo=github-sponsors)](https://github.com/sponsors/JyotirmoyBhowmik)
 
 An enterprise-grade, multi-tenant Project Management System (PMS) built on **Next.js 15 (App Router, Server Actions, React Server Components)**, **Tailwind CSS v4**, **Zustand**, **TanStack React Query v5**, and **Supabase (PostgreSQL 16)**. Designed for production deployment on **Vercel** with full multi-tenancy, Row Level Security (RLS), real-time collaboration, and an in-engine Critical Path Method (CPM) scheduling pipeline.
 
@@ -262,6 +263,16 @@ The automated migration [`00009_root_superadmin_and_demo_seed.sql`](file:///c:/U
 ## 🚢 Production Deployment
 
 For complete, step-by-step instructions on deploying the application to **Vercel** with a **Supabase (PostgreSQL 16)** backend, Cloudflare wildcard DNS routing (`*.pms.jyotirmoyb.com`), and transactional email configuration, consult [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
+---
+
+## 💖 Support & Sponsorship
+
+If this enterprise project management system accelerates your workflows, solves your architecture needs, or serves as a valuable production blueprint, consider sponsoring its ongoing development and maintenance!
+
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-ea4aaa?style=for-the-badge&logo=github-sponsors&logoColor=white)](https://github.com/sponsors/JyotirmoyBhowmik)
+
+Your sponsorship directly funds continuous open-source improvements, new enterprise integrations, and comprehensive documentation.
 
 ---
 
