@@ -48,6 +48,7 @@ interface InteractiveGanttProps {
   onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
   onAddDependency?: (dep: { predecessor_id: string; successor_id: string; type: 'FS' | 'SS' | 'FF' | 'SF'; lag_days: number }) => void;
   onAddTask?: (task: { title: string; start_date: string; duration_days: number; priority: string; is_milestone: boolean }) => void;
+  onAddTaskClick?: () => void;
   onRecalculateCPM?: () => void;
   onOpenExportModal?: () => void;
   onOpenImportModal?: () => void;
@@ -64,6 +65,7 @@ export function InteractiveGantt({
   onTaskUpdate,
   onAddDependency,
   onAddTask,
+  onAddTaskClick,
   onRecalculateCPM,
   onOpenExportModal,
   onOpenImportModal,
@@ -500,7 +502,7 @@ export function InteractiveGantt({
 
           <Button
             size="sm"
-            onClick={() => setIsAddTaskModalOpen(true)}
+            onClick={() => (onAddTaskClick ? onAddTaskClick() : setIsAddTaskModalOpen(true))}
             className="gap-1.5 text-xs"
           >
             <Plus className="h-3.5 w-3.5" />

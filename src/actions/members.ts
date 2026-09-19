@@ -34,15 +34,48 @@ export async function getWorkspaceMembersAction(
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true });
 
-    if (error) {
-      logger.warn('Failed to fetch tenant memberships', {
-        fn: 'getWorkspaceMembersAction',
-        ctx: { tenantId, error: error.message },
-      });
-      return { success: false, error: error.message, correlation_id: correlationId };
+    if (!error && data) {
+      return { success: true, data, correlation_id: correlationId };
     }
 
-    return { success: true, data: data || [], correlation_id: correlationId };
+    // Resilient fallback if schema cache or alias has transient issues
+    const { data: rawMembers, error: rawError } = await supabase
+      .from('tenant_memberships')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
+
+    if (rawError) {
+      logger.warn('Failed to fetch tenant memberships', {
+        fn: 'getWorkspaceMembersAction',
+        ctx: { tenantId, error: rawError.message },
+      });
+      return { success: false, error: rawError.message, correlation_id: correlationId };
+    }
+
+    const userIds = (rawMembers || []).map((m) => m.user_id).filter(Boolean);
+    const profileMap = new Map<string, any>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, avatar_url, is_superadmin')
+        .in('id', userIds);
+
+      (profiles || []).forEach((p) => profileMap.set(p.id, p));
+    }
+
+    const stitched: TenantMembership[] = (rawMembers || []).map((m) => ({
+      ...m,
+      user: profileMap.get(m.user_id) || {
+        id: m.user_id,
+        email: 'user@workspace.internal',
+        full_name: 'Workspace Member',
+        avatar_url: null,
+        is_superadmin: false,
+      },
+    }));
+
+    return { success: true, data: stitched, correlation_id: correlationId };
   } catch (err: any) {
     logger.error('Exception in getWorkspaceMembersAction', { fn: 'getWorkspaceMembersAction', err });
     return { success: false, error: err?.message || 'Failed to fetch members', correlation_id: correlationId };
@@ -100,6 +133,7 @@ export async function provisionMemberAction(
     }
 
     // 2. Upsert membership
+    let memberData: any = null;
     const { data: membership, error: memError } = await supabase
       .from('tenant_memberships')
       .upsert(
@@ -117,12 +151,45 @@ export async function provisionMemberAction(
       .select('*, user:profiles(id, email, full_name, avatar_url)')
       .single();
 
-    if (memError) {
-      logger.error('Failed to upsert tenant membership during provisioning', {
-        fn: 'provisionMemberAction',
-        ctx: { error: memError.message },
-      });
-      return { success: false, error: memError.message, correlation_id: correlationId };
+    if (!memError && membership) {
+      memberData = membership;
+    } else {
+      // Resilient fallback with flat select
+      const { data: fallbackMem, error: fallbackError } = await supabase
+        .from('tenant_memberships')
+        .upsert(
+          {
+            tenant_id,
+            user_id: targetUserId,
+            role,
+            is_active: true,
+            is_suspended: false,
+            invited_by: currentUser.id,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'tenant_id,user_id' }
+        )
+        .select('*')
+        .single();
+
+      if (fallbackError) {
+        logger.error('Failed to upsert tenant membership during provisioning', {
+          fn: 'provisionMemberAction',
+          ctx: { error: fallbackError.message },
+        });
+        return { success: false, error: fallbackError.message, correlation_id: correlationId };
+      }
+
+      memberData = {
+        ...fallbackMem,
+        user: {
+          id: targetUserId,
+          email: email.toLowerCase().trim(),
+          full_name,
+          avatar_url: null,
+          is_superadmin: false,
+        },
+      };
     }
 
     // 3. Assign to team if specified

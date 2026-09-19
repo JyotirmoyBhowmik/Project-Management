@@ -458,15 +458,18 @@ function ProjectWorkspaceContent() {
                 );
                 await refreshProjectData();
               }}
+              onAddTaskClick={() => setIsAddTaskModalOpen(true)}
               onAddTask={async (task) => {
                 if (!projectId || !tenantId) return;
+                const calculatedEnd = new Date(task.start_date);
+                calculatedEnd.setDate(calculatedEnd.getDate() + (task.duration_days > 0 ? task.duration_days : 1));
                 await dbService.createTask(
                   {
                     project_id: projectId,
                     tenant_id: tenantId,
                     title: task.title,
                     start_date: task.start_date,
-                    end_date: task.start_date,
+                    end_date: calculatedEnd.toISOString().split('T')[0],
                     duration_days: task.duration_days,
                     priority: task.priority,
                     status: 'todo',

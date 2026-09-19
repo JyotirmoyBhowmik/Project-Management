@@ -1,6 +1,6 @@
 # Repository Map - Enterprise PMS
 
-> Generated on 2026-09-19T14:17:03.121Z | **149** source files | **37,475** lines of code | **858** indexed symbols | **373** dependency relations
+> Generated on 2026-09-19T16:02:37.632Z | **152** source files | **37,717** lines of code | **860** indexed symbols | **373** dependency relations
 
 Compact AST symbol map (classes, functions, interfaces, types, components) with 1-based relative line numbers. Elides implementation bodies to optimize for AI token budget.
 
@@ -37,16 +37,16 @@ L179: export function deleteProjectAction
 L292: export function purgeTenantAction
 ```
 
-### `src/actions/members.ts` (412 lines)
+### `src/actions/members.ts` (479 lines)
 ```typescript
 L25: export function getWorkspaceMembersAction
-L52: export function provisionMemberAction
-L158: export function updateMemberRoleAction
-L207: export function toggleMemberSuspensionAction
-L250: export function revokeMemberSessionsAction
-L285: export function removeMemberAction
-L327: export function getCrossTenantUsersAction
-L377: export function toggleGlobalUserLockAction
+L85: export function provisionMemberAction
+L225: export function updateMemberRoleAction
+L274: export function toggleMemberSuspensionAction
+L317: export function revokeMemberSessionsAction
+L352: export function removeMemberAction
+L394: export function getCrossTenantUsersAction
+L444: export function toggleGlobalUserLockAction
 ```
 
 ### `src/actions/sprints.ts` (287 lines)
@@ -307,7 +307,7 @@ L28: export const useEnterpriseTheme
 L8: export function createClient
 ```
 
-### `src/lib/supabase/db-service.ts` (1844 lines)
+### `src/lib/supabase/db-service.ts` (1924 lines)
 ```typescript
 L37: function getSupabase
 L42: export class DatabaseService
@@ -320,69 +320,69 @@ L42: export class DatabaseService
   L186: getTenantMembers(...)
   L227: getUserGuestAccess(...)
   L253: getTenantProjects(...)
-  L289: getProjectDetails(...)
-  L310: createProject(...)
-  L333: updateProject(...)
-  L356: getProjectPhases(...)
-  L384: getProjectTasks(...)
-  L409: getTasksForProject(...)
-  L413: getProjectDependencies(...)
-  L433: getDependenciesForProject(...)
-  L437: createDependency(...)
-  L475: deleteDependency(...)
-  L492: createTask(...)
-  L524: updateTask(...)
-  L525: updateTask(...)
-  L526: updateTask(...)
-  L570: getWorkingCalendar(...)
-  L596: getCalendarHolidays(...)
-  L615: getProjectBaselines(...)
-  L632: getBaselineSnapshots(...)
-  L647: createBaselineSnapshot(...)
-  L704: getUserNotifications(...)
-  L721: markNotificationRead(...)
-  L739: createNotification(...)
-  L771: getSystemThemes(...)
-  L788: updateSystemTheme(...)
-  L810: getTenantTheme(...)
-  L835: setTenantTheme(...)
-  L866: getTenantTaskStatuses(...)
-  L882: createTenantTaskStatus(...)
-  L907: updateTenantTaskStatus(...)
-  L928: deleteTenantTaskStatus(...)
-  L946: getTenantTaskPriorities(...)
-  L962: createTenantTaskPriority(...)
-  L987: updateTenantTaskPriority(...)
-  L1008: deleteTenantTaskPriority(...)
-  L1026: getTenantTaskTypes(...)
-  L1041: createTenantTaskType(...)
-  L1065: deleteTenantTaskType(...)
-  L1083: getTenantCustomFields(...)
-  L1099: createTenantCustomField(...)
-  L1123: deleteTenantCustomField(...)
-  L1141: getTenantRolePermissions(...)
-  L1156: updateRolePermission(...)
-  L1182: hasPermission(...)
-  L1191: saveWorkingCalendar(...)
-  L1225: addCalendarHoliday(...)
-  L1270: deleteCalendarHoliday(...)
-  L1288: getAuditLogs(...)
-  L1316: createAuditLog(...)
-  L1344: getAllUsers(...)
-  L1366: getGlobalAuditLogs(...)
-  L1389: lockProjectBaseline(...)
-  L1414: getTaskComments(...)
-  L1434: createTaskComment(...)
-  L1481: getTaskActivityLogs(...)
-  L1501: createTaskActivityLog(...)
-  L1543: getTaskAttachments(...)
-  L1563: createTaskAttachmentRecord(...)
-  L1618: deleteTaskAttachmentRecord(...)
-  L1645: getAttachmentSignedUrl(...)
-  L1671: getTenantMembersWithProfiles(...)
-L1719: export component_or_fn DEFAULT_THEME_TOKENS
-L1745: export component_or_fn DEFAULT_SYSTEM_THEMES
-L1843: export const dbService
+  L291: getProjectDetails(...)
+  L313: createProject(...)
+  L336: updateProject(...)
+  L359: getProjectPhases(...)
+  L387: getProjectTasks(...)
+  L413: getTasksForProject(...)
+  L417: getProjectDependencies(...)
+  L437: getDependenciesForProject(...)
+  L441: createDependency(...)
+  L479: deleteDependency(...)
+  L496: createTask(...)
+  L528: updateTask(...)
+  L529: updateTask(...)
+  L530: updateTask(...)
+  L574: getWorkingCalendar(...)
+  L600: getCalendarHolidays(...)
+  L619: getProjectBaselines(...)
+  L636: getBaselineSnapshots(...)
+  L651: createBaselineSnapshot(...)
+  L708: getUserNotifications(...)
+  L725: markNotificationRead(...)
+  L743: createNotification(...)
+  L775: getSystemThemes(...)
+  L792: updateSystemTheme(...)
+  L814: getTenantTheme(...)
+  L839: setTenantTheme(...)
+  L870: getTenantTaskStatuses(...)
+  L886: createTenantTaskStatus(...)
+  L911: updateTenantTaskStatus(...)
+  L932: deleteTenantTaskStatus(...)
+  L950: getTenantTaskPriorities(...)
+  L966: createTenantTaskPriority(...)
+  L991: updateTenantTaskPriority(...)
+  L1012: deleteTenantTaskPriority(...)
+  L1030: getTenantTaskTypes(...)
+  L1045: createTenantTaskType(...)
+  L1069: deleteTenantTaskType(...)
+  L1087: getTenantCustomFields(...)
+  L1103: createTenantCustomField(...)
+  L1127: deleteTenantCustomField(...)
+  L1145: getTenantRolePermissions(...)
+  L1160: updateRolePermission(...)
+  L1186: hasPermission(...)
+  L1195: saveWorkingCalendar(...)
+  L1229: addCalendarHoliday(...)
+  L1274: deleteCalendarHoliday(...)
+  L1292: getAuditLogs(...)
+  L1367: createAuditLog(...)
+  L1395: getAllUsers(...)
+  L1446: getGlobalAuditLogs(...)
+  L1469: lockProjectBaseline(...)
+  L1494: getTaskComments(...)
+  L1514: createTaskComment(...)
+  L1561: getTaskActivityLogs(...)
+  L1581: createTaskActivityLog(...)
+  L1623: getTaskAttachments(...)
+  L1643: createTaskAttachmentRecord(...)
+  L1698: deleteTaskAttachmentRecord(...)
+  L1725: getAttachmentSignedUrl(...)
+  L1751: getTenantMembersWithProfiles(...)
+L1799: export component_or_fn DEFAULT_THEME_TOKENS
+L1825: export component_or_fn DEFAULT_SYSTEM_THEMES
+L1923: export const dbService
 ```
 
 ### `src/lib/supabase/mock-db.ts` (1739 lines)
@@ -595,17 +595,17 @@ L192: component_or_fn handleFileUpload
 L253: component_or_fn handleCommitImport
 ```
 
-### `src/components/gantt/InteractiveGantt.tsx` (1225 lines)
+### `src/components/gantt/InteractiveGantt.tsx` (1227 lines)
 ```typescript
 L41: interface InteractiveGanttProps { ... }
-L57: export function InteractiveGantt
-L173: component_or_fn handleMouseDown
-L260: component_or_fn handleMouseMove
-L338: component_or_fn onGlobalMouseMove
-L342: component_or_fn onGlobalMouseUp
-L356: component_or_fn handleConnectorMouseUp
-L398: component_or_fn handleTaskClick
-L403: component_or_fn handleCreateTask
+L58: export function InteractiveGantt
+L175: component_or_fn handleMouseDown
+L262: component_or_fn handleMouseMove
+L340: component_or_fn onGlobalMouseMove
+L344: component_or_fn onGlobalMouseUp
+L358: component_or_fn handleConnectorMouseUp
+L400: component_or_fn handleTaskClick
+L405: component_or_fn handleCreateTask
 ```
 
 ### `src/components/graphify/GraphCanvas.tsx` (638 lines)
@@ -773,7 +773,7 @@ L129: component_or_fn handleLinkTask
 L143: component_or_fn renderDocumentWithEmbeddedTasks
 ```
 
-## PAGE (20 files)
+## PAGE (22 files)
 
 ### `src/app/(auth)/login/page.tsx` (632 lines)
 ```typescript
@@ -808,6 +808,11 @@ L55: function loadTenantDetails
 ```typescript
 L30: export function CrossTenantUsersPage
 L59: component_or_fn handleToggleLock
+```
+
+### `src/app/(dashboard)/admin/page.tsx` (6 lines)
+```typescript
+L3: export function AdminRedirectPage
 ```
 
 ### `src/app/(dashboard)/admin/superadmin/help/page.tsx` (172 lines)
@@ -845,10 +850,10 @@ L47: function initSession
 L155: component_or_fn handleSignOut
 ```
 
-### `src/app/(dashboard)/page.tsx` (420 lines)
+### `src/app/(dashboard)/page.tsx` (421 lines)
 ```typescript
 L34: export function DashboardOverviewPage
-L92: component_or_fn handleCreateProject
+L93: component_or_fn handleCreateProject
 ```
 
 ### `src/app/(dashboard)/projects/page.tsx` (359 lines)
@@ -858,7 +863,7 @@ L83: component_or_fn handleCreateProject
 L115: component_or_fn getStatusBadgeVariant
 ```
 
-### `src/app/(dashboard)/projects/[projectId]/page.tsx` (665 lines)
+### `src/app/(dashboard)/projects/[projectId]/page.tsx` (668 lines)
 ```typescript
 L71: function ProjectWorkspaceContent
 L83: type ViewType
@@ -866,7 +871,7 @@ L185: function loadSnapshots
 L199: component_or_fn handleRunCPM
 L234: component_or_fn handleLockBaseline
 L392: component_or_fn Icon
-L652: export function ProjectWorkspacePage
+L655: export function ProjectWorkspacePage
 ```
 
 ### `src/app/(dashboard)/settings/automations/page.tsx` (438 lines)
@@ -897,6 +902,11 @@ L113: component_or_fn handleRoleChange
 L134: component_or_fn handleToggleSuspend
 L151: component_or_fn handleRevokeSessions
 L167: component_or_fn handleRemoveMember
+```
+
+### `src/app/(dashboard)/settings/page.tsx` (6 lines)
+```typescript
+L3: export function SettingsRedirectPage
 ```
 
 ### `src/app/(dashboard)/settings/trash/page.tsx` (230 lines)

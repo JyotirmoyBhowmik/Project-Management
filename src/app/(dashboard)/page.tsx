@@ -67,7 +67,8 @@ export default function DashboardOverviewPage() {
       const { data: fetchedTasks } = await supabase
         .from('tasks')
         .select('*')
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', tenantId)
+        .is('deleted_at', null);
       setTasks(fetchedTasks || []);
 
       // 3. Fetch Audit Logs for active tenant

@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generatedAt": "2026-09-19T14:17:03.151Z",
-    "totalFiles": 149,
+    "generatedAt": "2026-09-19T16:02:37.665Z",
+    "totalFiles": 152,
     "totalEdges": 373,
-    "totalLines": 37475,
-    "totalSymbols": 858
+    "totalLines": 37717,
+    "totalSymbols": 860
   },
   "nodes": [
     {
@@ -178,7 +178,7 @@
       "path": "src/actions/members.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 412,
+      "lines": 479,
       "symbolsCount": 8,
       "symbols": [
         {
@@ -190,43 +190,43 @@
         {
           "name": "provisionMemberAction",
           "kind": "function",
-          "line": 52,
+          "line": 85,
           "isExported": true
         },
         {
           "name": "updateMemberRoleAction",
           "kind": "function",
-          "line": 158,
+          "line": 225,
           "isExported": true
         },
         {
           "name": "toggleMemberSuspensionAction",
           "kind": "function",
-          "line": 207,
+          "line": 274,
           "isExported": true
         },
         {
           "name": "revokeMemberSessionsAction",
           "kind": "function",
-          "line": 250,
+          "line": 317,
           "isExported": true
         },
         {
           "name": "removeMemberAction",
           "kind": "function",
-          "line": 285,
+          "line": 352,
           "isExported": true
         },
         {
           "name": "getCrossTenantUsersAction",
           "kind": "function",
-          "line": 327,
+          "line": 394,
           "isExported": true
         },
         {
           "name": "toggleGlobalUserLockAction",
           "kind": "function",
-          "line": 377,
+          "line": 444,
           "isExported": true
         }
       ]
@@ -588,6 +588,23 @@
       ]
     },
     {
+      "id": "src/app/(dashboard)/admin/page.tsx",
+      "label": "page.tsx",
+      "path": "src/app/(dashboard)/admin/page.tsx",
+      "type": "page",
+      "extension": ".tsx",
+      "lines": 6,
+      "symbolsCount": 1,
+      "symbols": [
+        {
+          "name": "AdminRedirectPage",
+          "kind": "function",
+          "line": 3,
+          "isExported": true
+        }
+      ]
+    },
+    {
       "id": "src/app/(dashboard)/admin/superadmin/help/page.tsx",
       "label": "page.tsx",
       "path": "src/app/(dashboard)/admin/superadmin/help/page.tsx",
@@ -725,7 +742,7 @@
       "path": "src/app/(dashboard)/page.tsx",
       "type": "page",
       "extension": ".tsx",
-      "lines": 420,
+      "lines": 421,
       "symbolsCount": 2,
       "symbols": [
         {
@@ -737,7 +754,7 @@
         {
           "name": "handleCreateProject",
           "kind": "component_or_fn",
-          "line": 92,
+          "line": 93,
           "isExported": false
         }
       ]
@@ -777,7 +794,7 @@
       "path": "src/app/(dashboard)/projects/[projectId]/page.tsx",
       "type": "page",
       "extension": ".tsx",
-      "lines": 665,
+      "lines": 668,
       "symbolsCount": 7,
       "symbols": [
         {
@@ -819,7 +836,7 @@
         {
           "name": "ProjectWorkspacePage",
           "kind": "function",
-          "line": 652,
+          "line": 655,
           "isExported": true
         }
       ]
@@ -962,6 +979,23 @@
           "kind": "component_or_fn",
           "line": 167,
           "isExported": false
+        }
+      ]
+    },
+    {
+      "id": "src/app/(dashboard)/settings/page.tsx",
+      "label": "page.tsx",
+      "path": "src/app/(dashboard)/settings/page.tsx",
+      "type": "page",
+      "extension": ".tsx",
+      "lines": 6,
+      "symbolsCount": 1,
+      "symbols": [
+        {
+          "name": "SettingsRedirectPage",
+          "kind": "function",
+          "line": 3,
+          "isExported": true
         }
       ]
     },
@@ -1763,7 +1797,7 @@
       "path": "src/components/gantt/InteractiveGantt.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 1225,
+      "lines": 1227,
       "symbolsCount": 9,
       "symbols": [
         {
@@ -1775,49 +1809,49 @@
         {
           "name": "InteractiveGantt",
           "kind": "function",
-          "line": 57,
+          "line": 58,
           "isExported": true
         },
         {
           "name": "handleMouseDown",
           "kind": "component_or_fn",
-          "line": 173,
+          "line": 175,
           "isExported": false
         },
         {
           "name": "handleMouseMove",
           "kind": "component_or_fn",
-          "line": 260,
+          "line": 262,
           "isExported": false
         },
         {
           "name": "onGlobalMouseMove",
           "kind": "component_or_fn",
-          "line": 338,
+          "line": 340,
           "isExported": false
         },
         {
           "name": "onGlobalMouseUp",
           "kind": "component_or_fn",
-          "line": 342,
+          "line": 344,
           "isExported": false
         },
         {
           "name": "handleConnectorMouseUp",
           "kind": "component_or_fn",
-          "line": 356,
+          "line": 358,
           "isExported": false
         },
         {
           "name": "handleTaskClick",
           "kind": "component_or_fn",
-          "line": 398,
+          "line": 400,
           "isExported": false
         },
         {
           "name": "handleCreateTask",
           "kind": "component_or_fn",
-          "line": 403,
+          "line": 405,
           "isExported": false
         }
       ]
@@ -3371,7 +3405,7 @@
       "path": "src/lib/supabase/db-service.ts",
       "type": "lib",
       "extension": ".ts",
-      "lines": 1844,
+      "lines": 1924,
       "symbolsCount": 5,
       "symbols": [
         {
@@ -3389,19 +3423,19 @@
         {
           "name": "DEFAULT_THEME_TOKENS",
           "kind": "component_or_fn",
-          "line": 1719,
+          "line": 1799,
           "isExported": true
         },
         {
           "name": "DEFAULT_SYSTEM_THEMES",
           "kind": "component_or_fn",
-          "line": 1745,
+          "line": 1825,
           "isExported": true
         },
         {
           "name": "dbService",
           "kind": "const",
-          "line": 1843,
+          "line": 1923,
           "isExported": true
         }
       ]
@@ -6313,6 +6347,16 @@
           "isExported": true
         }
       ]
+    },
+    {
+      "id": "supabase/migrations/00015_fix_profiles_foreign_keys_and_audit_logs.sql",
+      "label": "00015_fix_profiles_foreign_keys_and_audit_logs.sql",
+      "path": "supabase/migrations/00015_fix_profiles_foreign_keys_and_audit_logs.sql",
+      "type": "database",
+      "extension": ".sql",
+      "lines": 77,
+      "symbolsCount": 0,
+      "symbols": []
     },
     {
       "id": "supabase/seed.sql",

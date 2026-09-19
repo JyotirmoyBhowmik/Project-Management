@@ -263,6 +263,7 @@ export class DatabaseService {
           .select('*')
           .eq('tenant_id', tenantId)
           .in('id', projectIds)
+          .is('deleted_at', null)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -273,6 +274,7 @@ export class DatabaseService {
         .from('projects')
         .select('*')
         .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -294,6 +296,7 @@ export class DatabaseService {
         .select('*')
         .eq('id', projectId)
         .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (error) {
@@ -389,6 +392,7 @@ export class DatabaseService {
         .select('*, assignees:task_assignees(*, user:profiles(*))')
         .eq('project_id', projectId)
         .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
         .order('order_index', { ascending: true });
 
       if (error) {
@@ -1306,9 +1310,56 @@ export class DatabaseService {
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
-      if (error) return { logs: [], total: 0 };
-      return { logs: data || [], total: count || 0 };
+      if (!error && data) {
+        return { logs: data, total: count ?? data.length };
+      }
+
+      // Resilient fallback: fetch flat logs and attach profiles in memory
+      logger.warn('Joined audit logs query returned error, trying fallback flat query', {
+        fn: 'dbService.getAuditLogs',
+        ctx: { tenantId, error: error?.message },
+      });
+
+      let fallbackQuery = supabase
+        .from('audit_logs')
+        .select('*', { count: 'exact' });
+
+      if (tenantId) {
+        fallbackQuery = fallbackQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: flatLogs, count: flatCount, error: flatError } = await fallbackQuery
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (flatError || !flatLogs) {
+        logger.error('Fallback audit logs query failed', {
+          fn: 'dbService.getAuditLogs',
+          ctx: { tenantId, error: flatError?.message },
+        });
+        return { logs: [], total: 0 };
+      }
+
+      const actorIds = Array.from(new Set(flatLogs.map((l: any) => l.actor_id).filter(Boolean)));
+      let profilesMap: Record<string, any> = {};
+      if (actorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', actorIds);
+        if (profiles) {
+          profilesMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]));
+        }
+      }
+
+      const mappedLogs = flatLogs.map((log: any) => ({
+        ...log,
+        actor: log.actor_id ? profilesMap[log.actor_id] || null : null,
+      }));
+
+      return { logs: mappedLogs, total: flatCount ?? mappedLogs.length };
     } catch (err) {
+      logger.error('Exception fetching audit logs', { fn: 'dbService.getAuditLogs', err });
       return { logs: [], total: 0 };
     }
   }
@@ -1348,11 +1399,40 @@ export class DatabaseService {
         .from('profiles')
         .select('*, memberships:tenant_memberships(*, tenant:tenants(id, name, slug, code))')
         .order('created_at', { ascending: false });
-      if (error) {
-        logger.warn('Error fetching all users', { fn: 'dbService.getAllUsers', ctx: { error: error.message } });
+      if (!error && data) {
+        return data;
+      }
+
+      logger.warn('Joined getAllUsers query failed, attempting flat fallback', {
+        fn: 'dbService.getAllUsers',
+        ctx: { error: error?.message },
+      });
+
+      // Resilient fallback
+      const { data: rawProfiles, error: profError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (profError || !rawProfiles) {
         return [];
       }
-      return data || [];
+
+      const { data: allMemberships } = await supabase
+        .from('tenant_memberships')
+        .select('*, tenant:tenants(id, name, slug, code)');
+
+      const membershipMap = new Map<string, any[]>();
+      (allMemberships || []).forEach((m: any) => {
+        const list = membershipMap.get(m.user_id) || [];
+        list.push(m);
+        membershipMap.set(m.user_id, list);
+      });
+
+      return rawProfiles.map((p: any) => ({
+        ...p,
+        memberships: membershipMap.get(p.id) || [],
+      }));
     } catch (err) {
       logger.error('Exception fetching all users', { fn: 'dbService.getAllUsers', err });
       return [];
