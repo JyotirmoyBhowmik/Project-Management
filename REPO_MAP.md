@@ -1,6 +1,6 @@
 # Repository Map - Enterprise PMS
 
-> Generated on 2026-09-19T16:02:37.632Z | **152** source files | **37,717** lines of code | **860** indexed symbols | **373** dependency relations
+> Generated on 2026-09-19T17:47:30.736Z | **156** source files | **38,900** lines of code | **880** indexed symbols | **390** dependency relations
 
 Compact AST symbol map (classes, functions, interfaces, types, components) with 1-based relative line numbers. Elides implementation bodies to optimize for AI token budget.
 
@@ -37,16 +37,17 @@ L179: export function deleteProjectAction
 L292: export function purgeTenantAction
 ```
 
-### `src/actions/members.ts` (479 lines)
+### `src/actions/members.ts` (579 lines)
 ```typescript
-L25: export function getWorkspaceMembersAction
-L85: export function provisionMemberAction
-L225: export function updateMemberRoleAction
-L274: export function toggleMemberSuspensionAction
-L317: export function revokeMemberSessionsAction
-L352: export function removeMemberAction
-L394: export function getCrossTenantUsersAction
-L444: export function toggleGlobalUserLockAction
+L27: export function getWorkspaceMembersAction
+L87: export function provisionMemberAction
+L228: export function updateMemberRoleAction
+L277: export function toggleMemberSuspensionAction
+L320: export function revokeMemberSessionsAction
+L355: export function removeMemberAction
+L397: export function getCrossTenantUsersAction
+L447: export function toggleGlobalUserLockAction
+L483: export function updateGlobalUserAction
 ```
 
 ### `src/actions/sprints.ts` (287 lines)
@@ -466,7 +467,7 @@ L196: export function useDynamicTheme
 L9: export function cn
 ```
 
-### `src/lib/validation/action-schemas.ts` (226 lines)
+### `src/lib/validation/action-schemas.ts` (246 lines)
 ```typescript
 L10: export interface ActionResponse { ... }
 L23: export component_or_fn TaskInputSchema
@@ -497,6 +498,8 @@ L209: export component_or_fn DeleteProjectSchema
 L216: export type DeleteProjectInput
 L218: export component_or_fn PurgeTenantSchema
 L224: export type PurgeTenantInput
+L230: export component_or_fn UpdateGlobalUserSchema
+L244: export type UpdateGlobalUserInput
 ```
 
 ### `src/lib/validation/schemas.ts` (196 lines)
@@ -527,21 +530,20 @@ L191: export component_or_fn AuthRepairSchema
 L195: export type ValidatedAuthRepair
 ```
 
-## COMPONENT (26 files)
+## COMPONENT (29 files)
 
-### `src/components/admin/SuperAdminPanel.tsx` (913 lines)
+### `src/components/admin/SuperAdminPanel.tsx` (935 lines)
 ```typescript
-L35: export function SuperAdminPanel
-L68: function loadSuperAdminData
-L95: component_or_fn showNotification
-L100: component_or_fn handleSelectThemeToEdit
-L108: component_or_fn handleUpdateToken
-L115: component_or_fn handleSaveTheme
-L124: component_or_fn handleProvisionTenant
-L165: component_or_fn toggleTenantStatus
-L177: component_or_fn handleUpdateQuota
-L204: component_or_fn toggleFeatureFlag
-L225: component_or_fn handleCloneTenant
+L37: export function SuperAdminPanel
+L94: component_or_fn showNotification
+L99: component_or_fn handleSelectThemeToEdit
+L107: component_or_fn handleUpdateToken
+L114: component_or_fn handleSaveTheme
+L123: component_or_fn handleProvisionTenant
+L164: component_or_fn toggleTenantStatus
+L176: component_or_fn handleUpdateQuota
+L203: component_or_fn toggleFeatureFlag
+L224: component_or_fn handleCloneTenant
 ```
 
 ### `src/components/admin/TenantAdminPanel.tsx` (1023 lines)
@@ -670,6 +672,32 @@ L43: component_or_fn handleDelete
 L23: interface DeleteTaskModalProps { ... }
 L34: export function DeleteTaskModal
 L48: component_or_fn handleDelete
+```
+
+### `src/components/modals/EditUserModal.tsx` (324 lines)
+```typescript
+L18: interface EditUserModalProps { ... }
+L43: export function EditUserModal
+L77: component_or_fn handleRoleChange
+L83: component_or_fn handleRemoveMembership
+L87: component_or_fn handleAddMembership
+L101: component_or_fn handleSubmit
+```
+
+### `src/components/modals/ExportProjectModal.tsx` (183 lines)
+```typescript
+L16: interface ExportProjectModalProps { ... }
+L25: export function ExportProjectModal
+L38: component_or_fn handleExport
+```
+
+### `src/components/modals/ImportProjectModal.tsx` (296 lines)
+```typescript
+L15: interface ImportProjectModalProps { ... }
+L23: export function ImportProjectModal
+L41: component_or_fn handleFileSelect
+L76: component_or_fn handleValidate
+L134: component_or_fn handleIngest
 ```
 
 ### `src/components/modals/PurgeTenantModal.tsx` (155 lines)
@@ -804,10 +832,10 @@ L31: export function TenantDangerZonePage
 L55: function loadTenantDetails
 ```
 
-### `src/app/(dashboard)/admin/multisite/users/page.tsx` (265 lines)
+### `src/app/(dashboard)/admin/multisite/users/page.tsx` (313 lines)
 ```typescript
-L30: export function CrossTenantUsersPage
-L59: component_or_fn handleToggleLock
+L33: export function CrossTenantUsersPage
+L68: component_or_fn handleToggleLock
 ```
 
 ### `src/app/(dashboard)/admin/page.tsx` (6 lines)
@@ -863,7 +891,7 @@ L83: component_or_fn handleCreateProject
 L115: component_or_fn getStatusBadgeVariant
 ```
 
-### `src/app/(dashboard)/projects/[projectId]/page.tsx` (668 lines)
+### `src/app/(dashboard)/projects/[projectId]/page.tsx` (681 lines)
 ```typescript
 L71: function ProjectWorkspaceContent
 L83: type ViewType
@@ -871,7 +899,7 @@ L185: function loadSnapshots
 L199: component_or_fn handleRunCPM
 L234: component_or_fn handleLockBaseline
 L392: component_or_fn Icon
-L655: export function ProjectWorkspacePage
+L668: export function ProjectWorkspacePage
 ```
 
 ### `src/app/(dashboard)/settings/automations/page.tsx` (438 lines)
@@ -1093,7 +1121,7 @@ L708: export interface DirectorySyncLog { ... }
 L720: export interface CrossTenantUser { ... }
 ```
 
-## DATABASE (17 files)
+## DATABASE (18 files)
 
 ### `supabase/fix_and_seed.sql` (1017 lines)
 ```typescript
@@ -1458,6 +1486,14 @@ L115: export policy directory_sync_logs_select on public.directory_sync_logs
 L124: export policy directory_sync_logs_insert on public.directory_sync_logs
 L134: export function public.get_sso_config_by_domain
 L159: export function public.purge_tenant_cascade
+```
+
+### `supabase/migrations/00016_seed_tenant_defaults_and_custom_fields.sql` (144 lines)
+```typescript
+L7: export table public.tenant_custom_fields
+L22: export table public.entity_custom_field_values
+L66: export function public.seed_tenant_defaults
+L113: export function public.handle_new_tenant_seeding
 ```
 
 ### `supabase/seed.sql` (549 lines)

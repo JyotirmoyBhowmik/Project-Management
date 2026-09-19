@@ -648,6 +648,19 @@ function ProjectWorkspaceContent() {
           </div>
         </form>
       </Modal>
+
+      {/* Import / Export Schedule Modal */}
+      {project && (
+        <ImportExportModal
+          mode={exchangeMode}
+          isOpen={exchangeMode !== null}
+          onClose={() => setExchangeMode(null)}
+          project={project}
+          tasks={tasks}
+          dependencies={dependencies}
+          onImportCompleted={refreshProjectData}
+        />
+      )}
     </div>
   );
 }

@@ -223,3 +223,23 @@ export const PurgeTenantSchema = z.object({
 
 export type PurgeTenantInput = z.infer<typeof PurgeTenantSchema>;
 
+// ------------------------------------------------------------------------------
+// 9. SuperAdmin Global User Management Schemas
+// ------------------------------------------------------------------------------
+
+export const UpdateGlobalUserSchema = z.object({
+  user_id: z.string().uuid('Valid user UUID is required'),
+  full_name: z.string().trim().min(1, 'Full name is required'),
+  email: z.string().trim().email('Valid email address is required'),
+  is_superadmin: z.boolean().default(false),
+  tenant_memberships: z.array(
+    z.object({
+      tenant_id: z.string().uuid('Valid tenant UUID is required'),
+      role: z.enum(['owner', 'admin', 'project_manager', 'member', 'guest']),
+      is_active: z.boolean().default(true),
+    })
+  ).optional(),
+});
+
+export type UpdateGlobalUserInput = z.infer<typeof UpdateGlobalUserSchema>;
+

@@ -21,6 +21,7 @@ import {
   Users,
   ShieldCheck,
   Skull,
+  Edit2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { dbService, DEFAULT_THEME_TOKENS, DEFAULT_SYSTEM_THEMES } from '@/lib/supabase/db-service';
@@ -31,11 +32,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
+import { EditUserModal } from '@/components/modals/EditUserModal';
 
 export function SuperAdminPanel() {
   const [activeTab, setActiveTab] = React.useState<'tenants' | 'users' | 'themes' | 'features' | 'audit'>('tenants');
   const [tenants, setTenants] = React.useState<Tenant[]>([]);
   const [users, setUsers] = React.useState<any[]>([]);
+  const [editingUser, setEditingUser] = React.useState<any | null>(null);
   const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>(DEFAULT_SYSTEM_THEMES);
   const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
   const [isProvisionModalOpen, setIsProvisionModalOpen] = React.useState(false);
@@ -63,34 +66,30 @@ export function SuperAdminPanel() {
   const [editingTokens, setEditingTokens] = React.useState<ThemeTokens>(DEFAULT_THEME_TOKENS);
 
   // Live Supabase Loading
-  React.useEffect(() => {
-    let isMounted = true;
-    async function loadSuperAdminData() {
-      try {
-        const [fetchedTenants, fetchedThemes, fetchedAudit, fetchedUsers] = await Promise.all([
-          dbService.getAllTenants(),
-          dbService.getSystemThemes(),
-          dbService.getAuditLogs(),
-          dbService.getAllUsers(),
-        ]);
-        if (!isMounted) return;
-        setTenants(fetchedTenants);
-        setUsers(fetchedUsers);
-        setSystemThemes(fetchedThemes);
-        setAuditLogs(fetchedAudit.logs);
-        if (fetchedThemes.length > 0) {
-          const navy = fetchedThemes.find(t => t.id === 'navy') || fetchedThemes[0];
-          setEditingTokens({ ...navy.tokens_json });
-        }
-      } catch (err) {
-        // Graceful handling
+  const loadSuperAdminData = React.useCallback(async () => {
+    try {
+      const [fetchedTenants, fetchedThemes, fetchedAudit, fetchedUsers] = await Promise.all([
+        dbService.getAllTenants(),
+        dbService.getSystemThemes(),
+        dbService.getAuditLogs(),
+        dbService.getAllUsers(),
+      ]);
+      setTenants(fetchedTenants);
+      setUsers(fetchedUsers);
+      setSystemThemes(fetchedThemes);
+      setAuditLogs(fetchedAudit.logs);
+      if (fetchedThemes.length > 0) {
+        const navy = fetchedThemes.find(t => t.id === 'navy') || fetchedThemes[0];
+        setEditingTokens({ ...navy.tokens_json });
       }
+    } catch (err) {
+      // Graceful handling
     }
-    loadSuperAdminData();
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  React.useEffect(() => {
+    loadSuperAdminData();
+  }, [loadSuperAdminData]);
 
   const showNotification = (msg: string) => {
     setNotificationMsg(msg);
@@ -403,6 +402,7 @@ export function SuperAdminPanel() {
                   <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Role</th>
                   <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Tenant Affiliations</th>
                   <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Joined</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-[var(--muted-foreground)]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -439,6 +439,17 @@ export function SuperAdminPanel() {
                     </td>
                     <td className="px-4 py-3 font-mono text-[var(--muted-foreground)]">
                       {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingUser(u)}
+                        className="h-7 px-2.5 text-[11px] gap-1 hover:border-blue-500 hover:text-blue-400"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -907,6 +918,17 @@ export function SuperAdminPanel() {
           </div>
         </form>
       </Modal>
+
+      {/* SuperAdmin Global Edit User Modal */}
+      <EditUserModal
+        isOpen={Boolean(editingUser)}
+        onClose={() => setEditingUser(null)}
+        user={editingUser}
+        allTenants={tenants}
+        onUserUpdated={() => {
+          loadSuperAdminData();
+        }}
+      />
     </div>
   );
 }

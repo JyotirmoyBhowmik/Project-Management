@@ -11,6 +11,7 @@ import {
   DependencyCreateSchema,
   sanitizeString,
 } from '@/lib/validation/schemas';
+import { UpdateGlobalUserSchema } from '@/lib/validation/action-schemas';
 
 describe('Input Validation & Boundary Enforcement', () => {
   it('should sanitize HTML tags and script injections', () => {
@@ -99,4 +100,36 @@ describe('Input Validation & Boundary Enforcement', () => {
 
     expect(parsed.success).toBe(true);
   });
+
+  it('should validate UpdateGlobalUserSchema for platform SuperAdmin operations', () => {
+    const valid = {
+      user_id: 'b0000000-0000-0000-0000-000000000099',
+      full_name: 'Elena Rostova',
+      email: 'elena.rostova@enterprise.com',
+      is_superadmin: false,
+      tenant_memberships: [
+        {
+          tenant_id: 'a0000000-0000-0000-0000-000000000001',
+          role: 'project_manager' as const,
+          is_active: true,
+        },
+      ],
+    };
+
+    const parsed = UpdateGlobalUserSchema.safeParse(valid);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('should reject UpdateGlobalUserSchema with invalid email or malformed UUID', () => {
+    const invalid = {
+      user_id: 'not-a-uuid',
+      full_name: 'Elena',
+      email: 'invalid-email',
+      is_superadmin: false,
+    };
+
+    const parsed = UpdateGlobalUserSchema.safeParse(invalid);
+    expect(parsed.success).toBe(false);
+  });
 });
+

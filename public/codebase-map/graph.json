@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generatedAt": "2026-09-19T16:02:37.665Z",
-    "totalFiles": 152,
-    "totalEdges": 373,
-    "totalLines": 37717,
-    "totalSymbols": 860
+    "generatedAt": "2026-09-19T17:47:30.761Z",
+    "totalFiles": 156,
+    "totalEdges": 390,
+    "totalLines": 38900,
+    "totalSymbols": 880
   },
   "nodes": [
     {
@@ -178,55 +178,61 @@
       "path": "src/actions/members.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 479,
-      "symbolsCount": 8,
+      "lines": 579,
+      "symbolsCount": 9,
       "symbols": [
         {
           "name": "getWorkspaceMembersAction",
           "kind": "function",
-          "line": 25,
+          "line": 27,
           "isExported": true
         },
         {
           "name": "provisionMemberAction",
           "kind": "function",
-          "line": 85,
+          "line": 87,
           "isExported": true
         },
         {
           "name": "updateMemberRoleAction",
           "kind": "function",
-          "line": 225,
+          "line": 228,
           "isExported": true
         },
         {
           "name": "toggleMemberSuspensionAction",
           "kind": "function",
-          "line": 274,
+          "line": 277,
           "isExported": true
         },
         {
           "name": "revokeMemberSessionsAction",
           "kind": "function",
-          "line": 317,
+          "line": 320,
           "isExported": true
         },
         {
           "name": "removeMemberAction",
           "kind": "function",
-          "line": 352,
+          "line": 355,
           "isExported": true
         },
         {
           "name": "getCrossTenantUsersAction",
           "kind": "function",
-          "line": 394,
+          "line": 397,
           "isExported": true
         },
         {
           "name": "toggleGlobalUserLockAction",
           "kind": "function",
-          "line": 444,
+          "line": 447,
+          "isExported": true
+        },
+        {
+          "name": "updateGlobalUserAction",
+          "kind": "function",
+          "line": 483,
           "isExported": true
         }
       ]
@@ -570,19 +576,19 @@
       "path": "src/app/(dashboard)/admin/multisite/users/page.tsx",
       "type": "page",
       "extension": ".tsx",
-      "lines": 265,
+      "lines": 313,
       "symbolsCount": 2,
       "symbols": [
         {
           "name": "CrossTenantUsersPage",
           "kind": "function",
-          "line": 30,
+          "line": 33,
           "isExported": true
         },
         {
           "name": "handleToggleLock",
           "kind": "component_or_fn",
-          "line": 59,
+          "line": 68,
           "isExported": false
         }
       ]
@@ -794,7 +800,7 @@
       "path": "src/app/(dashboard)/projects/[projectId]/page.tsx",
       "type": "page",
       "extension": ".tsx",
-      "lines": 668,
+      "lines": 681,
       "symbolsCount": 7,
       "symbols": [
         {
@@ -836,7 +842,7 @@
         {
           "name": "ProjectWorkspacePage",
           "kind": "function",
-          "line": 655,
+          "line": 668,
           "isExported": true
         }
       ]
@@ -1466,73 +1472,67 @@
       "path": "src/components/admin/SuperAdminPanel.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 913,
-      "symbolsCount": 11,
+      "lines": 935,
+      "symbolsCount": 10,
       "symbols": [
         {
           "name": "SuperAdminPanel",
           "kind": "function",
-          "line": 35,
+          "line": 37,
           "isExported": true
-        },
-        {
-          "name": "loadSuperAdminData",
-          "kind": "function",
-          "line": 68,
-          "isExported": false
         },
         {
           "name": "showNotification",
           "kind": "component_or_fn",
-          "line": 95,
+          "line": 94,
           "isExported": false
         },
         {
           "name": "handleSelectThemeToEdit",
           "kind": "component_or_fn",
-          "line": 100,
+          "line": 99,
           "isExported": false
         },
         {
           "name": "handleUpdateToken",
           "kind": "component_or_fn",
-          "line": 108,
+          "line": 107,
           "isExported": false
         },
         {
           "name": "handleSaveTheme",
           "kind": "component_or_fn",
-          "line": 115,
+          "line": 114,
           "isExported": false
         },
         {
           "name": "handleProvisionTenant",
           "kind": "component_or_fn",
-          "line": 124,
+          "line": 123,
           "isExported": false
         },
         {
           "name": "toggleTenantStatus",
           "kind": "component_or_fn",
-          "line": 165,
+          "line": 164,
           "isExported": false
         },
         {
           "name": "handleUpdateQuota",
           "kind": "component_or_fn",
-          "line": 177,
+          "line": 176,
           "isExported": false
         },
         {
           "name": "toggleFeatureFlag",
           "kind": "component_or_fn",
-          "line": 204,
+          "line": 203,
           "isExported": false
         },
         {
           "name": "handleCloneTenant",
           "kind": "component_or_fn",
-          "line": 225,
+          "line": 224,
           "isExported": false
         }
       ]
@@ -2132,6 +2132,123 @@
           "name": "handleDelete",
           "kind": "component_or_fn",
           "line": 48,
+          "isExported": false
+        }
+      ]
+    },
+    {
+      "id": "src/components/modals/EditUserModal.tsx",
+      "label": "EditUserModal.tsx",
+      "path": "src/components/modals/EditUserModal.tsx",
+      "type": "component",
+      "extension": ".tsx",
+      "lines": 324,
+      "symbolsCount": 6,
+      "symbols": [
+        {
+          "name": "EditUserModalProps",
+          "kind": "interface",
+          "line": 18,
+          "isExported": false
+        },
+        {
+          "name": "EditUserModal",
+          "kind": "function",
+          "line": 43,
+          "isExported": true
+        },
+        {
+          "name": "handleRoleChange",
+          "kind": "component_or_fn",
+          "line": 77,
+          "isExported": false
+        },
+        {
+          "name": "handleRemoveMembership",
+          "kind": "component_or_fn",
+          "line": 83,
+          "isExported": false
+        },
+        {
+          "name": "handleAddMembership",
+          "kind": "component_or_fn",
+          "line": 87,
+          "isExported": false
+        },
+        {
+          "name": "handleSubmit",
+          "kind": "component_or_fn",
+          "line": 101,
+          "isExported": false
+        }
+      ]
+    },
+    {
+      "id": "src/components/modals/ExportProjectModal.tsx",
+      "label": "ExportProjectModal.tsx",
+      "path": "src/components/modals/ExportProjectModal.tsx",
+      "type": "component",
+      "extension": ".tsx",
+      "lines": 183,
+      "symbolsCount": 3,
+      "symbols": [
+        {
+          "name": "ExportProjectModalProps",
+          "kind": "interface",
+          "line": 16,
+          "isExported": false
+        },
+        {
+          "name": "ExportProjectModal",
+          "kind": "function",
+          "line": 25,
+          "isExported": true
+        },
+        {
+          "name": "handleExport",
+          "kind": "component_or_fn",
+          "line": 38,
+          "isExported": false
+        }
+      ]
+    },
+    {
+      "id": "src/components/modals/ImportProjectModal.tsx",
+      "label": "ImportProjectModal.tsx",
+      "path": "src/components/modals/ImportProjectModal.tsx",
+      "type": "component",
+      "extension": ".tsx",
+      "lines": 296,
+      "symbolsCount": 5,
+      "symbols": [
+        {
+          "name": "ImportProjectModalProps",
+          "kind": "interface",
+          "line": 15,
+          "isExported": false
+        },
+        {
+          "name": "ImportProjectModal",
+          "kind": "function",
+          "line": 23,
+          "isExported": true
+        },
+        {
+          "name": "handleFileSelect",
+          "kind": "component_or_fn",
+          "line": 41,
+          "isExported": false
+        },
+        {
+          "name": "handleValidate",
+          "kind": "component_or_fn",
+          "line": 76,
+          "isExported": false
+        },
+        {
+          "name": "handleIngest",
+          "kind": "component_or_fn",
+          "line": 134,
           "isExported": false
         }
       ]
@@ -3610,8 +3727,8 @@
       "path": "src/lib/validation/action-schemas.ts",
       "type": "lib",
       "extension": ".ts",
-      "lines": 226,
-      "symbolsCount": 29,
+      "lines": 246,
+      "symbolsCount": 31,
       "symbols": [
         {
           "name": "ActionResponse",
@@ -3785,6 +3902,18 @@
           "name": "PurgeTenantInput",
           "kind": "type",
           "line": 224,
+          "isExported": true
+        },
+        {
+          "name": "UpdateGlobalUserSchema",
+          "kind": "component_or_fn",
+          "line": 230,
+          "isExported": true
+        },
+        {
+          "name": "UpdateGlobalUserInput",
+          "kind": "type",
+          "line": 244,
           "isExported": true
         }
       ]
@@ -6359,6 +6488,41 @@
       "symbols": []
     },
     {
+      "id": "supabase/migrations/00016_seed_tenant_defaults_and_custom_fields.sql",
+      "label": "00016_seed_tenant_defaults_and_custom_fields.sql",
+      "path": "supabase/migrations/00016_seed_tenant_defaults_and_custom_fields.sql",
+      "type": "database",
+      "extension": ".sql",
+      "lines": 144,
+      "symbolsCount": 4,
+      "symbols": [
+        {
+          "name": "public.tenant_custom_fields",
+          "kind": "table",
+          "line": 7,
+          "isExported": true
+        },
+        {
+          "name": "public.entity_custom_field_values",
+          "kind": "table",
+          "line": 22,
+          "isExported": true
+        },
+        {
+          "name": "public.seed_tenant_defaults",
+          "kind": "function",
+          "line": 66,
+          "isExported": true
+        },
+        {
+          "name": "public.handle_new_tenant_seeding",
+          "kind": "function",
+          "line": 113,
+          "isExported": true
+        }
+      ]
+    },
+    {
       "id": "supabase/seed.sql",
       "label": "seed.sql",
       "path": "supabase/seed.sql",
@@ -6724,7 +6888,7 @@
       "path": "tests/unit/validation.test.ts",
       "type": "test",
       "extension": ".ts",
-      "lines": 103,
+      "lines": 136,
       "symbolsCount": 0,
       "symbols": []
     },
@@ -6973,8 +7137,10 @@
       "specifiers": [
         "ProvisionMemberSchema",
         "UpdateMemberRoleSchema",
+        "UpdateGlobalUserSchema",
         "ProvisionMemberInput",
         "UpdateMemberRoleInput",
+        "UpdateGlobalUserInput",
         "ActionResponse"
       ],
       "line": 13
@@ -7339,16 +7505,17 @@
       "specifiers": [
         "useTenantStore"
       ],
-      "line": 22
+      "line": 23
     },
     {
       "source": "src/app/(dashboard)/admin/multisite/users/page.tsx",
       "target": "src/types/database.ts",
       "type": "imports",
       "specifiers": [
-        "CrossTenantUser"
+        "CrossTenantUser",
+        "Tenant"
       ],
-      "line": 23
+      "line": 24
     },
     {
       "source": "src/app/(dashboard)/admin/multisite/users/page.tsx",
@@ -7357,7 +7524,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 24
+      "line": 25
     },
     {
       "source": "src/app/(dashboard)/admin/multisite/users/page.tsx",
@@ -7366,7 +7533,7 @@
       "specifiers": [
         "Input"
       ],
-      "line": 25
+      "line": 26
     },
     {
       "source": "src/app/(dashboard)/admin/multisite/users/page.tsx",
@@ -7375,7 +7542,7 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 26
+      "line": 27
     },
     {
       "source": "src/app/(dashboard)/admin/multisite/users/page.tsx",
@@ -7385,7 +7552,25 @@
         "getCrossTenantUsersAction",
         "toggleGlobalUserLockAction"
       ],
-      "line": 27
+      "line": 28
+    },
+    {
+      "source": "src/app/(dashboard)/admin/multisite/users/page.tsx",
+      "target": "src/lib/supabase/db-service.ts",
+      "type": "imports",
+      "specifiers": [
+        "dbService"
+      ],
+      "line": 29
+    },
+    {
+      "source": "src/app/(dashboard)/admin/multisite/users/page.tsx",
+      "target": "src/components/modals/EditUserModal.tsx",
+      "type": "imports",
+      "specifiers": [
+        "EditUserModal"
+      ],
+      "line": 30
     },
     {
       "source": "src/app/(dashboard)/admin/superadmin/page.tsx",
@@ -8664,7 +8849,7 @@
         "DEFAULT_THEME_TOKENS",
         "DEFAULT_SYSTEM_THEMES"
       ],
-      "line": 26
+      "line": 27
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -8673,7 +8858,7 @@
       "specifiers": [
         "createClient"
       ],
-      "line": 27
+      "line": 28
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -8685,7 +8870,7 @@
         "Tenant",
         "AuditLog"
       ],
-      "line": 28
+      "line": 29
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -8694,7 +8879,7 @@
       "specifiers": [
         "Button"
       ],
-      "line": 29
+      "line": 30
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -8703,7 +8888,7 @@
       "specifiers": [
         "Input"
       ],
-      "line": 30
+      "line": 31
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -8712,7 +8897,7 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 31
+      "line": 32
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -8721,7 +8906,7 @@
       "specifiers": [
         "Modal"
       ],
-      "line": 32
+      "line": 33
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -8730,7 +8915,16 @@
       "specifiers": [
         "Tabs"
       ],
-      "line": 33
+      "line": 34
+    },
+    {
+      "source": "src/components/admin/SuperAdminPanel.tsx",
+      "target": "src/components/modals/EditUserModal.tsx",
+      "type": "imports",
+      "specifiers": [
+        "EditUserModal"
+      ],
+      "line": 35
     },
     {
       "source": "src/components/admin/TenantAdminPanel.tsx",
@@ -9313,6 +9507,126 @@
         "deleteTaskAction"
       ],
       "line": 20
+    },
+    {
+      "source": "src/components/modals/EditUserModal.tsx",
+      "target": "src/components/ui/button.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Button"
+      ],
+      "line": 10
+    },
+    {
+      "source": "src/components/modals/EditUserModal.tsx",
+      "target": "src/components/ui/input.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Input"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/components/modals/EditUserModal.tsx",
+      "target": "src/components/ui/badge.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Badge"
+      ],
+      "line": 12
+    },
+    {
+      "source": "src/components/modals/EditUserModal.tsx",
+      "target": "src/components/ui/dialog.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Modal"
+      ],
+      "line": 13
+    },
+    {
+      "source": "src/components/modals/EditUserModal.tsx",
+      "target": "src/types/database.ts",
+      "type": "imports",
+      "specifiers": [
+        "Tenant",
+        "UserTenantRole"
+      ],
+      "line": 14
+    },
+    {
+      "source": "src/components/modals/EditUserModal.tsx",
+      "target": "src/actions/members.ts",
+      "type": "imports",
+      "specifiers": [
+        "updateGlobalUserAction"
+      ],
+      "line": 15
+    },
+    {
+      "source": "src/components/modals/ExportProjectModal.tsx",
+      "target": "src/components/ui/button.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Button"
+      ],
+      "line": 10
+    },
+    {
+      "source": "src/components/modals/ExportProjectModal.tsx",
+      "target": "src/components/ui/badge.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Badge"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/components/modals/ExportProjectModal.tsx",
+      "target": "src/components/ui/dialog.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Modal"
+      ],
+      "line": 12
+    },
+    {
+      "source": "src/components/modals/ExportProjectModal.tsx",
+      "target": "src/types/database.ts",
+      "type": "imports",
+      "specifiers": [
+        "Project",
+        "Task",
+        "TaskDependency"
+      ],
+      "line": 13
+    },
+    {
+      "source": "src/components/modals/ImportProjectModal.tsx",
+      "target": "src/components/ui/button.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Button"
+      ],
+      "line": 10
+    },
+    {
+      "source": "src/components/modals/ImportProjectModal.tsx",
+      "target": "src/components/ui/badge.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Badge"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/components/modals/ImportProjectModal.tsx",
+      "target": "src/components/ui/dialog.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Modal"
+      ],
+      "line": 12
     },
     {
       "source": "src/components/modals/PurgeTenantModal.tsx",
@@ -10477,6 +10791,15 @@
         "sanitizeString"
       ],
       "line": 7
+    },
+    {
+      "source": "tests/unit/validation.test.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "UpdateGlobalUserSchema"
+      ],
+      "line": 14
     }
   ]
 }

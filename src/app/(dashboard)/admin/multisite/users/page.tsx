@@ -18,13 +18,16 @@ import {
   Building2,
   CheckCircle2,
   AlertOctagon,
+  Edit2,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
-import { CrossTenantUser } from '@/types/database';
+import { CrossTenantUser, Tenant } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { getCrossTenantUsersAction, toggleGlobalUserLockAction } from '@/actions/members';
+import { dbService } from '@/lib/supabase/db-service';
+import { EditUserModal } from '@/components/modals/EditUserModal';
 import { toast } from 'sonner';
 
 export default function CrossTenantUsersPage() {
@@ -32,6 +35,8 @@ export default function CrossTenantUsersPage() {
   const isSuperadmin = Boolean(currentUser?.is_superadmin) || currentUser?.email === 'admin@jyotirmoyb.com';
 
   const [users, setUsers] = React.useState<CrossTenantUser[]>([]);
+  const [allTenants, setAllTenants] = React.useState<Tenant[]>([]);
+  const [editingUser, setEditingUser] = React.useState<any | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filterProvider, setFilterProvider] = React.useState<string>('all');
   const [isLoading, setIsLoading] = React.useState(true);
@@ -39,7 +44,11 @@ export default function CrossTenantUsersPage() {
   const loadUsers = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await getCrossTenantUsersAction();
+      const [res, fetchedTenants] = await Promise.all([
+        getCrossTenantUsersAction(),
+        dbService.getAllTenants(),
+      ]);
+      setAllTenants(fetchedTenants);
       if (res.success && res.data) {
         setUsers(res.data);
       } else {
@@ -229,28 +238,56 @@ export default function CrossTenantUsersPage() {
                     </td>
 
                     <td className="py-3 px-4 text-right">
-                      {!u.is_superadmin && (
+                      <div className="flex items-center justify-end gap-1.5">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleToggleLock(u.id, Boolean(u.is_suspended))}
-                          className={`text-xs gap-1.5 ${
-                            u.is_suspended ? 'text-emerald-400 border-emerald-500/30' : 'text-amber-400 border-amber-500/30'
-                          }`}
+                          onClick={() =>
+                            setEditingUser({
+                              ...u,
+                              memberships: (u.tenants || []).map((t) => ({
+                                tenant_id: t.tenant_id,
+                                role: t.role as any,
+                                is_active: t.is_active,
+                                tenant: {
+                                  id: t.tenant_id,
+                                  name: t.tenant_name,
+                                  slug: t.tenant_name.toLowerCase().replace(/\s+/g, '-'),
+                                },
+                              })),
+                            })
+                          }
+                          className="text-xs gap-1 hover:border-blue-500 hover:text-blue-400"
                         >
-                          {u.is_suspended ? (
-                            <>
-                              <Unlock className="w-3 h-3" />
-                              <span>Unlock Account</span>
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="w-3 h-3" />
-                              <span>Lock Account</span>
-                            </>
-                          )}
+                          <Edit2 className="w-3 h-3" />
+                          <span>Edit</span>
                         </Button>
-                      )}
+
+                        {!u.is_superadmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleLock(u.id, Boolean(u.is_suspended))}
+                            className={`text-xs gap-1.5 ${
+                              u.is_suspended
+                                ? 'text-emerald-400 border-emerald-500/30'
+                                : 'text-amber-400 border-amber-500/30'
+                            }`}
+                          >
+                            {u.is_suspended ? (
+                              <>
+                                <Unlock className="w-3 h-3" />
+                                <span>Unlock</span>
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="w-3 h-3" />
+                                <span>Lock</span>
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -259,6 +296,17 @@ export default function CrossTenantUsersPage() {
           </div>
         )}
       </div>
+
+      {/* Global Edit User Modal */}
+      <EditUserModal
+        isOpen={Boolean(editingUser)}
+        onClose={() => setEditingUser(null)}
+        user={editingUser}
+        allTenants={allTenants}
+        onUserUpdated={() => {
+          loadUsers();
+        }}
+      />
     </div>
   );
 }

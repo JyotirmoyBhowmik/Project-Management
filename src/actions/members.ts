@@ -13,8 +13,10 @@ import { logger } from '@/lib/logger/logger';
 import {
   ProvisionMemberSchema,
   UpdateMemberRoleSchema,
+  UpdateGlobalUserSchema,
   type ProvisionMemberInput,
   type UpdateMemberRoleInput,
+  type UpdateGlobalUserInput,
   type ActionResponse,
 } from '@/lib/validation/action-schemas';
 
@@ -201,12 +203,13 @@ export async function provisionMemberAction(
     }
 
     // 4. Record audit log
+    const activeMembership = memberData || membership;
     await supabase.from('audit_logs').insert({
       tenant_id,
-      actor_id: currentUser.id,
+      actor_id: currentUser?.id || '00000000-0000-0000-0000-000000000000',
       action: 'MEMBER_PROVISIONED',
       entity_type: 'tenant_membership',
-      entity_id: membership.id,
+      entity_id: activeMembership?.id || targetUserId,
       details: { email, role, target_user_id: targetUserId },
     });
 
@@ -215,7 +218,7 @@ export async function provisionMemberAction(
       revalidatePath('/admin/tenant');
     } catch {}
 
-    return { success: true, data: membership, correlation_id: correlationId };
+    return { success: true, data: activeMembership, correlation_id: correlationId };
   } catch (err: any) {
     logger.error('Exception in provisionMemberAction', { fn: 'provisionMemberAction', err });
     return { success: false, error: err?.message || 'Failed to provision member', correlation_id: correlationId };
@@ -474,5 +477,102 @@ export async function toggleGlobalUserLockAction(
     return { success: true, correlation_id: correlationId };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Failed to update user lock state', correlation_id: correlationId };
+  }
+}
+
+export async function updateGlobalUserAction(
+  rawInput: UpdateGlobalUserInput
+): Promise<ActionResponse<void>> {
+  const correlationId = `act-update-global-user-${Date.now()}`;
+  try {
+    const parsed = UpdateGlobalUserSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues.map((i) => i.message).join(', '),
+        correlation_id: correlationId,
+      };
+    }
+
+    const { user_id, full_name, email, is_superadmin, tenant_memberships } = parsed.data;
+    const supabase = await createServerSupabaseClient();
+    const { data: { user: caller } } = await supabase.auth.getUser();
+
+    // Verify caller is SuperAdmin
+    if (caller) {
+      const { data: callerProfile } = await supabase
+        .from('profiles')
+        .select('is_superadmin, email')
+        .eq('id', caller.id)
+        .maybeSingle();
+
+      const isCallerSuperAdmin =
+        callerProfile?.is_superadmin === true ||
+        caller.email === 'admin@jyotirmoyb.com';
+
+      if (!isCallerSuperAdmin) {
+        return {
+          success: false,
+          error: 'Forbidden: Platform SuperAdmin authorization required to modify global user profiles',
+          correlation_id: correlationId,
+        };
+      }
+    }
+
+    // 1. Update public.profiles
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: full_name.trim(),
+        email: email.toLowerCase().trim(),
+        is_superadmin,
+      })
+      .eq('id', user_id);
+
+    if (profileError) {
+      logger.error('Failed to update user profile in updateGlobalUserAction', {
+        fn: 'updateGlobalUserAction',
+        ctx: { user_id, error: profileError.message },
+      });
+      return { success: false, error: profileError.message, correlation_id: correlationId };
+    }
+
+    // 2. Synchronize tenant memberships if provided
+    if (tenant_memberships && Array.isArray(tenant_memberships)) {
+      for (const m of tenant_memberships) {
+        await supabase
+          .from('tenant_memberships')
+          .upsert(
+            {
+              tenant_id: m.tenant_id,
+              user_id,
+              role: m.role,
+              is_active: m.is_active,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'tenant_id,user_id' }
+          );
+      }
+    }
+
+    // 3. Log audit event
+    await supabase.from('audit_logs').insert({
+      actor_id: caller?.id || null,
+      action: 'GLOBAL_USER_PROFILE_UPDATED',
+      entity_type: 'profile',
+      entity_id: user_id,
+      details: { full_name, email, is_superadmin, tenant_count: tenant_memberships?.length || 0 },
+    });
+
+    try {
+      revalidatePath('/admin/superadmin');
+      revalidatePath('/admin/multisite/users');
+      revalidatePath('/settings/members');
+    } catch {}
+
+    return { success: true, correlation_id: correlationId };
+  } catch (err: any) {
+    logger.error('Exception in updateGlobalUserAction', { fn: 'updateGlobalUserAction', err });
+    return { success: false, error: err?.message || 'Failed to update global user', correlation_id: correlationId };
   }
 }
