@@ -10,6 +10,7 @@ import * as React from 'react';
 import { ThemeTokens, SystemTheme } from '@/types/database';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { dbService, DEFAULT_THEME_TOKENS, DEFAULT_SYSTEM_THEMES } from '@/lib/supabase/db-service';
+import { createClient } from '@/lib/supabase/client';
 
 interface DynamicThemeContextType {
   activeThemeId: string;
@@ -53,14 +54,34 @@ export function generateCssVariables(tokens: ThemeTokens): string {
 }
 
 export function DynamicThemeProvider({ children }: { children: React.ReactNode }) {
-  const { activeTenant } = useTenantStore();
+  const { activeTenant, currentUser } = useTenantStore();
   const tenantId = activeTenant?.id;
+  const supabase = React.useMemo(() => createClient(), []);
 
   const [activeThemeId, setActiveThemeId] = React.useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('pms_theme_preference');
+      if (stored) return stored;
+    }
     return activeTenant?.branding_json?.theme_preset || 'navy';
   });
   const [tokens, setTokens] = React.useState<ThemeTokens>(DEFAULT_THEME_TOKENS);
   const [systemThemes, setSystemThemes] = React.useState<SystemTheme[]>(DEFAULT_SYSTEM_THEMES);
+
+  // Apply theme class to <html> element
+  const applyThemeClass = React.useCallback((themeId: string) => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.classList.forEach((cls) => {
+      if (cls.startsWith('theme-')) root.classList.remove(cls);
+    });
+    root.classList.add(`theme-${themeId}`);
+    if (themeId === 'light') {
+      root.classList.remove('dark');
+    } else {
+      root.classList.add('dark');
+    }
+  }, []);
 
   // Refresh theme when tenant changes or mounts
   React.useEffect(() => {
@@ -71,10 +92,23 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
       if (!isMounted) return;
       setSystemThemes(themes);
 
+      const savedTheme = (typeof window !== 'undefined' && localStorage.getItem('pms_theme_preference')) ||
+        currentUser?.theme_preference ||
+        activeTenant?.branding_json?.theme_preset ||
+        'navy';
+
+      setActiveThemeId(savedTheme);
+      applyThemeClass(savedTheme);
+
       if (tenantId) {
         const tenantTokens = await dbService.getTenantTheme(tenantId);
         if (!isMounted) return;
         setTokens(tenantTokens);
+      } else {
+        const matched = themes.find((t) => t.id === savedTheme);
+        if (matched && isMounted) {
+          setTokens(matched.tokens_json);
+        }
       }
     }
 
@@ -83,22 +117,38 @@ export function DynamicThemeProvider({ children }: { children: React.ReactNode }
     return () => {
       isMounted = false;
     };
-  }, [tenantId]);
+  }, [tenantId, currentUser, activeTenant, applyThemeClass]);
 
   const setTheme = React.useCallback(
     async (themeId: string) => {
       setActiveThemeId(themeId);
-      const matched = systemThemes.find(t => t.id === themeId);
+      applyThemeClass(themeId);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pms_theme_preference', themeId);
+      }
+
+      const matched = systemThemes.find((t) => t.id === themeId);
       if (matched) {
         setTokens(matched.tokens_json);
       }
+
+      // Persist to user profile if authenticated
+      if (currentUser?.id) {
+        supabase
+          .from('profiles')
+          .update({ theme_preference: themeId })
+          .eq('id', currentUser.id)
+          .then();
+      }
+
       if (tenantId) {
         await dbService.setTenantTheme(tenantId, themeId, {});
         const newTokens = await dbService.getTenantTheme(tenantId);
         setTokens(newTokens);
       }
     },
-    [tenantId, systemThemes]
+    [tenantId, systemThemes, currentUser, supabase, applyThemeClass]
   );
 
   const updateCustomTokens = React.useCallback(

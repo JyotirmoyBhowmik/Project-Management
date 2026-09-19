@@ -42,6 +42,13 @@ AS $$
   );
 $$;
 
+-- ============ COLUMNS ENSURANCE ============
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS theme_preference text DEFAULT 'navy';
+ALTER TABLE public.calendar_holidays ALTER COLUMN calendar_id DROP NOT NULL;
+ALTER TABLE public.task_baseline_snapshots ADD COLUMN IF NOT EXISTS planned_start_date date;
+ALTER TABLE public.task_baseline_snapshots ADD COLUMN IF NOT EXISTS planned_end_date date;
+
 -- ============ RLS POLICIES ============
 
 -- TENANTS
@@ -107,17 +114,25 @@ CREATE POLICY "cal_admin_mutate" ON public.working_calendars
 DROP POLICY IF EXISTS "hol_superadmin_all" ON public.calendar_holidays;
 DROP POLICY IF EXISTS "hol_member_select" ON public.calendar_holidays;
 DROP POLICY IF EXISTS "hol_admin_mutate" ON public.calendar_holidays;
-CREATE POLICY "hol_superadmin_all" ON public.calendar_holidays FOR ALL USING (public.is_superadmin());
+CREATE POLICY "hol_superadmin_all" ON public.calendar_holidays FOR ALL USING (public.is_superadmin()) WITH CHECK (public.is_superadmin());
 CREATE POLICY "hol_member_select" ON public.calendar_holidays FOR SELECT USING (public.is_tenant_member(auth.uid(), tenant_id));
 CREATE POLICY "hol_admin_mutate" ON public.calendar_holidays
-  FOR ALL USING (public.get_user_tenant_role(auth.uid(), tenant_id) IN ('owner', 'admin', 'tenant_admin'));
+  FOR ALL
+  USING (public.is_superadmin() OR public.get_user_tenant_role(auth.uid(), tenant_id) IN ('owner', 'admin', 'tenant_admin'))
+  WITH CHECK (public.is_superadmin() OR public.get_user_tenant_role(auth.uid(), tenant_id) IN ('owner', 'admin', 'tenant_admin'));
 
 -- AUDIT_LOGS
 DROP POLICY IF EXISTS "audit_superadmin_all" ON public.audit_logs;
 DROP POLICY IF EXISTS "audit_member_select" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_tenant_admin_select" ON public.audit_logs;
 DROP POLICY IF EXISTS "audit_insert_system" ON public.audit_logs;
 CREATE POLICY "audit_superadmin_all" ON public.audit_logs FOR ALL USING (public.is_superadmin());
-CREATE POLICY "audit_member_select" ON public.audit_logs FOR SELECT USING (public.is_tenant_member(auth.uid(), tenant_id));
+CREATE POLICY "audit_tenant_admin_select" ON public.audit_logs
+  FOR SELECT USING (
+    public.is_superadmin()
+    OR public.get_user_tenant_role(auth.uid(), tenant_id) IN ('owner', 'admin', 'tenant_admin')
+    OR public.is_tenant_member(auth.uid(), tenant_id)
+  );
 CREATE POLICY "audit_insert_system" ON public.audit_logs FOR INSERT WITH CHECK (true);
 
 -- PROJECT_BASELINES
@@ -135,24 +150,6 @@ DROP POLICY IF EXISTS "snapshots_insert" ON public.task_baseline_snapshots;
 CREATE POLICY "snapshots_superadmin_all" ON public.task_baseline_snapshots FOR ALL USING (public.is_superadmin());
 CREATE POLICY "snapshots_select" ON public.task_baseline_snapshots FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "snapshots_insert" ON public.task_baseline_snapshots FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-
--- REMAINING TABLES
-CREATE POLICY "assignees_superadmin_all" ON public.task_assignees FOR ALL USING (public.is_superadmin());
-CREATE POLICY "assignees_member_all" ON public.task_assignees FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY "notifs_superadmin_all" ON public.user_notifications FOR ALL USING (public.is_superadmin());
-CREATE POLICY "notifs_own" ON public.user_notifications FOR ALL USING (recipient_id = auth.uid());
-CREATE POLICY "tts_superadmin_all" ON public.tenant_task_statuses FOR ALL USING (public.is_superadmin());
-CREATE POLICY "tts_member_select" ON public.tenant_task_statuses FOR SELECT USING (public.is_tenant_member(auth.uid(), tenant_id));
-CREATE POLICY "ttp_superadmin_all" ON public.tenant_task_priorities FOR ALL USING (public.is_superadmin());
-CREATE POLICY "ttp_member_select" ON public.tenant_task_priorities FOR SELECT USING (public.is_tenant_member(auth.uid(), tenant_id));
-CREATE POLICY "ttt_superadmin_all" ON public.tenant_task_types FOR ALL USING (public.is_superadmin());
-CREATE POLICY "ttt_member_select" ON public.tenant_task_types FOR SELECT USING (public.is_tenant_member(auth.uid(), tenant_id));
-CREATE POLICY "trp_superadmin_all" ON public.tenant_role_permissions FOR ALL USING (public.is_superadmin());
-CREATE POLICY "trp_member_select" ON public.tenant_role_permissions FOR SELECT USING (public.is_tenant_member(auth.uid(), tenant_id));
-CREATE POLICY "themes_select_all" ON public.system_themes FOR SELECT USING (true);
-CREATE POLICY "themes_superadmin_mutate" ON public.system_themes FOR ALL USING (public.is_superadmin());
-CREATE POLICY "tto_superadmin_all" ON public.tenant_theme_overrides FOR ALL USING (public.is_superadmin());
-CREATE POLICY "tto_member_select" ON public.tenant_theme_overrides FOR SELECT USING (public.is_tenant_member(auth.uid(), tenant_id));
 
 -- ============ TRIGGERS ============
 
@@ -184,26 +181,63 @@ CREATE TRIGGER on_auth_user_created
 ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS details jsonb;
 ALTER TABLE public.audit_logs DROP CONSTRAINT IF EXISTS audit_logs_actor_id_fkey;
 ALTER TABLE public.audit_logs ALTER COLUMN actor_id DROP NOT NULL;
+ALTER TABLE public.audit_logs ALTER COLUMN entity_id TYPE text USING entity_id::text;
 
 CREATE OR REPLACE FUNCTION public.log_entity_mutation()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
-  v_action text; v_entity_id uuid; v_tenant_id uuid; v_actor_id uuid; v_details jsonb;
+  v_action text;
+  v_entity_id text;
+  v_tenant_id uuid;
+  v_actor_id uuid;
+  v_details jsonb;
 BEGIN
   v_actor_id := auth.uid();
+
+  IF TG_TABLE_NAME = 'tenants' THEN
+    IF TG_OP = 'DELETE' THEN
+      v_tenant_id := OLD.id;
+      v_entity_id := OLD.id::text;
+    ELSE
+      v_tenant_id := NEW.id;
+      v_entity_id := NEW.id::text;
+    END IF;
+  ELSE
+    IF TG_OP = 'DELETE' THEN
+      v_tenant_id := OLD.tenant_id;
+      v_entity_id := OLD.id::text;
+    ELSE
+      v_tenant_id := NEW.tenant_id;
+      v_entity_id := NEW.id::text;
+    END IF;
+  END IF;
+
   IF TG_OP = 'DELETE' THEN
-    v_action := 'DELETE'; v_entity_id := OLD.id; v_tenant_id := OLD.tenant_id;
+    v_action := 'DELETE';
     v_details := to_jsonb(OLD);
   ELSIF TG_OP = 'UPDATE' THEN
-    v_action := 'UPDATE'; v_entity_id := NEW.id; v_tenant_id := NEW.tenant_id;
+    v_action := 'UPDATE';
     v_details := jsonb_build_object('before', to_jsonb(OLD), 'after', to_jsonb(NEW));
   ELSE
-    v_action := 'INSERT'; v_entity_id := NEW.id; v_tenant_id := NEW.tenant_id;
+    v_action := 'INSERT';
     v_details := to_jsonb(NEW);
   END IF;
-  INSERT INTO public.audit_logs (id, tenant_id, actor_id, action, entity_type, entity_id, details, created_at)
-  VALUES (gen_random_uuid(), v_tenant_id, v_actor_id, v_action, TG_TABLE_NAME, v_entity_id, v_details, NOW());
+
+  INSERT INTO public.audit_logs (
+    id, tenant_id, actor_id, action, entity_type, entity_id, details, created_at
+  )
+  VALUES (
+    gen_random_uuid(),
+    v_tenant_id,
+    v_actor_id,
+    v_action,
+    TG_TABLE_NAME,
+    v_entity_id,
+    v_details,
+    NOW()
+  );
+
   IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
@@ -221,27 +255,65 @@ DROP TRIGGER IF EXISTS audit_memberships_mutation ON public.tenant_memberships;
 CREATE TRIGGER audit_memberships_mutation AFTER INSERT OR UPDATE OR DELETE ON public.tenant_memberships
   FOR EACH ROW EXECUTE FUNCTION public.log_entity_mutation();
 
+DROP TRIGGER IF EXISTS audit_tenants_mutation ON public.tenants;
+CREATE TRIGGER audit_tenants_mutation AFTER INSERT OR UPDATE OR DELETE ON public.tenants
+  FOR EACH ROW EXECUTE FUNCTION public.log_entity_mutation();
+
 -- ============ BASELINE LOCKING RPC ============
 
+DROP FUNCTION IF EXISTS public.lock_project_baseline(uuid, text, uuid);
+DROP FUNCTION IF EXISTS public.lock_project_baseline(uuid, text);
+
 CREATE OR REPLACE FUNCTION public.lock_project_baseline(
-  p_project_id uuid, p_baseline_name text, p_tenant_id uuid DEFAULT NULL
+  p_project_id uuid,
+  p_baseline_name text,
+  p_tenant_id uuid DEFAULT NULL
 )
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
 AS $$
-DECLARE v_baseline_id uuid; v_tenant uuid;
+DECLARE
+  v_baseline_id uuid;
+  v_tenant_id uuid;
 BEGIN
   IF p_tenant_id IS NULL THEN
-    SELECT tenant_id INTO v_tenant FROM public.projects WHERE id = p_project_id;
-  ELSE v_tenant := p_tenant_id;
+    SELECT tenant_id INTO v_tenant_id FROM public.projects WHERE id = p_project_id;
+  ELSE
+    v_tenant_id := p_tenant_id;
   END IF;
-  IF v_tenant IS NULL THEN RAISE EXCEPTION 'Project not found: %', p_project_id; END IF;
+
+  IF v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'Project % not found', p_project_id;
+  END IF;
+
   v_baseline_id := gen_random_uuid();
-  INSERT INTO public.project_baselines (id, project_id, tenant_id, name, snapshot_date, created_by, created_at)
-  VALUES (v_baseline_id, p_project_id, v_tenant, p_baseline_name, CURRENT_DATE, auth.uid(), NOW());
-  INSERT INTO public.task_baseline_snapshots (id, baseline_id, task_id, title, start_date, end_date, duration_days, progress, created_at)
-  SELECT gen_random_uuid(), v_baseline_id, t.id, t.title, t.start_date, t.end_date, t.duration_days,
-    COALESCE(t.progress, t.progress_percent, 0), NOW()
-  FROM public.tasks t WHERE t.project_id = p_project_id;
+  INSERT INTO public.project_baselines (
+    id, project_id, tenant_id, name, snapshot_date, created_by, created_at
+  )
+  VALUES (
+    v_baseline_id, p_project_id, v_tenant_id, p_baseline_name, CURRENT_DATE, auth.uid(), NOW()
+  );
+
+  INSERT INTO public.task_baseline_snapshots (
+    id, baseline_id, task_id, title, start_date, end_date, planned_start_date, planned_end_date, duration_days, progress, created_at
+  )
+  SELECT
+    gen_random_uuid(),
+    v_baseline_id,
+    t.id,
+    t.title,
+    t.start_date,
+    t.end_date,
+    t.start_date,
+    t.end_date,
+    t.duration_days,
+    COALESCE(t.progress, t.progress_percent, 0),
+    NOW()
+  FROM public.tasks t
+  WHERE t.project_id = p_project_id;
+
   RETURN v_baseline_id;
 END;
 $$;

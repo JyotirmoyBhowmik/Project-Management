@@ -60,6 +60,7 @@ export interface UserProfile {
   full_name: string;
   avatar_url: string | null;
   is_superadmin: boolean;
+  theme_preference?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -220,6 +221,7 @@ export interface AuditLog {
   action: 'INSERT' | 'UPDATE' | 'DELETE' | 'SECURITY_OVERRIDE';
   entity_type: string;
   entity_id: string;
+  details?: Record<string, unknown> | null;
   diff_before: Record<string, unknown> | null;
   diff_after: Record<string, unknown> | null;
   correlation_id: string | null;

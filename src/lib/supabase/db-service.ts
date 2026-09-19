@@ -435,9 +435,11 @@ export class DatabaseService {
   public async createTask(taskData: Partial<Task>, client?: any): Promise<Task | null> {
     const supabase = getSupabase(client);
     try {
+      // Sanitize taskData to exclude non-column fields like 'code' or 'assignees'
+      const { code, assignees, ...safeTaskData } = taskData as any;
       const payload = {
-        ...taskData,
-        id: taskData.id || crypto.randomUUID(),
+        ...safeTaskData,
+        id: safeTaskData.id || crypto.randomUUID(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -478,8 +480,9 @@ export class DatabaseService {
 
     const supabase = getSupabase(client);
     try {
+      const { code, assignees, ...safeUpdates } = updates as any;
       const payload = {
-        ...updates,
+        ...safeUpdates,
         updated_at: new Date().toISOString(),
       };
       let query = supabase.from('tasks').update(payload).eq('id', taskId);
@@ -1160,11 +1163,31 @@ export class DatabaseService {
     client?: any
   ): Promise<CalendarHoliday> {
     const supabase = getSupabase(client);
-    const payload = {
+    
+    // Format strictly as ISO YYYY-MM-DD string to avoid timezone roll-overs
+    const rawDate = (holiday as any).date || (holiday as any).holiday_date || new Date().toISOString().split('T')[0];
+    const formattedDate = typeof rawDate === 'string' && rawDate.includes('T') 
+      ? rawDate.split('T')[0] 
+      : String(rawDate).substring(0, 10);
+
+    let calendarId = (holiday as any).calendar_id;
+    if (!calendarId && holiday.tenant_id) {
+      const defaultCal = await this.getWorkingCalendar(holiday.tenant_id, client);
+      calendarId = defaultCal?.id || null;
+    }
+
+    const payload: any = {
       ...holiday,
       id: crypto.randomUUID(),
+      tenant_id: holiday.tenant_id,
+      calendar_id: calendarId,
+      name: holiday.name,
+      date: formattedDate,
+      holiday_date: formattedDate,
+      is_recurring: holiday.is_recurring !== undefined ? Boolean(holiday.is_recurring) : false,
       created_at: new Date().toISOString(),
     };
+
     try {
       const { data, error } = await supabase
         .from('calendar_holidays')
@@ -1175,7 +1198,8 @@ export class DatabaseService {
       if (error) throw error;
       return data;
     } catch (err) {
-      return payload as CalendarHoliday;
+      logger.error('Failed adding calendar holiday', { fn: 'dbService.addCalendarHoliday', err });
+      throw err;
     }
   }
 
@@ -1388,6 +1412,58 @@ export const DEFAULT_SYSTEM_THEMES: SystemTheme[] = [
       card: '#111827',
       popover: '#111827',
       primary: '#6366f1',
+    },
+  },
+  {
+    id: 'monokai-oled',
+    name: 'Monokai OLED',
+    description: 'Deep pitch black OLED background with vibrant Monokai accents',
+    tokens_json: {
+      ...DEFAULT_THEME_TOKENS,
+      background: '#000000',
+      foreground: '#f8f8f2',
+      card: '#0d0d0d',
+      card_foreground: '#f8f8f2',
+      popover: '#121212',
+      popover_foreground: '#f8f8f2',
+      primary: '#a6e22e',
+      primary_foreground: '#000000',
+      secondary: '#272822',
+      secondary_foreground: '#f8f8f2',
+      muted: '#1e1e1e',
+      muted_foreground: '#75715e',
+      accent: '#66d9ef',
+      destructive: '#f92672',
+      border: '#2a2a2a',
+      input: '#1a1a1a',
+      ring: '#a6e22e',
+      critical_path: '#f92672',
+    },
+  },
+  {
+    id: 'high-contrast',
+    name: 'High Contrast',
+    description: 'Maximum contrast theme for high visibility & accessibility compliance',
+    tokens_json: {
+      ...DEFAULT_THEME_TOKENS,
+      background: '#000000',
+      foreground: '#ffffff',
+      card: '#0a0a0a',
+      card_foreground: '#ffffff',
+      popover: '#0a0a0a',
+      popover_foreground: '#ffffff',
+      primary: '#ffff00',
+      primary_foreground: '#000000',
+      secondary: '#222222',
+      secondary_foreground: '#ffffff',
+      muted: '#1a1a1a',
+      muted_foreground: '#cccccc',
+      accent: '#00ffff',
+      destructive: '#ff0000',
+      border: '#ffffff',
+      input: '#333333',
+      ring: '#ffff00',
+      critical_path: '#ff0055',
     },
   },
 ];

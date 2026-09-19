@@ -38,6 +38,16 @@ export function SuperAdminPanel() {
   const [isProvisionModalOpen, setIsProvisionModalOpen] = React.useState(false);
   const [notificationMsg, setNotificationMsg] = React.useState<string | null>(null);
 
+  // Quota Adjustment State
+  const [selectedTenantForQuota, setSelectedTenantForQuota] = React.useState<Tenant | null>(null);
+  const [quotaInputGB, setQuotaInputGB] = React.useState<number>(10);
+  const [isQuotaModalOpen, setIsQuotaModalOpen] = React.useState(false);
+
+  // Audit Filter State
+  const [auditTenantFilter, setAuditTenantFilter] = React.useState<string>('all');
+  const [auditActionFilter, setAuditActionFilter] = React.useState<string>('all');
+  const [auditSearch, setAuditSearch] = React.useState<string>('');
+
   // New Tenant Form State
   const [name, setName] = React.useState('');
   const [code, setCode] = React.useState('');
@@ -160,6 +170,33 @@ export function SuperAdminPanel() {
       showNotification(`Tenant ${target.code} status changed to ${newStatus.toUpperCase()}.`);
     }
   };
+
+  const handleUpdateQuota = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTenantForQuota) return;
+    const mb = Math.max(1, quotaInputGB) * 1024;
+    const supabase = createClient();
+    await supabase.from('tenants').update({ storage_quota_mb: mb }).eq('id', selectedTenantForQuota.id);
+    const refreshed = await dbService.getAllTenants();
+    setTenants(refreshed);
+    setIsQuotaModalOpen(false);
+    showNotification(`Storage quota for ${selectedTenantForQuota.code} updated to ${quotaInputGB} GB.`);
+  };
+
+  const filteredAuditLogs = React.useMemo(() => {
+    return auditLogs.filter((log) => {
+      if (auditTenantFilter !== 'all' && log.tenant_id !== auditTenantFilter) return false;
+      if (auditActionFilter !== 'all' && log.action !== auditActionFilter) return false;
+      if (auditSearch.trim()) {
+        const q = auditSearch.toLowerCase();
+        const matchEntity = log.entity_type?.toLowerCase().includes(q);
+        const matchId = log.entity_id?.toLowerCase().includes(q);
+        const matchActor = (log as any).actor_id?.toLowerCase().includes(q);
+        if (!matchEntity && !matchId && !matchActor) return false;
+      }
+      return true;
+    });
+  }, [auditLogs, auditTenantFilter, auditActionFilter, auditSearch]);
 
   const toggleFeatureFlag = async (tenantId: string, flag: string) => {
     const target = tenants.find(t => t.id === tenantId);
@@ -293,6 +330,19 @@ export function SuperAdminPanel() {
 
                 {/* Tenant Controls */}
                 <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedTenantForQuota(tenant);
+                      setQuotaInputGB(Math.round((tenant.storage_quota_mb || 10240) / 1024));
+                      setIsQuotaModalOpen(true);
+                    }}
+                    className="gap-1 text-xs"
+                  >
+                    <HardDrive className="h-3.5 w-3.5" />
+                    Adjust Quota
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -647,35 +697,87 @@ export function SuperAdminPanel() {
       {/* Tab: Global Audit */}
       {activeTab === 'audit' && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold text-[var(--foreground)]">Cross-Tenant Global Compliance Audit Stream</h2>
               <p className="text-xs text-[var(--muted-foreground)]">
                 Unified audit event ledger across all tenant boundaries.
               </p>
             </div>
-            <Badge variant="outline" className="font-mono">{auditLogs.length} Events</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono">{filteredAuditLogs.length} Events</Badge>
+            </div>
           </div>
 
-          <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden text-xs">
-            {auditLogs.slice(0, 15).map((log) => (
-              <div key={log.id} className="p-3 bg-[var(--card)] space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={log.action === 'DELETE' ? 'destructive' : log.action === 'INSERT' ? 'success' : 'secondary'}>
-                      {log.action}
-                    </Badge>
-                    <span className="font-semibold text-[var(--foreground)] capitalize">{log.entity_type}</span>
-                    <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{log.entity_id}</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{log.created_at}</span>
-                </div>
-                <div className="text-[11px] text-[var(--muted-foreground)] font-mono flex items-center justify-between">
-                  <span>Tenant: {log.tenant_id}</span>
-                  <span>Trace: {log.correlation_id}</span>
-                </div>
+          {/* Audit Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+            <select
+              value={auditTenantFilter}
+              onChange={(e) => setAuditTenantFilter(e.target.value)}
+              className="rounded-md border border-[var(--border)] bg-[var(--secondary)] px-2.5 py-1.5 text-xs text-[var(--foreground)] focus:outline-none"
+            >
+              <option value="all">All Workspaces</option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.code})
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={auditActionFilter}
+              onChange={(e) => setAuditActionFilter(e.target.value)}
+              className="rounded-md border border-[var(--border)] bg-[var(--secondary)] px-2.5 py-1.5 text-xs text-[var(--foreground)] focus:outline-none"
+            >
+              <option value="all">All Actions</option>
+              <option value="INSERT">INSERT</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+
+            <Input
+              value={auditSearch}
+              onChange={(e) => setAuditSearch(e.target.value)}
+              placeholder="Search by entity or ID..."
+              className="text-xs py-1"
+            />
+          </div>
+
+          <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden text-xs max-h-[500px] overflow-y-auto">
+            {filteredAuditLogs.length === 0 ? (
+              <div className="p-8 text-center text-[var(--muted-foreground)] text-xs">
+                No audit events match the current filter criteria.
               </div>
-            ))}
+            ) : (
+              filteredAuditLogs.slice(0, 50).map((log) => (
+                <div key={log.id} className="p-3 bg-[var(--card)] space-y-1 hover:bg-[var(--secondary)]/20 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={log.action === 'DELETE' ? 'destructive' : log.action === 'INSERT' ? 'success' : 'secondary'}>
+                        {log.action}
+                      </Badge>
+                      <span className="font-semibold text-[var(--foreground)] capitalize">{log.entity_type}</span>
+                      <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{log.entity_id}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                      {log.created_at ? new Date(log.created_at).toLocaleString() : '-'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-[var(--muted-foreground)] font-mono flex items-center justify-between">
+                    <span>Tenant ID: {log.tenant_id || 'System'}</span>
+                    <span>Actor: {log.actor_id || 'System'}</span>
+                  </div>
+                  {log.details && (
+                    <details className="text-[10px] font-mono text-[var(--muted-foreground)] cursor-pointer mt-1">
+                      <summary className="hover:text-[var(--foreground)]">View Mutation Payload Diff</summary>
+                      <pre className="p-2 mt-1 rounded bg-[var(--secondary)] text-[10px] overflow-x-auto whitespace-pre-wrap">
+                        {JSON.stringify(log.details, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -747,6 +849,42 @@ export function SuperAdminPanel() {
               Cancel
             </Button>
             <Button type="submit">Provision Tenant</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Storage Quota Modal */}
+      <Modal
+        isOpen={isQuotaModalOpen}
+        onClose={() => setIsQuotaModalOpen(false)}
+        title={`Adjust Storage Quota - ${selectedTenantForQuota?.name || ''}`}
+        description="Update maximum database and file storage allocation for this workspace partition."
+      >
+        <form onSubmit={handleUpdateQuota} className="space-y-4 text-xs">
+          <div>
+            <label className="font-semibold block mb-1">Storage Allocation (Gigabytes)</label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="1"
+                max="1000"
+                value={quotaInputGB}
+                onChange={(e) => setQuotaInputGB(parseInt(e.target.value, 10) || 1)}
+                required
+                className="font-mono"
+              />
+              <span className="text-xs font-semibold text-[var(--muted-foreground)]">GB</span>
+            </div>
+            <p className="text-[11px] text-[var(--muted-foreground)] mt-1">
+              Equivalent to {(quotaInputGB * 1024).toLocaleString()} MB isolated partition.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
+            <Button type="button" variant="outline" onClick={() => setIsQuotaModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">Update Allocation</Button>
           </div>
         </form>
       </Modal>

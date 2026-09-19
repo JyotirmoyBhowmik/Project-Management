@@ -28,6 +28,7 @@ import {
   ArrowLeft,
   Loader2,
   FolderGit2,
+  AlertCircle,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { createClient } from '@/lib/supabase/client';
@@ -57,7 +58,7 @@ import { ImportExportModal } from '@/components/exchange/ImportExportModal';
 import { useProjectPresence } from '@/lib/realtime/presence-service';
 import { calculateCPM } from '@/lib/cpm/cpm-engine';
 
-export default function ProjectWorkspacePage() {
+function ProjectWorkspaceContent() {
   const params = useParams();
   const router = useRouter();
   const projectId = params?.projectId as string;
@@ -66,7 +67,8 @@ export default function ProjectWorkspacePage() {
   const { activeTenant, activeRole, currentUser } = useTenantStore();
 
   const searchParams = useSearchParams();
-  const viewParam = searchParams?.get('view') || 'gantt';
+  const rawView = searchParams?.get('view') || 'gantt';
+  const viewParam = rawView === 'heatmap' ? 'resource' : rawView;
   const validViews = ['gantt', 'kanban', 'grid', 'calendar', 'resource'] as const;
   type ViewType = typeof validViews[number];
   const activeView: ViewType = (validViews as readonly string[]).includes(viewParam) ? (viewParam as ViewType) : 'gantt';
@@ -184,27 +186,39 @@ export default function ProjectWorkspacePage() {
     setIsSubmittingTask(true);
     setTaskError(null);
     try {
-      await dbService.createTask(
+      const duration = Math.max(0, Number(newTaskDuration) || 1);
+      let calculatedEndDate = newTaskStart;
+      if (duration > 1) {
+        const start = new Date(newTaskStart);
+        start.setDate(start.getDate() + (duration - 1));
+        calculatedEndDate = start.toISOString().split('T')[0];
+      }
+
+      const created = await dbService.createTask(
         {
           project_id: projectId,
           tenant_id: tenantId,
           title: newTaskTitle.trim(),
-          duration_days: Number(newTaskDuration) || 1,
+          duration_days: duration,
           start_date: newTaskStart,
-          end_date: newTaskStart,
+          end_date: calculatedEndDate,
           priority: newTaskPriority,
           status: 'todo',
           progress: 0,
-          is_milestone: Number(newTaskDuration) === 0,
+          is_milestone: duration === 0,
           order_index: tasks.length + 1,
           created_by: userId || null,
         },
         supabase
       );
 
+      if (created) {
+        setTasks((prev) => [...prev, created]);
+      }
       setIsAddTaskModalOpen(false);
       setNewTaskTitle('');
       setNewTaskCode('');
+      setTaskError(null);
       await refreshProjectData();
     } catch (err: any) {
       const pgCode = err?.code || '';
@@ -479,7 +493,6 @@ export default function ProjectWorkspacePage() {
                     project_id: projectId,
                     tenant_id: tenantId,
                     title: task.title,
-                    code: `TSK-${tasks.length + 1}`,
                     start_date: task.start_date,
                     end_date: task.start_date,
                     duration_days: task.duration_days,
@@ -541,6 +554,15 @@ export default function ProjectWorkspacePage() {
         title="Add New Work Item"
       >
         <form onSubmit={handleCreateTask} className="space-y-4">
+          {taskError && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-semibold">Task Creation Failed</span>
+                <p className="text-[11px] opacity-90 mt-0.5">{taskError}</p>
+              </div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[var(--foreground)]">Task Title</label>
             <Input
@@ -652,5 +674,19 @@ export default function ProjectWorkspacePage() {
         </form>
       </Modal>
     </div>
+  );
+}
+
+export default function ProjectWorkspacePage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex h-96 items-center justify-center">
+          <RefreshCw className="h-6 w-6 animate-spin text-[var(--primary)]" />
+        </div>
+      }
+    >
+      <ProjectWorkspaceContent />
+    </React.Suspense>
   );
 }
