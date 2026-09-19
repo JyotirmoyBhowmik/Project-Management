@@ -1,6 +1,6 @@
 # Repository Map - Enterprise PMS
 
-> Generated on 2026-09-19T20:52:49.301Z | **164** source files | **42,871** lines of code | **947** indexed symbols | **415** dependency relations
+> Generated on 2026-09-19T21:03:26.613Z | **167** source files | **43,760** lines of code | **957** indexed symbols | **419** dependency relations
 
 Compact AST symbol map (classes, functions, interfaces, types, components) with 1-based relative line numbers. Elides implementation bodies to optimize for AI token budget.
 
@@ -519,17 +519,17 @@ L232: export component_or_fn UpdateGlobalUserSchema
 L246: export type UpdateGlobalUserInput
 ```
 
-### `src/lib/validation/config-schemas.ts` (148 lines)
+### `src/lib/validation/config-schemas.ts` (150 lines)
 ```typescript
 L9: export component_or_fn SupportedAppIcons
 L26: export type SupportedAppIcon
 L28: export component_or_fn ControlFeaturesSchema
-L47: export type ControlFeatures
-L49: export component_or_fn SecurityControlsSchema
-L73: export type SecurityControls
-L75: export component_or_fn GlobalAppConfigSchema
-L114: export type GlobalAppConfig
-L116: export component_or_fn DEFAULT_GLOBAL_APP_CONFIG
+L48: export type ControlFeatures
+L50: export component_or_fn SecurityControlsSchema
+L74: export type SecurityControls
+L76: export component_or_fn GlobalAppConfigSchema
+L115: export type GlobalAppConfig
+L117: export component_or_fn DEFAULT_GLOBAL_APP_CONFIG
 ```
 
 ### `src/lib/validation/schemas.ts` (196 lines)
@@ -560,18 +560,31 @@ L191: export component_or_fn AuthRepairSchema
 L195: export type ValidatedAuthRepair
 ```
 
-## COMPONENT (30 files)
+## COMPONENT (31 files)
 
-### `src/components/admin/GlobalConfigManager.tsx` (709 lines)
+### `src/components/admin/CodebaseVisualizer.tsx` (844 lines)
 ```typescript
-L52: export function GlobalConfigManager
-L68: component_or_fn handleSave
-L79: component_or_fn handleReset
-L85: component_or_fn updateFeatureFlag
-L95: component_or_fn ActiveIconComponent
-L155: component_or_fn Icon
-L238: component_or_fn IconComp
-L457: component_or_fn Icon
+L38: export interface CodebaseNode { ... }
+L58: export interface CodebaseEdge { ... }
+L66: export interface CodebaseGraphData { ... }
+L78: component_or_fn CATEGORY_COLORS
+L91: export function CodebaseVisualizer
+L228: component_or_fn handleCopyPath
+L236: component_or_fn handleMouseDown
+L243: component_or_fn handleMouseMove
+L251: component_or_fn handleMouseUp
+```
+
+### `src/components/admin/GlobalConfigManager.tsx` (716 lines)
+```typescript
+L53: export function GlobalConfigManager
+L69: component_or_fn handleSave
+L80: component_or_fn handleReset
+L86: component_or_fn updateFeatureFlag
+L96: component_or_fn ActiveIconComponent
+L156: component_or_fn Icon
+L239: component_or_fn IconComp
+L464: component_or_fn Icon
 ```
 
 ### `src/components/admin/SuperAdminPanel.tsx` (944 lines)
@@ -703,11 +716,11 @@ L98: component_or_fn handleSignOut
 L108: component_or_fn closeAllMenus
 ```
 
-### `src/components/layout/Sidebar.tsx` (245 lines)
+### `src/components/layout/Sidebar.tsx` (257 lines)
 ```typescript
-L31: export function Sidebar
-L147: component_or_fn Icon
-L178: component_or_fn Icon
+L32: export function Sidebar
+L159: component_or_fn Icon
+L190: component_or_fn Icon
 ```
 
 ### `src/components/modals/DeleteProjectModal.tsx` (153 lines)
@@ -876,7 +889,7 @@ L358: component_or_fn renderDocumentWithEmbeddedTasks
 L437: component_or_fn renderDocTreeItem
 ```
 
-## PAGE (23 files)
+## PAGE (24 files)
 
 ### `src/app/(auth)/login/page.tsx` (652 lines)
 ```typescript
@@ -886,6 +899,11 @@ L106: component_or_fn checkDomainSSO
 L131: component_or_fn handleSSOLogin
 L166: component_or_fn handleLogin
 L639: export function LoginPage
+```
+
+### `src/app/(dashboard)/admin/architecture/page.tsx` (14 lines)
+```typescript
+L11: export function ArchitecturePage
 ```
 
 ### `src/app/(dashboard)/admin/multisite/diagnostics/page.tsx` (284 lines)

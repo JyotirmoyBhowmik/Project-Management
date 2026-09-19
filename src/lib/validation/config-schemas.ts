@@ -36,6 +36,7 @@ export const ControlFeaturesSchema = z.object({
   enable_scim: z.boolean().default(true),
   enable_sso: z.boolean().default(true),
   enable_sla_milestone_alerts: z.boolean().default(true),
+  enable_codebase_visualizer: z.boolean().default(true),
   enable_public_registration: z.boolean().default(false),
   maintenance_mode: z.boolean().default(false),
   maintenance_message: z
@@ -134,6 +135,7 @@ export const DEFAULT_GLOBAL_APP_CONFIG: GlobalAppConfig = {
     enable_scim: true,
     enable_sso: true,
     enable_sla_milestone_alerts: true,
+    enable_codebase_visualizer: true,
     enable_public_registration: false,
     maintenance_mode: false,
     maintenance_message: 'Platform is currently undergoing scheduled maintenance. Please check back shortly.',

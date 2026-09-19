@@ -23,6 +23,7 @@ import {
   Users,
   KeyRound,
   Sliders,
+  Boxes,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { useAppConfig } from '@/lib/context/app-config-context';
@@ -112,6 +113,17 @@ export function Sidebar() {
       disabled: !isSuperadmin,
       restrictedMessage: 'Requires SuperAdmin role',
     },
+    ...(isFeatureEnabled('enable_codebase_visualizer')
+      ? [
+          {
+            label: 'Codebase Architecture',
+            href: '/admin/architecture',
+            icon: Boxes,
+            disabled: isGuest && !isSuperadmin,
+            restrictedMessage: 'Restricted for guest accounts',
+          },
+        ]
+      : []),
   ];
 
   return (

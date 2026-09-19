@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generatedAt": "2026-09-19T20:52:49.337Z",
-    "totalFiles": 164,
-    "totalEdges": 415,
-    "totalLines": 42871,
-    "totalSymbols": 947
+    "generatedAt": "2026-09-19T21:03:26.641Z",
+    "totalFiles": 167,
+    "totalEdges": 419,
+    "totalLines": 43760,
+    "totalSymbols": 957
   },
   "nodes": [
     {
@@ -520,6 +520,23 @@
           "name": "LoginPage",
           "kind": "function",
           "line": 639,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "src/app/(dashboard)/admin/architecture/page.tsx",
+      "label": "page.tsx",
+      "path": "src/app/(dashboard)/admin/architecture/page.tsx",
+      "type": "page",
+      "extension": ".tsx",
+      "lines": 14,
+      "symbolsCount": 1,
+      "symbols": [
+        {
+          "name": "ArchitecturePage",
+          "kind": "function",
+          "line": 11,
           "isExported": true
         }
       ]
@@ -1513,60 +1530,125 @@
       ]
     },
     {
+      "id": "src/components/admin/CodebaseVisualizer.tsx",
+      "label": "CodebaseVisualizer.tsx",
+      "path": "src/components/admin/CodebaseVisualizer.tsx",
+      "type": "component",
+      "extension": ".tsx",
+      "lines": 844,
+      "symbolsCount": 9,
+      "symbols": [
+        {
+          "name": "CodebaseNode",
+          "kind": "interface",
+          "line": 38,
+          "isExported": true
+        },
+        {
+          "name": "CodebaseEdge",
+          "kind": "interface",
+          "line": 58,
+          "isExported": true
+        },
+        {
+          "name": "CodebaseGraphData",
+          "kind": "interface",
+          "line": 66,
+          "isExported": true
+        },
+        {
+          "name": "CATEGORY_COLORS",
+          "kind": "component_or_fn",
+          "line": 78,
+          "isExported": false
+        },
+        {
+          "name": "CodebaseVisualizer",
+          "kind": "function",
+          "line": 91,
+          "isExported": true
+        },
+        {
+          "name": "handleCopyPath",
+          "kind": "component_or_fn",
+          "line": 228,
+          "isExported": false
+        },
+        {
+          "name": "handleMouseDown",
+          "kind": "component_or_fn",
+          "line": 236,
+          "isExported": false
+        },
+        {
+          "name": "handleMouseMove",
+          "kind": "component_or_fn",
+          "line": 243,
+          "isExported": false
+        },
+        {
+          "name": "handleMouseUp",
+          "kind": "component_or_fn",
+          "line": 251,
+          "isExported": false
+        }
+      ]
+    },
+    {
       "id": "src/components/admin/GlobalConfigManager.tsx",
       "label": "GlobalConfigManager.tsx",
       "path": "src/components/admin/GlobalConfigManager.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 709,
+      "lines": 716,
       "symbolsCount": 8,
       "symbols": [
         {
           "name": "GlobalConfigManager",
           "kind": "function",
-          "line": 52,
+          "line": 53,
           "isExported": true
         },
         {
           "name": "handleSave",
           "kind": "component_or_fn",
-          "line": 68,
+          "line": 69,
           "isExported": false
         },
         {
           "name": "handleReset",
           "kind": "component_or_fn",
-          "line": 79,
+          "line": 80,
           "isExported": false
         },
         {
           "name": "updateFeatureFlag",
           "kind": "component_or_fn",
-          "line": 85,
+          "line": 86,
           "isExported": false
         },
         {
           "name": "ActiveIconComponent",
           "kind": "component_or_fn",
-          "line": 95,
+          "line": 96,
           "isExported": false
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 155,
+          "line": 156,
           "isExported": false
         },
         {
           "name": "IconComp",
           "kind": "component_or_fn",
-          "line": 238,
+          "line": 239,
           "isExported": false
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 457,
+          "line": 464,
           "isExported": false
         }
       ]
@@ -2208,25 +2290,25 @@
       "path": "src/components/layout/Sidebar.tsx",
       "type": "component",
       "extension": ".tsx",
-      "lines": 245,
+      "lines": 257,
       "symbolsCount": 3,
       "symbols": [
         {
           "name": "Sidebar",
           "kind": "function",
-          "line": 31,
+          "line": 32,
           "isExported": true
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 147,
+          "line": 159,
           "isExported": false
         },
         {
           "name": "Icon",
           "kind": "component_or_fn",
-          "line": 178,
+          "line": 190,
           "isExported": false
         }
       ]
@@ -4256,7 +4338,7 @@
       "path": "src/lib/validation/config-schemas.ts",
       "type": "lib",
       "extension": ".ts",
-      "lines": 148,
+      "lines": 150,
       "symbolsCount": 9,
       "symbols": [
         {
@@ -4280,37 +4362,37 @@
         {
           "name": "ControlFeatures",
           "kind": "type",
-          "line": 47,
+          "line": 48,
           "isExported": true
         },
         {
           "name": "SecurityControlsSchema",
           "kind": "component_or_fn",
-          "line": 49,
+          "line": 50,
           "isExported": true
         },
         {
           "name": "SecurityControls",
           "kind": "type",
-          "line": 73,
+          "line": 74,
           "isExported": true
         },
         {
           "name": "GlobalAppConfigSchema",
           "kind": "component_or_fn",
-          "line": 75,
+          "line": 76,
           "isExported": true
         },
         {
           "name": "GlobalAppConfig",
           "kind": "type",
-          "line": 114,
+          "line": 115,
           "isExported": true
         },
         {
           "name": "DEFAULT_GLOBAL_APP_CONFIG",
           "kind": "component_or_fn",
-          "line": 116,
+          "line": 117,
           "isExported": true
         }
       ]
@@ -6947,6 +7029,16 @@
       "symbols": []
     },
     {
+      "id": "supabase/migrations/00020_add_codebase_visualizer_feature.sql",
+      "label": "00020_add_codebase_visualizer_feature.sql",
+      "path": "supabase/migrations/00020_add_codebase_visualizer_feature.sql",
+      "type": "database",
+      "extension": ".sql",
+      "lines": 10,
+      "symbolsCount": 0,
+      "symbols": []
+    },
+    {
       "id": "supabase/seed.sql",
       "label": "seed.sql",
       "path": "supabase/seed.sql",
@@ -7962,6 +8054,15 @@
         "cn"
       ],
       "line": 34
+    },
+    {
+      "source": "src/app/(dashboard)/admin/architecture/page.tsx",
+      "target": "src/components/admin/CodebaseVisualizer.tsx",
+      "type": "imports",
+      "specifiers": [
+        "CodebaseVisualizer"
+      ],
+      "line": 9
     },
     {
       "source": "src/app/(dashboard)/admin/multisite/diagnostics/page.tsx",
@@ -9405,13 +9506,40 @@
       "line": 7
     },
     {
+      "source": "src/components/admin/CodebaseVisualizer.tsx",
+      "target": "src/components/ui/button.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Button"
+      ],
+      "line": 33
+    },
+    {
+      "source": "src/components/admin/CodebaseVisualizer.tsx",
+      "target": "src/components/ui/input.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Input"
+      ],
+      "line": 34
+    },
+    {
+      "source": "src/components/admin/CodebaseVisualizer.tsx",
+      "target": "src/components/ui/badge.tsx",
+      "type": "imports",
+      "specifiers": [
+        "Badge"
+      ],
+      "line": 35
+    },
+    {
       "source": "src/components/admin/GlobalConfigManager.tsx",
       "target": "src/components/ui/button.tsx",
       "type": "imports",
       "specifiers": [
         "Button"
       ],
-      "line": 42
+      "line": 43
     },
     {
       "source": "src/components/admin/GlobalConfigManager.tsx",
@@ -9420,7 +9548,7 @@
       "specifiers": [
         "Input"
       ],
-      "line": 43
+      "line": 44
     },
     {
       "source": "src/components/admin/GlobalConfigManager.tsx",
@@ -9429,7 +9557,7 @@
       "specifiers": [
         "Badge"
       ],
-      "line": 44
+      "line": 45
     },
     {
       "source": "src/components/admin/GlobalConfigManager.tsx",
@@ -9439,7 +9567,7 @@
         "useAppConfig",
         "APP_ICON_MAP"
       ],
-      "line": 45
+      "line": 46
     },
     {
       "source": "src/components/admin/GlobalConfigManager.tsx",
@@ -9450,7 +9578,7 @@
         "SupportedAppIcons",
         "GlobalAppConfig"
       ],
-      "line": 46
+      "line": 47
     },
     {
       "source": "src/components/admin/SuperAdminPanel.tsx",
@@ -10073,7 +10201,7 @@
       "specifiers": [
         "useTenantStore"
       ],
-      "line": 27
+      "line": 28
     },
     {
       "source": "src/components/layout/Sidebar.tsx",
@@ -10082,7 +10210,7 @@
       "specifiers": [
         "useAppConfig"
       ],
-      "line": 28
+      "line": 29
     },
     {
       "source": "src/components/layout/Sidebar.tsx",
@@ -10091,7 +10219,7 @@
       "specifiers": [
         "cn"
       ],
-      "line": 29
+      "line": 30
     },
     {
       "source": "src/components/modals/DeleteProjectModal.tsx",

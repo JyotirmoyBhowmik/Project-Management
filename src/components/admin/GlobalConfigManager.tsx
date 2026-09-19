@@ -38,6 +38,7 @@ import {
   FileText,
   Clock,
   Check,
+  Network,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -446,6 +447,12 @@ export function GlobalConfigManager() {
                   label: 'SLA Milestone Escalations',
                   description: 'Background cron scanner dispatching alerts for approaching critical milestones.',
                   icon: AlertTriangle,
+                },
+                {
+                  key: 'enable_codebase_visualizer',
+                  label: 'Codebase Architecture & Treemap Visualizer',
+                  description: 'Interactive D3 dependency graph, codebase treemap packing, and AST symbol inspector under Governance & Controls.',
+                  icon: Network,
                 },
                 {
                   key: 'enable_public_registration',
