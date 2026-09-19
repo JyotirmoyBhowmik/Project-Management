@@ -185,6 +185,31 @@ export class DatabaseService {
   public async getTenantMembers(tenantId: string, client?: any): Promise<TenantMembership[]> {
     const supabase = getSupabase(client);
     try {
+      // 1. Try Security Definer RPC first for guaranteed visibility
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_tenant_members', {
+        p_tenant_id: tenantId,
+      });
+
+      if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+        return rpcData.map((m: any) => ({
+          id: m.id,
+          tenant_id: tenantId,
+          user_id: m.id,
+          role: m.role,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          user: {
+            id: m.id,
+            email: m.email,
+            full_name: m.full_name,
+            avatar_url: m.avatar_url,
+            is_superadmin: false,
+            created_at: new Date().toISOString(),
+          } as UserProfile,
+        }));
+      }
+
+      // 2. Fallback to direct query
       const { data, error } = await supabase
         .from('tenant_memberships')
         .select('*, user:profiles(*)')
@@ -345,7 +370,11 @@ export class DatabaseService {
         logger.warn('Error fetching project tasks', { fn: 'dbService.getProjectTasks', ctx: { projectId, error: error.message } });
         return [];
       }
-      return data || [];
+      return (data || []).map((t: any) => ({
+        ...t,
+        code: t.task_code || t.code,
+        task_code: t.task_code || t.code,
+      }));
     } catch (err) {
       logger.error('Exception fetching project tasks', { fn: 'dbService.getProjectTasks', err });
       return [];
@@ -440,12 +469,15 @@ export class DatabaseService {
     try {
       // Sanitize taskData to exclude non-column fields like 'code' or 'assignees'
       const { code, assignees, ...safeTaskData } = taskData as any;
-      const payload = {
+      const payload: any = {
         ...safeTaskData,
         id: safeTaskData.id || crypto.randomUUID(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+      if (taskData.task_code || code) {
+        payload.task_code = taskData.task_code || code;
+      }
       const { data, error } = await supabase
         .from('tasks')
         .insert(payload)
@@ -453,7 +485,11 @@ export class DatabaseService {
         .single();
 
       if (error) throw error;
-      return data;
+      return {
+        ...data,
+        code: data.task_code || data.code,
+        task_code: data.task_code || data.code,
+      };
     } catch (err) {
       logger.error('Failed creating task', { fn: 'dbService.createTask', err });
       throw err;
@@ -1613,6 +1649,28 @@ export class DatabaseService {
   ): Promise<Array<{ id: string; user_id: string; role: string; profile: UserProfile }>> {
     const supabase = getSupabase(client);
     try {
+      // 1. Try Security Definer RPC first
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_tenant_members', {
+        p_tenant_id: tenantId,
+      });
+
+      if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+        return rpcData.map((m: any) => ({
+          id: m.id,
+          user_id: m.id,
+          role: m.role,
+          profile: {
+            id: m.id,
+            email: m.email,
+            full_name: m.full_name,
+            avatar_url: m.avatar_url,
+            is_superadmin: false,
+            created_at: new Date().toISOString(),
+          } as UserProfile,
+        }));
+      }
+
+      // 2. Fallback to direct query
       const { data, error } = await supabase
         .from('tenant_memberships')
         .select(`

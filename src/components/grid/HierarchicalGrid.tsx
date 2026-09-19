@@ -84,51 +84,67 @@ export function HierarchicalGrid({ tasks, onTaskUpdate, onSelectTask }: Hierarch
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
-            {tasks.map((task, index) => {
-              const isCritical = task.is_critical;
-              const hasChildren = (task.subtasks && task.subtasks.length > 0) || false;
-              const isExpanded = expandedMap[task.id] ?? true;
-              const progressVal = task.progress ?? task.progress_percent ?? 0;
-
-              return (
-                <tr
-                  key={task.id}
-                  className={`hover:bg-[var(--secondary)]/40 transition-colors ${
-                    isCritical ? 'bg-rose-500/5' : ''
-                  }`}
+            {tasks.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={10 + taskCustomFields.length}
+                  className="py-12 text-center text-xs text-[var(--muted-foreground)]"
                 >
-                  {/* Row Number */}
-                  <td className="py-3 px-4 text-center font-mono text-[var(--muted-foreground)]">
-                    {index + 1}
-                  </td>
+                  No tasks found in this project. Click &ldquo;+ Add Task&rdquo; to create your first work item.
+                </td>
+              </tr>
+            ) : (
+              tasks.map((task, index) => {
+                const isCritical = task.is_critical;
+                const hasChildren = (task.subtasks && task.subtasks.length > 0) || false;
+                const isExpanded = expandedMap[task.id] ?? true;
+                const progressVal = task.progress ?? task.progress_percent ?? 0;
+                const displayCode = task.code || task.task_code;
 
-                  {/* Title with Nesting Indentation */}
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      {task.parent_id && <div className="w-4 h-px bg-[var(--border)] ml-2" />}
-                      {hasChildren ? (
-                        <button
-                          onClick={() => toggleExpand(task.id)}
-                          className="p-0.5 rounded hover:bg-[var(--secondary)] text-[var(--muted-foreground)] cursor-pointer"
+                return (
+                  <tr
+                    key={task.id}
+                    className={`hover:bg-[var(--secondary)]/40 transition-colors ${
+                      isCritical ? 'bg-rose-500/5' : ''
+                    }`}
+                  >
+                    {/* Row Number */}
+                    <td className="py-3 px-4 text-center font-mono text-[var(--muted-foreground)]">
+                      {index + 1}
+                    </td>
+
+                    {/* Title with Nesting Indentation */}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        {task.parent_id && <div className="w-4 h-px bg-[var(--border)] ml-2" />}
+                        {hasChildren ? (
+                          <button
+                            onClick={() => toggleExpand(task.id)}
+                            className="p-0.5 rounded hover:bg-[var(--secondary)] text-[var(--muted-foreground)] cursor-pointer"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        ) : (
+                          <div className="w-4" />
+                        )}
+                        {displayCode && (
+                          <span className="font-mono text-[10px] font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-1.5 py-0.5 rounded border border-[var(--primary)]/20 shrink-0">
+                            {displayCode}
+                          </span>
+                        )}
+                        <span
+                          onClick={() => onSelectTask?.(task)}
+                          className="font-medium text-[var(--foreground)] truncate max-w-sm cursor-pointer hover:text-[var(--primary)] hover:underline transition-colors"
+                          title="Click to view details & discussion"
                         >
-                          {isExpanded ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      ) : (
-                        <div className="w-4" />
-                      )}
-                      <span
-                        onClick={() => onSelectTask?.(task)}
-                        className="font-medium text-[var(--foreground)] truncate max-w-sm cursor-pointer hover:text-[var(--primary)] hover:underline transition-colors"
-                        title="Click to view details & discussion"
-                      >
-                        {task.title}
-                      </span>
-                    </div>
-                  </td>
+                          {task.title}
+                        </span>
+                      </div>
+                    </td>
 
                   {/* Dynamic Status Dropdown */}
                   <td className="py-3 px-4">
@@ -232,8 +248,9 @@ export function HierarchicalGrid({ tasks, onTaskUpdate, onSelectTask }: Hierarch
                   </td>
                 </tr>
               );
-            })}
-          </tbody>
+            })
+          )}
+        </tbody>
         </table>
       </div>
     </div>

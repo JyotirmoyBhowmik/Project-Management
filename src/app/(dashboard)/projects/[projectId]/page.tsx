@@ -56,6 +56,7 @@ import { ProjectCalendarView } from '@/components/calendar/ProjectCalendarView';
 import { ResourceHeatmapView } from '@/components/resource/ResourceHeatmapView';
 import { ImportExportModal } from '@/components/exchange/ImportExportModal';
 import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
+import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
 import { useProjectPresence } from '@/lib/realtime/presence-service';
 import { calculateCPM } from '@/lib/cpm/cpm-engine';
 
@@ -78,9 +79,9 @@ function ProjectWorkspaceContent() {
 
   const setActiveView = React.useCallback((view: ViewType) => {
     startTransition(() => {
-      const params = new URLSearchParams(searchParams?.toString() || '');
-      params.set('view', view);
-      router.replace(`?${params.toString()}`, { scroll: false });
+      const p = new URLSearchParams(searchParams?.toString() || '');
+      p.set('view', view);
+      router.push(`?${p.toString()}`, { scroll: false });
     });
   }, [searchParams, router]);
 
@@ -107,13 +108,7 @@ function ProjectWorkspaceContent() {
   const [isLockBaselineModalOpen, setIsLockBaselineModalOpen] = React.useState(false);
   const [exchangeMode, setExchangeMode] = React.useState<'import' | 'export' | null>(null);
 
-  // New Task Form
-  const [newTaskTitle, setNewTaskTitle] = React.useState('');
-  const [newTaskCode, setNewTaskCode] = React.useState('');
-  const [newTaskDuration, setNewTaskDuration] = React.useState(5);
-  const [newTaskStart, setNewTaskStart] = React.useState(new Date().toISOString().split('T')[0]);
-  const [newTaskPriority, setNewTaskPriority] = React.useState<TaskPriority>('medium');
-  const [isSubmittingTask, setIsSubmittingTask] = React.useState(false);
+
 
   // Baseline Form
   const [baselineName, setBaselineName] = React.useState('');
@@ -178,59 +173,7 @@ function ProjectWorkspaceContent() {
     loadSnapshots();
   }, [selectedBaselineId]);
 
-  // Task Creation Handler
-  const [taskError, setTaskError] = React.useState<string | null>(null);
 
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim() || !projectId || !tenantId) return;
-
-    setIsSubmittingTask(true);
-    setTaskError(null);
-    try {
-      const duration = Math.max(0, Number(newTaskDuration) || 1);
-      let calculatedEndDate = newTaskStart;
-      if (duration > 1) {
-        const start = new Date(newTaskStart);
-        start.setDate(start.getDate() + (duration - 1));
-        calculatedEndDate = start.toISOString().split('T')[0];
-      }
-
-      const created = await dbService.createTask(
-        {
-          project_id: projectId,
-          tenant_id: tenantId,
-          title: newTaskTitle.trim(),
-          duration_days: duration,
-          start_date: newTaskStart,
-          end_date: calculatedEndDate,
-          priority: newTaskPriority,
-          status: 'todo',
-          progress: 0,
-          is_milestone: duration === 0,
-          order_index: tasks.length + 1,
-          created_by: userId || null,
-        },
-        supabase
-      );
-
-      if (created) {
-        setTasks((prev) => [...prev, created]);
-      }
-      setIsAddTaskModalOpen(false);
-      setNewTaskTitle('');
-      setNewTaskCode('');
-      setTaskError(null);
-      await refreshProjectData();
-    } catch (err: any) {
-      const pgCode = err?.code || '';
-      const msg = err?.message || 'Unknown error';
-      setTaskError(`Task creation failed [${pgCode}]: ${msg}`);
-      console.error('Failed creating task:', err);
-    } finally {
-      setIsSubmittingTask(false);
-    }
-  };
 
   // Run CPM Calculation
   const handleRunCPM = async () => {
@@ -429,7 +372,8 @@ function ProjectWorkspaceContent() {
               <button
                 key={tab.id}
                 onClick={() => setActiveView(tab.id as any)}
-                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                data-state={isActive ? 'active' : 'inactive'}
+                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap data-[state=active]:border-[var(--primary)] data-[state=active]:text-[var(--primary)] ${
                   isActive
                     ? 'border-[var(--primary)] text-[var(--primary)]'
                     : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
@@ -443,26 +387,26 @@ function ProjectWorkspaceContent() {
         </div>
       </div>
 
-      {/* View Rendering or Clean Empty State */}
-      {tasks.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] p-12 text-center space-y-4">
-          <div className="h-12 w-12 rounded-full bg-[var(--secondary)] flex items-center justify-center mx-auto text-[var(--muted-foreground)]">
-            <Layers className="h-6 w-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-[var(--foreground)]">No tasks in this project yet</h3>
-            <p className="text-xs text-[var(--muted-foreground)] max-w-sm mx-auto">
-              Get started by adding your first task or milestone to generate the CPM schedule and Gantt timeline.
-            </p>
-          </div>
-          <Button onClick={() => setIsAddTaskModalOpen(true)} className="gap-2 text-xs">
-            <Plus className="h-4 w-4" />
-            <span>Add First Task</span>
-          </Button>
-        </div>
-      ) : (
-        <div>
-          {activeView === 'gantt' && (
+      {/* Active Viewport Rendering */}
+      <div>
+        {activeView === 'gantt' && (
+          tasks.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] p-12 text-center space-y-4">
+              <div className="h-12 w-12 rounded-full bg-[var(--secondary)] flex items-center justify-center mx-auto text-[var(--muted-foreground)]">
+                <Layers className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-[var(--foreground)]">No tasks in this project yet</h3>
+                <p className="text-xs text-[var(--muted-foreground)] max-w-sm mx-auto">
+                  Get started by adding your first task or milestone to generate the CPM schedule and Gantt timeline.
+                </p>
+              </div>
+              <Button onClick={() => setIsAddTaskModalOpen(true)} className="gap-2 text-xs">
+                <Plus className="h-4 w-4" />
+                <span>Add First Task</span>
+              </Button>
+            </div>
+          ) : (
             <InteractiveGantt
               tasks={tasks}
               dependencies={dependencies}
@@ -470,6 +414,9 @@ function ProjectWorkspaceContent() {
               calendar={calendar}
               holidays={holidays}
               onTaskUpdate={async (taskId, updates) => {
+                setTasks((prev) =>
+                  prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+                );
                 await dbService.updateTask(taskId, updates, supabase);
                 await refreshProjectData();
               }}
@@ -513,44 +460,48 @@ function ProjectWorkspaceContent() {
               onOpenImportModal={() => setExchangeMode('import')}
               onSelectTask={(t) => setSelectedTaskForDrawer(t)}
             />
-          )}
+          )
+        )}
 
-          {activeView === 'kanban' && (
-            <KanbanBoard
-              tasks={tasks}
-              onTaskUpdate={async (taskId, updates) => {
-                await dbService.updateTask(taskId, updates, supabase);
-                await refreshProjectData();
-              }}
-              onSelectTask={(t) => setSelectedTaskForDrawer(t)}
-            />
-          )}
+        {activeView === 'kanban' && (
+          <KanbanBoard
+            tasks={tasks}
+            onTaskUpdate={(taskId, updates) => {
+              setTasks((prev) =>
+                prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+              );
+            }}
+            onSelectTask={(t) => setSelectedTaskForDrawer(t)}
+          />
+        )}
 
-          {activeView === 'grid' && (
-            <HierarchicalGrid
-              tasks={tasks}
-              onTaskUpdate={async (taskId, updates) => {
-                await dbService.updateTask(taskId, updates, supabase);
-                await refreshProjectData();
-              }}
-              onSelectTask={(t) => setSelectedTaskForDrawer(t)}
-            />
-          )}
+        {activeView === 'grid' && (
+          <HierarchicalGrid
+            tasks={tasks}
+            onTaskUpdate={async (taskId, updates) => {
+              setTasks((prev) =>
+                prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
+              );
+              await dbService.updateTask(taskId, updates, supabase);
+              await refreshProjectData();
+            }}
+            onSelectTask={(t) => setSelectedTaskForDrawer(t)}
+          />
+        )}
 
-          {activeView === 'calendar' && (
-            <ProjectCalendarView tasks={tasks} calendar={calendar} holidays={holidays} />
-          )}
+        {activeView === 'calendar' && (
+          <ProjectCalendarView tasks={tasks} calendar={calendar} holidays={holidays} />
+        )}
 
-          {activeView === 'resource' && (
-            <ResourceHeatmapView
-              tasks={tasks}
-              calendar={calendar}
-              holidays={holidays}
-              tenantId={tenantId || ''}
-            />
-          )}
-        </div>
-      )}
+        {activeView === 'resource' && (
+          <ResourceHeatmapView
+            tasks={tasks}
+            calendar={calendar}
+            holidays={holidays}
+            tenantId={tenantId || ''}
+          />
+        )}
+      </div>
 
       {/* Interactive Task Detail Drawer */}
       <TaskDetailDrawer
@@ -572,95 +523,17 @@ function ProjectWorkspaceContent() {
         }}
       />
 
-      {/* Add Task Modal */}
-      <Modal
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
         isOpen={isAddTaskModalOpen}
         onClose={() => setIsAddTaskModalOpen(false)}
-        title="Add New Work Item"
-      >
-        <form onSubmit={handleCreateTask} className="space-y-4">
-          {taskError && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <div>
-                <span className="font-semibold">Task Creation Failed</span>
-                <p className="text-[11px] opacity-90 mt-0.5">{taskError}</p>
-              </div>
-            </div>
-          )}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--foreground)]">Task Title</label>
-            <Input
-              placeholder="e.g. Database Schema & RLS Matrix"
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--foreground)]">Task Code</label>
-              <Input
-                placeholder="e.g. TSK-101"
-                value={newTaskCode}
-                onChange={(e) => setNewTaskCode(e.target.value)}
-                className="font-mono"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--foreground)]">Duration (Days)</label>
-              <Input
-                type="number"
-                min="0"
-                value={newTaskDuration}
-                onChange={(e) => setNewTaskDuration(Number(e.target.value))}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--foreground)]">Start Date</label>
-              <Input
-                type="date"
-                value={newTaskStart}
-                onChange={(e) => setNewTaskStart(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--foreground)]">Priority</label>
-              <select
-                value={newTaskPriority}
-                onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs text-[var(--foreground)]"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsAddTaskModalOpen(false)}
-              disabled={isSubmittingTask}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmittingTask || !newTaskTitle.trim()}>
-              {isSubmittingTask ? 'Adding...' : 'Add Task'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        projectId={projectId}
+        tenantId={tenantId || ''}
+        onTaskCreated={(newTask) => {
+          setTasks((prev) => [...prev, newTask]);
+          refreshProjectData();
+        }}
+      />
 
       {/* Lock Baseline Modal */}
       <Modal

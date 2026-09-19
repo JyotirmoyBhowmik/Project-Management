@@ -108,6 +108,7 @@ export interface Project {
   tenant_id: string;
   name: string;
   code?: string;
+  task_counter?: number;
   description: string | null;
   status: ProjectStatus;
   start_date: string; // YYYY-MM-DD
@@ -180,6 +181,7 @@ export interface Task {
   parent_id?: string | null;
   title: string;
   code?: string;
+  task_code?: string;
   description: string | null;
   status: TaskStatus | string;
   priority: TaskPriority | string;

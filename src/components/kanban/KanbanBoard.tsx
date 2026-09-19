@@ -1,7 +1,7 @@
 // ==============================================================================
 // src/components/kanban/KanbanBoard.tsx
-// Dynamic Kanban Board Engine (Zero Hardcoded Values Mandate)
-// Workflow statuses and priority levels are fetched dynamically from the database.
+// Production Kanban Board Engine with Drag-and-Drop, Live Supabase Sync,
+// Optimistic UI, Automatic Code Badges, and Error Rollback
 // ==============================================================================
 
 'use client';
@@ -12,10 +12,13 @@ import {
   Calendar,
   ChevronRight,
   ChevronLeft,
+  GripVertical,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Task } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
 import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
+import { updateTaskStatusAction } from '@/actions/tasks';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -25,6 +28,8 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardProps) {
   const { statuses, priorities } = useTenantMetadata();
+  const [draggingTaskId, setDraggingTaskId] = React.useState<string | null>(null);
+  const [dragOverLaneSlug, setDragOverLaneSlug] = React.useState<string | null>(null);
 
   // Dynamic lane order derived from database positions
   const lanes = React.useMemo(() => {
@@ -33,11 +38,43 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
 
   const laneOrder = React.useMemo(() => lanes.map((l) => l.slug), [lanes]);
 
+  // Handle status update with optimistic UI and live database synchronization
+  const handleStatusChange = async (task: Task, newStatus: string) => {
+    if (task.status === newStatus) return;
+
+    const originalStatus = task.status;
+
+    // 1. Optimistically update parent / board state immediately
+    onTaskUpdate(task.id, { status: newStatus });
+
+    try {
+      // 2. Dispatch Server Action
+      const result = await updateTaskStatusAction({
+        taskId: task.id,
+        status: newStatus,
+        projectId: task.project_id,
+      });
+
+      if (!result.success) {
+        // Revert card back to original column
+        onTaskUpdate(task.id, { status: originalStatus });
+        toast.error(`Status update rejected: ${result.error || 'Server error'}`);
+      } else {
+        const laneName = lanes.find((l) => l.slug === newStatus)?.name || newStatus;
+        const taskCode = task.code || task.task_code || 'Task';
+        toast.success(`${taskCode} moved to ${laneName}`);
+      }
+    } catch (err: any) {
+      onTaskUpdate(task.id, { status: originalStatus });
+      toast.error(`Network failure: ${err?.message || 'Could not persist status'}`);
+    }
+  };
+
   const moveLane = (task: Task, direction: 'prev' | 'next') => {
     const currentIndex = laneOrder.indexOf(task.status);
     const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
     if (newIndex >= 0 && newIndex < laneOrder.length) {
-      onTaskUpdate(task.id, { status: laneOrder[newIndex] });
+      handleStatusChange(task, laneOrder[newIndex]);
     }
   };
 
@@ -69,11 +106,40 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
     <div className="flex h-full gap-4 overflow-x-auto p-4 bg-[var(--background)]">
       {lanes.map((lane) => {
         const laneTasks = tasks.filter((t) => t.status === lane.slug);
+        const isDragOver = dragOverLaneSlug === lane.slug;
 
         return (
           <div
             key={lane.id}
-            className="flex flex-col w-80 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xs"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              if (dragOverLaneSlug !== lane.slug) {
+                setDragOverLaneSlug(lane.slug);
+              }
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setDragOverLaneSlug(null);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOverLaneSlug(null);
+              const droppedTaskId = e.dataTransfer.getData('text/plain') || draggingTaskId;
+              setDraggingTaskId(null);
+
+              if (!droppedTaskId) return;
+              const task = tasks.find((t) => t.id === droppedTaskId);
+              if (task) {
+                handleStatusChange(task, lane.slug);
+              }
+            }}
+            className={`flex flex-col w-80 shrink-0 rounded-xl border transition-all duration-200 bg-[var(--card)] shadow-xs ${
+              isDragOver
+                ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/30 bg-[var(--primary)]/5'
+                : 'border-[var(--border)]'
+            }`}
           >
             {/* Dynamic Lane Header */}
             <div className="flex items-center justify-between p-3.5 border-b border-[var(--border)] bg-[var(--secondary)]/40">
@@ -95,30 +161,55 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
             </div>
 
             {/* Lane Task Cards */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-[140px]">
               {laneTasks.length === 0 ? (
-                <div className="flex items-center justify-center h-28 border border-dashed border-[var(--border)] rounded-lg text-xs text-[var(--muted-foreground)]">
-                  No tasks in {lane.name}
+                <div
+                  className={`flex flex-col items-center justify-center h-28 border border-dashed rounded-lg text-xs transition-colors ${
+                    isDragOver
+                      ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/10 font-semibold'
+                      : 'border-[var(--border)] text-[var(--muted-foreground)]'
+                  }`}
+                >
+                  <span>{isDragOver ? `Drop to move to ${lane.name}` : `No tasks in ${lane.name}`}</span>
                 </div>
               ) : (
                 laneTasks.map((task) => {
                   const currentIndex = laneOrder.indexOf(task.status);
                   const canMovePrev = currentIndex > 0;
                   const canMoveNext = currentIndex < laneOrder.length - 1;
+                  const isBeingDragged = draggingTaskId === task.id;
+                  const displayCode = task.code || task.task_code;
 
                   return (
                     <div
                       key={task.id}
+                      draggable={true}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', task.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                        setDraggingTaskId(task.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingTaskId(null);
+                        setDragOverLaneSlug(null);
+                      }}
                       onClick={() => onSelectTask?.(task)}
-                      className={`group rounded-lg border p-3.5 shadow-xs transition-all bg-[var(--card)] hover:shadow-md cursor-pointer ${
-                        task.is_critical
+                      className={`group rounded-lg border p-3.5 shadow-xs transition-all bg-[var(--card)] hover:shadow-md cursor-grab active:cursor-grabbing ${
+                        isBeingDragged
+                          ? 'opacity-40 border-dashed border-[var(--primary)] ring-2 ring-[var(--primary)]'
+                          : task.is_critical
                           ? 'border-rose-500/50 hover:border-rose-500 ring-1 ring-rose-500/20'
                           : 'border-[var(--border)] hover:border-[var(--primary)]'
                       }`}
                     >
                       {/* Top Badges */}
                       <div className="flex items-center justify-between gap-1 mb-2">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {displayCode && (
+                            <span className="font-mono text-[10px] font-bold text-[var(--primary)] bg-[var(--primary)]/10 px-1.5 py-0.5 rounded border border-[var(--primary)]/20">
+                              {displayCode}
+                            </span>
+                          )}
                           {renderPriorityBadge(task.priority)}
                           {task.is_critical && (
                             <Badge variant="critical" className="gap-1 text-[10px] py-0 px-1.5">
@@ -127,9 +218,10 @@ export function KanbanBoard({ tasks, onTaskUpdate, onSelectTask }: KanbanBoardPr
                             </Badge>
                           )}
                         </div>
-                        <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
-                          {task.duration_days}d
-                        </span>
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-[var(--muted-foreground)]">
+                          <GripVertical className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100" />
+                          <span>{task.duration_days}d</span>
+                        </div>
                       </div>
 
                       {/* Title */}

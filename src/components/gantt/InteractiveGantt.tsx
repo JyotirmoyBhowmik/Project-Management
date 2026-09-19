@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { updateTaskScheduleAction } from '@/actions/tasks';
 import { Task, TaskDependency, WorkingCalendar, CalendarHoliday, TaskBaselineSnapshot } from '@/types/database';
 import { useGanttStore, GanttZoomLevel } from '@/lib/stores/gantt-store';
 import {
@@ -93,6 +95,13 @@ export function InteractiveGantt({
     origStartDate: string;
     origEndDate: string;
     origDuration: number;
+  } | null>(null);
+
+  const [dragPreview, setDragPreview] = React.useState<{
+    taskId: string;
+    start_date: string;
+    end_date: string;
+    duration_days: number;
   } | null>(null);
 
   const { priorities } = useTenantMetadata();
@@ -178,7 +187,75 @@ export function InteractiveGantt({
       origEndDate: task.end_date,
       origDuration: task.duration_days,
     });
+    setDragPreview({
+      taskId,
+      start_date: task.start_date,
+      end_date: task.end_date,
+      duration_days: task.duration_days,
+    });
   };
+
+  const updateDragPreviewPosition = React.useCallback(
+    (clientX: number) => {
+      if (!draggingTask) return;
+
+      const deltaX = clientX - draggingTask.startX;
+      const deltaDays = Math.round(deltaX / pxPerDay);
+
+      const task = tasks.find((t) => t.id === draggingTask.taskId);
+      if (!task) return;
+
+      if (deltaDays === 0) {
+        setDragPreview({
+          taskId: task.id,
+          start_date: draggingTask.origStartDate,
+          end_date: draggingTask.origEndDate,
+          duration_days: draggingTask.origDuration,
+        });
+        return;
+      }
+
+      if (draggingTask.action === 'move') {
+        const newStart = parseISODate(draggingTask.origStartDate);
+        newStart.setUTCDate(newStart.getUTCDate() + deltaDays);
+        const newEnd = addWorkingDays(newStart, draggingTask.origDuration, calendar, holidays);
+
+        setDragPreview({
+          taskId: task.id,
+          start_date: formatDateToISO(newStart),
+          end_date: formatDateToISO(newEnd),
+          duration_days: draggingTask.origDuration,
+        });
+      } else if (draggingTask.action === 'resize-end') {
+        const newDuration = Math.max(1, draggingTask.origDuration + deltaDays);
+        const start = parseISODate(draggingTask.origStartDate);
+        const newEnd = addWorkingDays(start, newDuration, calendar, holidays);
+
+        setDragPreview({
+          taskId: task.id,
+          start_date: draggingTask.origStartDate,
+          end_date: formatDateToISO(newEnd),
+          duration_days: newDuration,
+        });
+      } else if (draggingTask.action === 'resize-start') {
+        const origStart = parseISODate(draggingTask.origStartDate);
+        const newStart = new Date(origStart.getTime());
+        newStart.setUTCDate(newStart.getUTCDate() + deltaDays);
+        const currentEnd = parseISODate(draggingTask.origEndDate);
+
+        if (newStart <= currentEnd) {
+          const newDuration = Math.max(1, calculateWorkingDays(newStart, currentEnd, calendar, holidays));
+          setDragPreview({
+            taskId: task.id,
+            start_date: formatDateToISO(newStart),
+            end_date: draggingTask.origEndDate,
+            duration_days: newDuration,
+          });
+        }
+      }
+    },
+    [draggingTask, pxPerDay, tasks, calendar, holidays]
+  );
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (svgRef.current) {
@@ -189,54 +266,91 @@ export function InteractiveGantt({
       });
     }
 
+    if (draggingTask) {
+      updateDragPreviewPosition(e.clientX);
+    }
+  };
+
+  const handleMouseUp = React.useCallback(async () => {
+    if (draggingTask && dragPreview) {
+      const activeDragging = draggingTask;
+      const activePreview = dragPreview;
+
+      setDraggingTask(null);
+      setDragPreview(null);
+
+      const hasChanged =
+        activePreview.start_date !== activeDragging.origStartDate ||
+        activePreview.end_date !== activeDragging.origEndDate ||
+        activePreview.duration_days !== activeDragging.origDuration;
+
+      if (hasChanged) {
+        // 1. Optimistic update
+        onTaskUpdate?.(activeDragging.taskId, {
+          start_date: activePreview.start_date,
+          end_date: activePreview.end_date,
+          duration_days: activePreview.duration_days,
+        });
+
+        // 2. Dispatch Server Action for persistent database write
+        try {
+          const task = tasks.find((t) => t.id === activeDragging.taskId);
+          const result = await updateTaskScheduleAction({
+            taskId: activeDragging.taskId,
+            startDate: activePreview.start_date,
+            endDate: activePreview.end_date,
+            durationDays: activePreview.duration_days,
+            projectId: task?.project_id,
+          });
+
+          if (!result.success) {
+            // Revert back to original on database failure
+            onTaskUpdate?.(activeDragging.taskId, {
+              start_date: activeDragging.origStartDate,
+              end_date: activeDragging.origEndDate,
+              duration_days: activeDragging.origDuration,
+            });
+            toast.error(
+              `Schedule update failed to save to server: ${result.error || 'Database error'}`
+            );
+          } else {
+            toast.success('Schedule update saved.');
+          }
+        } catch (err: any) {
+          onTaskUpdate?.(activeDragging.taskId, {
+            start_date: activeDragging.origStartDate,
+            end_date: activeDragging.origEndDate,
+            duration_days: activeDragging.origDuration,
+          });
+          toast.error('Schedule update failed to save to server.');
+        }
+      }
+    } else if (draggingTask) {
+      setDraggingTask(null);
+      setDragPreview(null);
+    }
+  }, [draggingTask, dragPreview, onTaskUpdate, tasks]);
+
+  // Window event listeners to guarantee drag releases even outside the SVG bounds
+  React.useEffect(() => {
     if (!draggingTask) return;
 
-    const deltaX = e.clientX - draggingTask.startX;
-    const deltaDays = Math.round(deltaX / pxPerDay);
-    if (deltaDays === 0) return;
+    const onGlobalMouseMove = (e: MouseEvent) => {
+      updateDragPreviewPosition(e.clientX);
+    };
 
-    const task = tasks.find((t) => t.id === draggingTask.taskId);
-    if (!task) return;
+    const onGlobalMouseUp = () => {
+      handleMouseUp();
+    };
 
-    if (draggingTask.action === 'move') {
-      const newStart = parseISODate(draggingTask.origStartDate);
-      newStart.setUTCDate(newStart.getUTCDate() + deltaDays);
-      const newEnd = addWorkingDays(newStart, task.duration_days, calendar, holidays);
+    window.addEventListener('mousemove', onGlobalMouseMove);
+    window.addEventListener('mouseup', onGlobalMouseUp);
 
-      onTaskUpdate?.(task.id, {
-        start_date: formatDateToISO(newStart),
-        end_date: formatDateToISO(newEnd),
-      });
-    } else if (draggingTask.action === 'resize-end') {
-      const newDuration = Math.max(1, draggingTask.origDuration + deltaDays);
-      const start = parseISODate(task.start_date);
-      const newEnd = addWorkingDays(start, newDuration, calendar, holidays);
-
-      onTaskUpdate?.(task.id, {
-        duration_days: newDuration,
-        end_date: formatDateToISO(newEnd),
-      });
-    } else if (draggingTask.action === 'resize-start') {
-      const origStart = parseISODate(draggingTask.origStartDate);
-      const newStart = new Date(origStart.getTime());
-      newStart.setUTCDate(newStart.getUTCDate() + deltaDays);
-      const currentEnd = parseISODate(task.end_date);
-
-      if (newStart <= currentEnd) {
-        const newDuration = Math.max(1, calculateWorkingDays(newStart, currentEnd, calendar, holidays));
-        onTaskUpdate?.(task.id, {
-          start_date: formatDateToISO(newStart),
-          duration_days: newDuration,
-        });
-      }
-    }
-  };
-
-  const handleMouseUp = () => {
-    if (draggingTask) {
-      setDraggingTask(null);
-    }
-  };
+    return () => {
+      window.removeEventListener('mousemove', onGlobalMouseMove);
+      window.removeEventListener('mouseup', onGlobalMouseUp);
+    };
+  }, [draggingTask, updateDragPreviewPosition, handleMouseUp]);
 
   // Drag-to-connect dependency complete handler with Kahn's loop guard
   const handleConnectorMouseUp = (targetTaskId: string, targetHandle: 'start' | 'finish') => {
@@ -794,9 +908,11 @@ export function InteractiveGantt({
             {/* 5. Interactive Task Bars & Milestone Diamonds */}
             <g className="task-bars">
               {tasks.map((task, index) => {
+                const effectiveStart = dragPreview?.taskId === task.id ? dragPreview.start_date : task.start_date;
+                const effectiveEnd = dragPreview?.taskId === task.id ? dragPreview.end_date : task.end_date;
                 const y = headerHeight + index * rowHeight + (rowHeight - 26) / 2;
-                const startX = dateToX(task.start_date);
-                const endX = dateToX(task.end_date) + pxPerDay;
+                const startX = dateToX(effectiveStart);
+                const endX = dateToX(effectiveEnd) + pxPerDay;
                 const width = Math.max(pxPerDay, endX - startX);
                 const isZeroFloat = task.total_float === 0;
                 const isCritical = (task.is_critical || isZeroFloat) && highlightCriticalPath;
@@ -921,7 +1037,7 @@ export function InteractiveGantt({
                       y={y + 17}
                       className="text-[11px] font-semibold fill-white pointer-events-none truncate select-none"
                     >
-                      {task.title}
+                      {(task.code || task.task_code ? `${task.code || task.task_code}: ` : '') + task.title}
                     </text>
 
                     {/* Resize Left Handle (Start Date change) */}

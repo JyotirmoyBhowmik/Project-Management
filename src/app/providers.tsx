@@ -4,6 +4,7 @@ import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TenantMetadataProvider } from '@/lib/context/tenant-metadata-context';
 import { DynamicThemeProvider } from '@/lib/theme/dynamic-theme-provider';
+import { Toaster } from 'sonner';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(
@@ -23,6 +24,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <TenantMetadataProvider>
         <DynamicThemeProvider>
           {children}
+          <Toaster richColors position="top-right" />
         </DynamicThemeProvider>
       </TenantMetadataProvider>
     </QueryClientProvider>
