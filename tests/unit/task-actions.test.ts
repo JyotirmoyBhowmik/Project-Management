@@ -8,7 +8,7 @@ import {
   TaskInputSchema,
   UpdateTaskScheduleSchema,
   UpdateTaskStatusSchema,
-} from '@/actions/tasks';
+} from '@/lib/validation/action-schemas';
 
 describe('Task Action Schemas & Boundary Validation', () => {
   const validProjectId = 'd0000000-0000-0000-0000-000000000004';

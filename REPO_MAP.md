@@ -1,6 +1,6 @@
 # Repository Map - Enterprise PMS
 
-> Generated on 2026-09-19T12:29:12.330Z | **129** source files | **32,202** lines of code | **764** indexed symbols | **307** dependency relations
+> Generated on 2026-09-19T12:43:04.786Z | **130** source files | **32,221** lines of code | **761** indexed symbols | **313** dependency relations
 
 Compact AST symbol map (classes, functions, interfaces, types, components) with 1-based relative line numbers. Elides implementation bodies to optimize for AI token budget.
 
@@ -8,82 +8,64 @@ Compact AST symbol map (classes, functions, interfaces, types, components) with 
 
 ## ACTION (6 files)
 
-### `src/actions/automations.ts` (272 lines)
+### `src/actions/automations.ts` (246 lines)
 ```typescript
-L14: export interface ActionResponse { ... }
-L21: export component_or_fn CreateAutomationSchema
-L42: export type CreateAutomationInput
-L44: export function createAutomationAction
-L79: export function toggleAutomationAction
-L96: export function deleteAutomationAction
-L113: export function getTenantAutomationsAction
-L146: export function dispatchAutomationTriggerAction
-L226: export function createWebhookAction
-L256: export function getTenantWebhooksAction
+L18: export function createAutomationAction
+L53: export function toggleAutomationAction
+L70: export function deleteAutomationAction
+L87: export function getTenantAutomationsAction
+L120: export function dispatchAutomationTriggerAction
+L200: export function createWebhookAction
+L230: export function getTenantWebhooksAction
 ```
 
-### `src/actions/sprints.ts` (301 lines)
+### `src/actions/sprints.ts` (287 lines)
 ```typescript
-L14: export interface ActionResponse { ... }
-L21: export component_or_fn CreateSprintSchema
-L30: export type CreateSprintInput
-L32: export function createSprintAction
-L67: export function startSprintAction
-L86: export function completeSprintAction
-L137: export function assignTaskToSprintAction
-L169: export function getProjectSprintsAction
-L200: export function getSprintMetricsAction
+L18: export function createSprintAction
+L53: export function startSprintAction
+L72: export function completeSprintAction
+L123: export function assignTaskToSprintAction
+L155: export function getProjectSprintsAction
+L186: export function getSprintMetricsAction
 ```
 
-### `src/actions/tasks.ts` (443 lines)
+### `src/actions/tasks.ts` (399 lines)
 ```typescript
-L18: export component_or_fn TaskInputSchema
-L41: export type TaskInput
-L43: export component_or_fn UpdateTaskScheduleSchema
-L51: export component_or_fn UpdateTaskStatusSchema
-L57: export interface ServerActionResponse { ... }
-L70: export function createTaskAction
-L227: export function updateTaskScheduleAction
-L319: export function updateTaskStatusAction
-L407: export function getTenantMembersAction
+L26: export function createTaskAction
+L183: export function updateTaskScheduleAction
+L275: export function updateTaskStatusAction
+L363: export function getTenantMembersAction
 ```
 
-### `src/actions/timesheets.ts` (335 lines)
+### `src/actions/timesheets.ts` (320 lines)
 ```typescript
-L14: export interface ActionResponse { ... }
-L21: export component_or_fn LogTimeSchema
-L31: export type LogTimeInput
-L33: export function logTimeAction
-L83: export function updateTimesheetApprovalAction
-L122: export function getTimesheetsAction
-L151: export function getProjectEVMMetricsAction
-L270: export function setTenantRateAction
-L302: export function setProjectBudgetAction
+L18: export function logTimeAction
+L68: export function updateTimesheetApprovalAction
+L107: export function getTimesheetsAction
+L136: export function getProjectEVMMetricsAction
+L255: export function setTenantRateAction
+L287: export function setProjectBudgetAction
 ```
 
-### `src/actions/trash.ts` (184 lines)
+### `src/actions/trash.ts` (178 lines)
 ```typescript
-L13: export interface ActionResponse { ... }
-L20: export function softDeleteEntityAction
-L54: export function restoreEntityAction
-L79: export function permanentDeleteEntityAction
-L104: export function getTrashItemsAction
+L14: export function softDeleteEntityAction
+L48: export function restoreEntityAction
+L73: export function permanentDeleteEntityAction
+L98: export function getTrashItemsAction
 ```
 
-### `src/actions/wiki.ts` (186 lines)
+### `src/actions/wiki.ts` (173 lines)
 ```typescript
-L14: export interface ActionResponse { ... }
-L21: export component_or_fn CreateDocSchema
-L29: export type CreateDocInput
-L31: export function createDocumentAction
-L64: export function updateDocumentContentAction
-L95: export function getDocumentTreeAction
-L138: export function linkTaskToDocAction
-L153: export function unlinkTaskFromDocAction
-L170: export function getTaskLinkedDocsAction
+L18: export function createDocumentAction
+L51: export function updateDocumentContentAction
+L82: export function getDocumentTreeAction
+L125: export function linkTaskToDocAction
+L140: export function unlinkTaskFromDocAction
+L157: export function getTaskLinkedDocsAction
 ```
 
-## LIB (29 files)
+## LIB (30 files)
 
 ### `src/lib/calendar/calendar-engine.ts` (213 lines)
 ```typescript
@@ -452,6 +434,25 @@ L196: export function useDynamicTheme
 ### `src/lib/utils.ts` (12 lines)
 ```typescript
 L9: export function cn
+```
+
+### `src/lib/validation/action-schemas.ts` (137 lines)
+```typescript
+L10: export interface ActionResponse { ... }
+L23: export component_or_fn TaskInputSchema
+L46: export type TaskInput
+L48: export component_or_fn UpdateTaskScheduleSchema
+L56: export type UpdateTaskScheduleInput
+L58: export component_or_fn UpdateTaskStatusSchema
+L64: export type UpdateTaskStatusInput
+L70: export component_or_fn LogTimeSchema
+L80: export type LogTimeInput
+L86: export component_or_fn CreateSprintSchema
+L95: export type CreateSprintInput
+L101: export component_or_fn CreateAutomationSchema
+L122: export type CreateAutomationInput
+L128: export component_or_fn CreateDocSchema
+L136: export type CreateDocInput
 ```
 
 ### `src/lib/validation/schemas.ts` (196 lines)

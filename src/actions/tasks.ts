@@ -6,62 +6,18 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { Task, TaskPriority } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
-
-// ------------------------------------------------------------------------------
-// Input Validation Schemas (Rules 1.1 - 1.4)
-// ------------------------------------------------------------------------------
-
-export const TaskInputSchema = z.object({
-  title: z
-    .string()
-    .min(1, 'Task title is required')
-    .max(255, 'Task title cannot exceed 255 characters'),
-  project_id: z.string().uuid('Valid project UUID is required'),
-  tenant_id: z.string().uuid('Valid tenant UUID is required'),
-  start_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format'),
-  end_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format')
-    .optional(),
-  duration_days: z.number().int().min(0).optional(),
-  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
-  status: z.string().default('todo'),
-  description: z.string().nullable().optional(),
-  task_code: z.string().optional(),
-  is_milestone: z.boolean().default(false),
-  assignee_ids: z.array(z.string().uuid()).optional(),
-});
-
-export type TaskInput = z.infer<typeof TaskInputSchema>;
-
-export const UpdateTaskScheduleSchema = z.object({
-  taskId: z.string().uuid('Valid task UUID is required'),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be YYYY-MM-DD'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be YYYY-MM-DD'),
-  durationDays: z.number().int().min(0, 'Duration days must be non-negative'),
-  projectId: z.string().uuid().optional(),
-});
-
-export const UpdateTaskStatusSchema = z.object({
-  taskId: z.string().uuid('Valid task UUID is required'),
-  status: z.string().min(1, 'Status cannot be empty'),
-  projectId: z.string().uuid().optional(),
-});
-
-export interface ServerActionResponse<T = any> {
-  success: boolean;
-  task?: T;
-  data?: T;
-  error?: string;
-  details?: any;
-  correlation_id?: string;
-}
+import {
+  TaskInputSchema,
+  UpdateTaskScheduleSchema,
+  UpdateTaskStatusSchema,
+  type TaskInput,
+  type UpdateTaskScheduleInput,
+  type UpdateTaskStatusInput,
+  type ActionResponse as ServerActionResponse,
+} from '@/lib/validation/action-schemas';
 
 // ------------------------------------------------------------------------------
 // 1. Create Task Server Action

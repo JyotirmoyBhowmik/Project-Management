@@ -6,40 +6,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { TenantAutomation, AutomationExecutionLog, TenantWebhook } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
-
-export interface ActionResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  correlation_id?: string;
-}
-
-export const CreateAutomationSchema = z.object({
-  tenant_id: z.string().uuid(),
-  project_id: z.string().uuid().nullable().optional(),
-  name: z.string().min(1, 'Automation name is required').max(150),
-  trigger_type: z.enum(['task_status_changed', 'task_created', 'due_date_approaching', 'dependency_cleared']),
-  trigger_config: z.record(z.any()).default({}),
-  conditions: z.array(
-    z.object({
-      field: z.string(),
-      operator: z.enum(['equals', 'not_equals', 'greater_than', 'contains', 'is_empty']),
-      value: z.any(),
-    })
-  ).default([]),
-  actions: z.array(
-    z.object({
-      action_type: z.enum(['update_field', 'assign_user', 'dispatch_webhook', 'create_subtask']),
-      payload: z.record(z.any()),
-    })
-  ).min(1, 'At least one action is required'),
-});
-
-export type CreateAutomationInput = z.infer<typeof CreateAutomationSchema>;
+import {
+  CreateAutomationSchema,
+  type CreateAutomationInput,
+  type ActionResponse,
+} from '@/lib/validation/action-schemas';
 
 export async function createAutomationAction(rawInput: CreateAutomationInput): Promise<ActionResponse<TenantAutomation>> {
   const correlationId = `act-create-auto-${Date.now()}`;

@@ -6,28 +6,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { ProjectSprint, AgileSprintMetrics, Task } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
-
-export interface ActionResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  correlation_id?: string;
-}
-
-export const CreateSprintSchema = z.object({
-  tenant_id: z.string().uuid(),
-  project_id: z.string().uuid(),
-  name: z.string().min(1, 'Sprint name is required').max(100),
-  sprint_goal: z.string().max(500).nullable().optional(),
-  start_date: z.string().min(1, 'Start date is required'),
-  end_date: z.string().min(1, 'End date is required'),
-});
-
-export type CreateSprintInput = z.infer<typeof CreateSprintSchema>;
+import {
+  CreateSprintSchema,
+  type CreateSprintInput,
+  type ActionResponse,
+} from '@/lib/validation/action-schemas';
 
 export async function createSprintAction(rawInput: CreateSprintInput): Promise<ActionResponse<ProjectSprint>> {
   const correlationId = `act-create-sprint-${Date.now()}`;

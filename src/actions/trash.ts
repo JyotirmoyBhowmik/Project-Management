@@ -9,13 +9,7 @@ import { revalidatePath } from 'next/cache';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { SoftDeletedItem } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
-
-export interface ActionResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  correlation_id?: string;
-}
+import type { ActionResponse } from '@/lib/validation/action-schemas';
 
 export async function softDeleteEntityAction(
   entityType: 'task' | 'project' | 'phase' | 'document',

@@ -6,27 +6,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { ProjectDocument, DocumentTaskLink, Task } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
-
-export interface ActionResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  correlation_id?: string;
-}
-
-export const CreateDocSchema = z.object({
-  tenant_id: z.string().uuid(),
-  project_id: z.string().uuid(),
-  parent_doc_id: z.string().uuid().nullable().optional(),
-  title: z.string().min(1, 'Document title is required').max(200),
-  content_json: z.record(z.any()).default({ type: 'doc', content: [] }),
-});
-
-export type CreateDocInput = z.infer<typeof CreateDocSchema>;
+import {
+  CreateDocSchema,
+  type CreateDocInput,
+  type ActionResponse,
+} from '@/lib/validation/action-schemas';
 
 export async function createDocumentAction(rawInput: CreateDocInput): Promise<ActionResponse<ProjectDocument>> {
   const correlationId = `act-create-doc-${Date.now()}`;

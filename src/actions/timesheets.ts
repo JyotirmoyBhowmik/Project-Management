@@ -6,29 +6,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { TaskTimeLog, EVMMetrics, TenantUserRate, ProjectBudget } from '@/types/database';
 import { logger } from '@/lib/logger/logger';
-
-export interface ActionResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  correlation_id?: string;
-}
-
-export const LogTimeSchema = z.object({
-  tenant_id: z.string().uuid(),
-  project_id: z.string().uuid(),
-  task_id: z.string().uuid(),
-  date_worked: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
-  hours_spent: z.number().positive('Hours spent must be greater than zero').max(24, 'Cannot log more than 24 hours per day'),
-  is_billable: z.boolean().default(true),
-  description: z.string().max(1000).nullable().optional(),
-});
-
-export type LogTimeInput = z.infer<typeof LogTimeSchema>;
+import {
+  LogTimeSchema,
+  type LogTimeInput,
+  type ActionResponse,
+} from '@/lib/validation/action-schemas';
 
 export async function logTimeAction(rawInput: LogTimeInput): Promise<ActionResponse<TaskTimeLog>> {
   const correlationId = `act-log-time-${Date.now()}`;

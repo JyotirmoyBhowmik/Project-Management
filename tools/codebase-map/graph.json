@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generatedAt": "2026-09-19T12:29:12.366Z",
-    "totalFiles": 129,
-    "totalEdges": 307,
-    "totalLines": 32202,
-    "totalSymbols": 764
+    "generatedAt": "2026-09-19T12:43:04.812Z",
+    "totalFiles": 130,
+    "totalEdges": 313,
+    "totalLines": 32221,
+    "totalSymbols": 761
   },
   "nodes": [
     {
@@ -43,67 +43,49 @@
       "path": "src/actions/automations.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 272,
-      "symbolsCount": 10,
+      "lines": 246,
+      "symbolsCount": 7,
       "symbols": [
-        {
-          "name": "ActionResponse",
-          "kind": "interface",
-          "line": 14,
-          "isExported": true
-        },
-        {
-          "name": "CreateAutomationSchema",
-          "kind": "component_or_fn",
-          "line": 21,
-          "isExported": true
-        },
-        {
-          "name": "CreateAutomationInput",
-          "kind": "type",
-          "line": 42,
-          "isExported": true
-        },
         {
           "name": "createAutomationAction",
           "kind": "function",
-          "line": 44,
+          "line": 18,
           "isExported": true
         },
         {
           "name": "toggleAutomationAction",
           "kind": "function",
-          "line": 79,
+          "line": 53,
           "isExported": true
         },
         {
           "name": "deleteAutomationAction",
           "kind": "function",
-          "line": 96,
+          "line": 70,
           "isExported": true
         },
         {
           "name": "getTenantAutomationsAction",
           "kind": "function",
-          "line": 113,
+          "line": 87,
           "isExported": true
         },
         {
           "name": "dispatchAutomationTriggerAction",
           "kind": "function",
-          "line": 146,
+          "line": 120,
           "isExported": true
         },
         {
           "name": "createWebhookAction",
           "kind": "function",
-          "line": 226,
+          "line": 200,
           "isExported": true
         },
         {
           "name": "getTenantWebhooksAction",
           "kind": "function",
-          "line": 256,
+          "line": 230,
           "isExported": true
         }
       ]
@@ -114,61 +96,43 @@
       "path": "src/actions/sprints.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 301,
-      "symbolsCount": 9,
+      "lines": 287,
+      "symbolsCount": 6,
       "symbols": [
-        {
-          "name": "ActionResponse",
-          "kind": "interface",
-          "line": 14,
-          "isExported": true
-        },
-        {
-          "name": "CreateSprintSchema",
-          "kind": "component_or_fn",
-          "line": 21,
-          "isExported": true
-        },
-        {
-          "name": "CreateSprintInput",
-          "kind": "type",
-          "line": 30,
-          "isExported": true
-        },
         {
           "name": "createSprintAction",
           "kind": "function",
-          "line": 32,
+          "line": 18,
           "isExported": true
         },
         {
           "name": "startSprintAction",
           "kind": "function",
-          "line": 67,
+          "line": 53,
           "isExported": true
         },
         {
           "name": "completeSprintAction",
           "kind": "function",
-          "line": 86,
+          "line": 72,
           "isExported": true
         },
         {
           "name": "assignTaskToSprintAction",
           "kind": "function",
-          "line": 137,
+          "line": 123,
           "isExported": true
         },
         {
           "name": "getProjectSprintsAction",
           "kind": "function",
-          "line": 169,
+          "line": 155,
           "isExported": true
         },
         {
           "name": "getSprintMetricsAction",
           "kind": "function",
-          "line": 200,
+          "line": 186,
           "isExported": true
         }
       ]
@@ -179,61 +143,31 @@
       "path": "src/actions/tasks.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 443,
-      "symbolsCount": 9,
+      "lines": 399,
+      "symbolsCount": 4,
       "symbols": [
-        {
-          "name": "TaskInputSchema",
-          "kind": "component_or_fn",
-          "line": 18,
-          "isExported": true
-        },
-        {
-          "name": "TaskInput",
-          "kind": "type",
-          "line": 41,
-          "isExported": true
-        },
-        {
-          "name": "UpdateTaskScheduleSchema",
-          "kind": "component_or_fn",
-          "line": 43,
-          "isExported": true
-        },
-        {
-          "name": "UpdateTaskStatusSchema",
-          "kind": "component_or_fn",
-          "line": 51,
-          "isExported": true
-        },
-        {
-          "name": "ServerActionResponse",
-          "kind": "interface",
-          "line": 57,
-          "isExported": true
-        },
         {
           "name": "createTaskAction",
           "kind": "function",
-          "line": 70,
+          "line": 26,
           "isExported": true
         },
         {
           "name": "updateTaskScheduleAction",
           "kind": "function",
-          "line": 227,
+          "line": 183,
           "isExported": true
         },
         {
           "name": "updateTaskStatusAction",
           "kind": "function",
-          "line": 319,
+          "line": 275,
           "isExported": true
         },
         {
           "name": "getTenantMembersAction",
           "kind": "function",
-          "line": 407,
+          "line": 363,
           "isExported": true
         }
       ]
@@ -244,61 +178,43 @@
       "path": "src/actions/timesheets.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 335,
-      "symbolsCount": 9,
+      "lines": 320,
+      "symbolsCount": 6,
       "symbols": [
-        {
-          "name": "ActionResponse",
-          "kind": "interface",
-          "line": 14,
-          "isExported": true
-        },
-        {
-          "name": "LogTimeSchema",
-          "kind": "component_or_fn",
-          "line": 21,
-          "isExported": true
-        },
-        {
-          "name": "LogTimeInput",
-          "kind": "type",
-          "line": 31,
-          "isExported": true
-        },
         {
           "name": "logTimeAction",
           "kind": "function",
-          "line": 33,
+          "line": 18,
           "isExported": true
         },
         {
           "name": "updateTimesheetApprovalAction",
           "kind": "function",
-          "line": 83,
+          "line": 68,
           "isExported": true
         },
         {
           "name": "getTimesheetsAction",
           "kind": "function",
-          "line": 122,
+          "line": 107,
           "isExported": true
         },
         {
           "name": "getProjectEVMMetricsAction",
           "kind": "function",
-          "line": 151,
+          "line": 136,
           "isExported": true
         },
         {
           "name": "setTenantRateAction",
           "kind": "function",
-          "line": 270,
+          "line": 255,
           "isExported": true
         },
         {
           "name": "setProjectBudgetAction",
           "kind": "function",
-          "line": 302,
+          "line": 287,
           "isExported": true
         }
       ]
@@ -309,37 +225,31 @@
       "path": "src/actions/trash.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 184,
-      "symbolsCount": 5,
+      "lines": 178,
+      "symbolsCount": 4,
       "symbols": [
-        {
-          "name": "ActionResponse",
-          "kind": "interface",
-          "line": 13,
-          "isExported": true
-        },
         {
           "name": "softDeleteEntityAction",
           "kind": "function",
-          "line": 20,
+          "line": 14,
           "isExported": true
         },
         {
           "name": "restoreEntityAction",
           "kind": "function",
-          "line": 54,
+          "line": 48,
           "isExported": true
         },
         {
           "name": "permanentDeleteEntityAction",
           "kind": "function",
-          "line": 79,
+          "line": 73,
           "isExported": true
         },
         {
           "name": "getTrashItemsAction",
           "kind": "function",
-          "line": 104,
+          "line": 98,
           "isExported": true
         }
       ]
@@ -350,61 +260,43 @@
       "path": "src/actions/wiki.ts",
       "type": "action",
       "extension": ".ts",
-      "lines": 186,
-      "symbolsCount": 9,
+      "lines": 173,
+      "symbolsCount": 6,
       "symbols": [
-        {
-          "name": "ActionResponse",
-          "kind": "interface",
-          "line": 14,
-          "isExported": true
-        },
-        {
-          "name": "CreateDocSchema",
-          "kind": "component_or_fn",
-          "line": 21,
-          "isExported": true
-        },
-        {
-          "name": "CreateDocInput",
-          "kind": "type",
-          "line": 29,
-          "isExported": true
-        },
         {
           "name": "createDocumentAction",
           "kind": "function",
-          "line": 31,
+          "line": 18,
           "isExported": true
         },
         {
           "name": "updateDocumentContentAction",
           "kind": "function",
-          "line": 64,
+          "line": 51,
           "isExported": true
         },
         {
           "name": "getDocumentTreeAction",
           "kind": "function",
-          "line": 95,
+          "line": 82,
           "isExported": true
         },
         {
           "name": "linkTaskToDocAction",
           "kind": "function",
-          "line": 138,
+          "line": 125,
           "isExported": true
         },
         {
           "name": "unlinkTaskFromDocAction",
           "kind": "function",
-          "line": 153,
+          "line": 140,
           "isExported": true
         },
         {
           "name": "getTaskLinkedDocsAction",
           "kind": "function",
-          "line": 170,
+          "line": 157,
           "isExported": true
         }
       ]
@@ -3179,6 +3071,107 @@
           "name": "cn",
           "kind": "function",
           "line": 9,
+          "isExported": true
+        }
+      ]
+    },
+    {
+      "id": "src/lib/validation/action-schemas.ts",
+      "label": "action-schemas.ts",
+      "path": "src/lib/validation/action-schemas.ts",
+      "type": "lib",
+      "extension": ".ts",
+      "lines": 137,
+      "symbolsCount": 15,
+      "symbols": [
+        {
+          "name": "ActionResponse",
+          "kind": "interface",
+          "line": 10,
+          "isExported": true
+        },
+        {
+          "name": "TaskInputSchema",
+          "kind": "component_or_fn",
+          "line": 23,
+          "isExported": true
+        },
+        {
+          "name": "TaskInput",
+          "kind": "type",
+          "line": 46,
+          "isExported": true
+        },
+        {
+          "name": "UpdateTaskScheduleSchema",
+          "kind": "component_or_fn",
+          "line": 48,
+          "isExported": true
+        },
+        {
+          "name": "UpdateTaskScheduleInput",
+          "kind": "type",
+          "line": 56,
+          "isExported": true
+        },
+        {
+          "name": "UpdateTaskStatusSchema",
+          "kind": "component_or_fn",
+          "line": 58,
+          "isExported": true
+        },
+        {
+          "name": "UpdateTaskStatusInput",
+          "kind": "type",
+          "line": 64,
+          "isExported": true
+        },
+        {
+          "name": "LogTimeSchema",
+          "kind": "component_or_fn",
+          "line": 70,
+          "isExported": true
+        },
+        {
+          "name": "LogTimeInput",
+          "kind": "type",
+          "line": 80,
+          "isExported": true
+        },
+        {
+          "name": "CreateSprintSchema",
+          "kind": "component_or_fn",
+          "line": 86,
+          "isExported": true
+        },
+        {
+          "name": "CreateSprintInput",
+          "kind": "type",
+          "line": 95,
+          "isExported": true
+        },
+        {
+          "name": "CreateAutomationSchema",
+          "kind": "component_or_fn",
+          "line": 101,
+          "isExported": true
+        },
+        {
+          "name": "CreateAutomationInput",
+          "kind": "type",
+          "line": 122,
+          "isExported": true
+        },
+        {
+          "name": "CreateDocSchema",
+          "kind": "component_or_fn",
+          "line": 128,
+          "isExported": true
+        },
+        {
+          "name": "CreateDocInput",
+          "kind": "type",
+          "line": 136,
           "isExported": true
         }
       ]
@@ -6003,7 +5996,7 @@
       "specifiers": [
         "createServerSupabaseClient"
       ],
-      "line": 10
+      "line": 9
     },
     {
       "source": "src/actions/automations.ts",
@@ -6014,7 +6007,7 @@
         "AutomationExecutionLog",
         "TenantWebhook"
       ],
-      "line": 11
+      "line": 10
     },
     {
       "source": "src/actions/automations.ts",
@@ -6022,6 +6015,17 @@
       "type": "imports",
       "specifiers": [
         "logger"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/actions/automations.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "CreateAutomationSchema",
+        "CreateAutomationInput",
+        "ActionResponse"
       ],
       "line": 12
     },
@@ -6032,7 +6036,7 @@
       "specifiers": [
         "createServerSupabaseClient"
       ],
-      "line": 10
+      "line": 9
     },
     {
       "source": "src/actions/sprints.ts",
@@ -6043,7 +6047,7 @@
         "AgileSprintMetrics",
         "Task"
       ],
-      "line": 11
+      "line": 10
     },
     {
       "source": "src/actions/sprints.ts",
@@ -6051,6 +6055,17 @@
       "type": "imports",
       "specifiers": [
         "logger"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/actions/sprints.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "CreateSprintSchema",
+        "CreateSprintInput",
+        "ActionResponse"
       ],
       "line": 12
     },
@@ -6061,7 +6076,7 @@
       "specifiers": [
         "createServerSupabaseClient"
       ],
-      "line": 10
+      "line": 9
     },
     {
       "source": "src/actions/tasks.ts",
@@ -6071,7 +6086,7 @@
         "Task",
         "TaskPriority"
       ],
-      "line": 11
+      "line": 10
     },
     {
       "source": "src/actions/tasks.ts",
@@ -6079,6 +6094,21 @@
       "type": "imports",
       "specifiers": [
         "logger"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/actions/tasks.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "TaskInputSchema",
+        "UpdateTaskScheduleSchema",
+        "UpdateTaskStatusSchema",
+        "TaskInput",
+        "UpdateTaskScheduleInput",
+        "UpdateTaskStatusInput",
+        "ServerActionResponse"
       ],
       "line": 12
     },
@@ -6089,7 +6119,7 @@
       "specifiers": [
         "createServerSupabaseClient"
       ],
-      "line": 10
+      "line": 9
     },
     {
       "source": "src/actions/timesheets.ts",
@@ -6101,7 +6131,7 @@
         "TenantUserRate",
         "ProjectBudget"
       ],
-      "line": 11
+      "line": 10
     },
     {
       "source": "src/actions/timesheets.ts",
@@ -6109,6 +6139,17 @@
       "type": "imports",
       "specifiers": [
         "logger"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/actions/timesheets.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "LogTimeSchema",
+        "LogTimeInput",
+        "ActionResponse"
       ],
       "line": 12
     },
@@ -6140,13 +6181,22 @@
       "line": 11
     },
     {
+      "source": "src/actions/trash.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "ActionResponse"
+      ],
+      "line": 12
+    },
+    {
       "source": "src/actions/wiki.ts",
       "target": "src/lib/supabase/server.ts",
       "type": "imports",
       "specifiers": [
         "createServerSupabaseClient"
       ],
-      "line": 10
+      "line": 9
     },
     {
       "source": "src/actions/wiki.ts",
@@ -6157,7 +6207,7 @@
         "DocumentTaskLink",
         "Task"
       ],
-      "line": 11
+      "line": 10
     },
     {
       "source": "src/actions/wiki.ts",
@@ -6165,6 +6215,17 @@
       "type": "imports",
       "specifiers": [
         "logger"
+      ],
+      "line": 11
+    },
+    {
+      "source": "src/actions/wiki.ts",
+      "target": "src/lib/validation/action-schemas.ts",
+      "type": "imports",
+      "specifiers": [
+        "CreateDocSchema",
+        "CreateDocInput",
+        "ActionResponse"
       ],
       "line": 12
     },
@@ -8986,7 +9047,7 @@
     },
     {
       "source": "tests/unit/task-actions.test.ts",
-      "target": "src/actions/tasks.ts",
+      "target": "src/lib/validation/action-schemas.ts",
       "type": "imports",
       "specifiers": [
         "TaskInputSchema",
