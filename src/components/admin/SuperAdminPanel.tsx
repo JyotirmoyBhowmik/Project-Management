@@ -33,9 +33,10 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
 import { EditUserModal } from '@/components/modals/EditUserModal';
+import { GlobalConfigManager } from '@/components/admin/GlobalConfigManager';
 
 export function SuperAdminPanel() {
-  const [activeTab, setActiveTab] = React.useState<'tenants' | 'users' | 'themes' | 'features' | 'audit'>('tenants');
+  const [activeTab, setActiveTab] = React.useState<'tenants' | 'users' | 'themes' | 'features' | 'config' | 'audit'>('tenants');
   const [tenants, setTenants] = React.useState<Tenant[]>([]);
   const [users, setUsers] = React.useState<any[]>([]);
   const [editingUser, setEditingUser] = React.useState<any | null>(null);
@@ -288,6 +289,7 @@ export function SuperAdminPanel() {
           { id: 'users', label: 'User Directory', icon: <Users className="h-4 w-4" />, count: users.length },
           { id: 'themes', label: 'Master Theme Engine', icon: <Palette className="h-4 w-4" />, count: systemThemes.length },
           { id: 'features', label: 'Feature Tiers & Flags', icon: <Sliders className="h-4 w-4" /> },
+          { id: 'config', label: 'Base System Config', icon: <Sliders className="h-4 w-4" /> },
           { id: 'audit', label: 'Global Audit Trail', icon: <Activity className="h-4 w-4" />, count: auditLogs.length },
         ]}
       />
@@ -721,6 +723,13 @@ export function SuperAdminPanel() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Tab: Base System Configuration */}
+      {activeTab === 'config' && (
+        <div className="pt-2">
+          <GlobalConfigManager />
         </div>
       )}
 

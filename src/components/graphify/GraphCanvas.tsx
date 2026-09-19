@@ -22,6 +22,9 @@ import {
   Plus,
   CheckCircle2,
   Clock,
+  GitFork,
+  Network,
+  Search,
 } from 'lucide-react';
 import { Task, TaskDependency, ProjectPhase, ProjectDocument, UserProfile } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +37,8 @@ export interface GraphNode extends d3.SimulationNodeDatum {
   status?: string;
   priority?: string;
   isCritical?: boolean;
+  isSubtask?: boolean;
+  parentId?: string;
   code?: string;
   assignees?: Array<{ id: string; name: string; avatarUrl?: string | null }>;
   meta?: any;
@@ -43,7 +48,7 @@ export interface GraphEdge extends d3.SimulationLinkDatum<GraphNode> {
   id: string;
   source: string | GraphNode;
   target: string | GraphNode;
-  relationship: 'DEPENDS_ON' | 'ASSIGNED_TO' | 'PART_OF' | 'REFERENCES';
+  relationship: 'DEPENDS_ON' | 'ASSIGNED_TO' | 'PART_OF' | 'REFERENCES' | 'SUBTASK_OF';
   depType?: string;
   lagDays?: number;
   isCritical?: boolean;
@@ -90,6 +95,8 @@ export function GraphCanvas({
   // Filters & State
   const [highlightCritical, setHighlightCritical] = React.useState(false);
   const [filterType, setFilterType] = React.useState<string>('all');
+  const [layoutMode, setLayoutMode] = React.useState<'force' | 'tree'>('force');
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [showClusters, setShowClusters] = React.useState(true);
   const [selectedNode, setSelectedNode] = React.useState<GraphNode | null>(null);
 
@@ -106,6 +113,7 @@ export function GraphCanvas({
     // 1. Task & Milestone Nodes
     tasks.forEach((t) => {
       const isMilestone = t.is_milestone || t.duration_days === 0;
+      const isSubtask = Boolean(t.parent_id || t.parent_task_id);
       const n: GraphNode = {
         id: `task-${t.id}`,
         name: t.title,
@@ -113,6 +121,8 @@ export function GraphCanvas({
         status: String(t.status || 'todo'),
         priority: String(t.priority || 'medium'),
         isCritical: Boolean(t.is_critical || t.total_float === 0),
+        isSubtask,
+        parentId: t.parent_id || t.parent_task_id || undefined,
         code: t.task_code || t.code,
         meta: t,
         assignees: t.assignees?.map((a) => ({
@@ -236,16 +246,109 @@ export function GraphCanvas({
       });
     });
 
+    // 9. Subtask Hierarchy Edges (SUBTASK_OF)
+    tasks.forEach((t) => {
+      const parentId = t.parent_id || t.parent_task_id;
+      if (parentId) {
+        const parentNodeId = `task-${parentId}`;
+        const childNodeId = `task-${t.id}`;
+        if (nodeMap.has(parentNodeId) && nodeMap.has(childNodeId)) {
+          eList.push({
+            id: `subtask-${t.id}-${parentId}`,
+            source: childNodeId,
+            target: parentNodeId,
+            relationship: 'SUBTASK_OF',
+          });
+        }
+      }
+    });
+
     return { nodes: nList, edges: eList };
   }, [tasks, dependencies, phases, documents]);
 
-  // D3 Force Simulation
+  // D3 Force Simulation & Hierarchical Tree Layout Engine
   const [simNodes, setSimNodes] = React.useState<GraphNode[]>([]);
   const [simEdges, setSimEdges] = React.useState<GraphEdge[]>([]);
 
   React.useEffect(() => {
     if (nodes.length === 0) return;
 
+    if (layoutMode === 'tree') {
+      // --------------------------------------------------------------------------
+      // Hierarchical WBS Tree Decomposition Layout
+      // Arranges Project Decomposition: Phase -> Parent Tasks -> Child Subtasks
+      // --------------------------------------------------------------------------
+      const phaseNodes = nodes.filter((n) => n.type === 'phase');
+      const rootTaskNodes = nodes.filter((n) => n.type === 'task' && !n.isSubtask);
+      const subtaskNodes = nodes.filter((n) => n.type === 'task' && n.isSubtask);
+      const milestoneNodes = nodes.filter((n) => n.type === 'milestone');
+      const memberNodes = nodes.filter((n) => n.type === 'member');
+      const docNodes = nodes.filter((n) => n.type === 'doc');
+
+      let currentY = 90;
+
+      // Position Root Tasks & their respective child subtasks
+      rootTaskNodes.forEach((rt) => {
+        rt.x = 360;
+        rt.y = currentY;
+        const taskId = rt.id.replace('task-', '');
+        const children = subtaskNodes.filter((st) => st.parentId === taskId);
+
+        if (children.length > 0) {
+          children.forEach((st, cIdx) => {
+            st.x = 650;
+            st.y = currentY + cIdx * 60;
+          });
+          currentY += Math.max(1, children.length) * 60 + 25;
+        } else {
+          currentY += 75;
+        }
+      });
+
+      // Position any unparented subtasks
+      const positionedSubtasks = new Set(subtaskNodes.map((s) => s.id));
+      subtaskNodes
+        .filter((st) => !positionedSubtasks.has(st.id))
+        .forEach((st) => {
+          st.x = 650;
+          st.y = currentY;
+          currentY += 65;
+        });
+
+      // Phases positioned on left column
+      let phaseY = 100;
+      phaseNodes.forEach((p) => {
+        p.x = 100;
+        p.y = phaseY;
+        phaseY += 130;
+      });
+
+      // Milestones aligned on dedicated target lane
+      let mY = 90;
+      milestoneNodes.forEach((m) => {
+        m.x = 510;
+        m.y = mY;
+        mY += 90;
+      });
+
+      // Members clustered at top left
+      memberNodes.forEach((m, idx) => {
+        m.x = 100 + idx * 80;
+        m.y = 35;
+      });
+
+      // Documents clustered at top right
+      docNodes.forEach((d, idx) => {
+        d.x = 580 + idx * 95;
+        d.y = 35;
+      });
+
+      setSimNodes([...nodes]);
+      setSimEdges([...edges]);
+      return;
+    }
+
+    // Force-Directed Physics Simulation
     const simulation = d3
       .forceSimulation<GraphNode>(nodes)
       .force(
@@ -253,7 +356,13 @@ export function GraphCanvas({
         d3
           .forceLink<GraphNode, GraphEdge>(edges)
           .id((d) => d.id)
-          .distance((l) => (l.relationship === 'DEPENDS_ON' ? 140 : 100))
+          .distance((l) =>
+            l.relationship === 'DEPENDS_ON'
+              ? 140
+              : l.relationship === 'SUBTASK_OF'
+              ? 85
+              : 100
+          )
       )
       .force('charge', d3.forceManyBody().strength(-280))
       .force('center', d3.forceCenter(450, 300))
@@ -267,7 +376,7 @@ export function GraphCanvas({
     return () => {
       simulation.stop();
     };
-  }, [nodes, edges]);
+  }, [nodes, edges, layoutMode]);
 
   // Pan & Zoom Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -304,7 +413,7 @@ export function GraphCanvas({
       className={`relative w-full h-[700px] bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden select-none ${className}`}
     >
       {/* Top Controls Toolbar */}
-      <div className="absolute top-4 left-4 z-20 flex items-center gap-2.5 bg-[var(--card)]/90 backdrop-blur-md p-2 rounded-xl border border-[var(--border)] shadow-lg">
+      <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2 bg-[var(--card)]/90 backdrop-blur-md p-2 rounded-xl border border-[var(--border)] shadow-lg max-w-[95%]">
         <div className="flex items-center gap-1.5 px-2 font-bold text-xs text-[var(--foreground)]">
           <Sparkles className="h-4 w-4 text-[var(--primary)]" />
           <span>Graphify Canvas</span>
@@ -315,28 +424,72 @@ export function GraphCanvas({
 
         <div className="h-4 w-[1px] bg-[var(--border)]" />
 
+        {/* Dual Layout Mode Switch */}
+        <div className="flex items-center gap-0.5 bg-[var(--secondary)]/80 p-0.5 rounded-lg text-[11px]">
+          <button
+            type="button"
+            onClick={() => setLayoutMode('force')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+              layoutMode === 'force'
+                ? 'bg-[var(--primary)] text-white shadow-xs'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+            title="Physics Force-Directed Knowledge Network"
+          >
+            <Network className="h-3.5 w-3.5" />
+            <span>Force Graph</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayoutMode('tree')}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer ${
+              layoutMode === 'tree'
+                ? 'bg-[var(--primary)] text-white shadow-xs'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+            title="Hierarchical WBS Tree Decomposition Layout"
+          >
+            <GitFork className="h-3.5 w-3.5" />
+            <span>WBS Tree</span>
+          </button>
+        </div>
+
+        <div className="h-4 w-[1px] bg-[var(--border)]" />
+
+        {/* Search Nodes */}
+        <div className="relative flex items-center">
+          <Search className="h-3 w-3 absolute left-2 text-[var(--muted-foreground)]" />
+          <input
+            type="text"
+            placeholder="Search nodes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-7 w-28 sm:w-36 pl-6 pr-2 rounded-md border border-[var(--border)] bg-[var(--secondary)]/50 text-[11px] text-[var(--foreground)] focus:w-44 transition-all focus:outline-none focus:border-[var(--primary)]"
+          />
+        </div>
+
         {/* Critical Path Toggle */}
         <Button
           size="sm"
           variant={highlightCritical ? 'default' : 'outline'}
           onClick={() => setHighlightCritical(!highlightCritical)}
-          className={`h-7 px-2.5 text-xs font-semibold gap-1.5 transition-all ${
+          className={`h-7 px-2 text-xs font-semibold gap-1 transition-all ${
             highlightCritical ? 'bg-red-600 hover:bg-red-700 text-white shadow-xs' : ''
           }`}
         >
-          <span className={`h-2 w-2 rounded-full ${highlightCritical ? 'bg-white animate-ping' : 'bg-red-500'}`} />
-          <span>Critical Path</span>
+          <span className={`h-1.5 w-1.5 rounded-full ${highlightCritical ? 'bg-white animate-ping' : 'bg-red-500'}`} />
+          <span>CPM</span>
         </Button>
 
         {/* Filter Pill */}
-        <div className="flex items-center gap-1 bg-[var(--secondary)]/60 p-0.5 rounded-lg text-[11px]">
-          {['all', 'task', 'phase', 'doc', 'member'].map((type) => (
+        <div className="flex items-center gap-0.5 bg-[var(--secondary)]/60 p-0.5 rounded-lg text-[10px]">
+          {['all', 'task', 'subtask', 'milestone', 'phase', 'doc', 'member'].map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
-              className={`px-2 py-0.5 rounded-md font-medium capitalize transition-colors ${
+              className={`px-1.5 py-0.5 rounded font-medium capitalize transition-colors cursor-pointer ${
                 filterType === type
-                  ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                  ? 'bg-[var(--primary)] text-[var(--primary-foreground)] font-bold'
                   : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
               }`}
             >
@@ -422,6 +575,10 @@ export function GraphCanvas({
             } else if (edge.relationship === 'REFERENCES') {
               stroke = '#a855f7';
               marker = 'none';
+            } else if (edge.relationship === 'SUBTASK_OF') {
+              stroke = '#f59e0b';
+              strokeDash = '3,3';
+              marker = 'none';
             }
 
             if (isEdgeCritical) {
@@ -437,7 +594,7 @@ export function GraphCanvas({
                   x2={tgt.x}
                   y2={tgt.y}
                   stroke={stroke}
-                  strokeWidth={isEdgeCritical ? 3 : 1.5}
+                  strokeWidth={isEdgeCritical ? 3 : edge.relationship === 'SUBTASK_OF' ? 2 : 1.5}
                   strokeDasharray={strokeDash}
                   markerEnd={marker}
                   filter={isEdgeCritical ? 'url(#cpm-neon-glow)' : 'none'}
@@ -452,6 +609,19 @@ export function GraphCanvas({
                     textAnchor="middle"
                   >
                     {edge.depType}
+                    {edge.lagDays ? `+${edge.lagDays}d` : ''}
+                  </text>
+                )}
+                {edge.relationship === 'SUBTASK_OF' && (
+                  <text
+                    x={(src.x + tgt.x) / 2}
+                    y={(src.y + tgt.y) / 2 - 4}
+                    fontSize="8"
+                    fontWeight="bold"
+                    fill="#f59e0b"
+                    textAnchor="middle"
+                  >
+                    ↳ child
                   </text>
                 )}
               </g>
@@ -474,10 +644,17 @@ export function GraphCanvas({
           {/* Nodes */}
           {simNodes.map((node) => {
             if (node.x === undefined || node.y === undefined) return null;
-            if (filterType !== 'all' && node.type !== filterType) return null;
+            if (filterType === 'subtask' && !node.isSubtask) return null;
+            if (filterType === 'task' && (node.isSubtask || node.type !== 'task')) return null;
+            if (filterType !== 'all' && filterType !== 'subtask' && node.type !== filterType) return null;
+
+            const isMatchedBySearch =
+              !searchQuery.trim() ||
+              node.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (node.code && node.code.toLowerCase().includes(searchQuery.toLowerCase()));
 
             const isNodeCritical = highlightCritical && node.isCritical;
-            const isDimmed = highlightCritical && !node.isCritical;
+            const isDimmed = (highlightCritical && !node.isCritical) || (!isMatchedBySearch && !!searchQuery.trim());
             const isSelected = selectedNode?.id === node.id;
 
             return (
@@ -552,11 +729,30 @@ export function GraphCanvas({
                     rx={8}
                     fill="var(--card)"
                     stroke={
-                      isSelected ? '#fbbf24' : isNodeCritical ? '#ef4444' : STATUS_COLORS[node.status || 'todo']
+                      isSelected
+                        ? '#fbbf24'
+                        : isNodeCritical
+                        ? '#ef4444'
+                        : node.isSubtask
+                        ? '#f59e0b'
+                        : STATUS_COLORS[node.status || 'todo']
                     }
-                    strokeWidth={isSelected || isNodeCritical ? 3 : 1.5}
+                    strokeWidth={isSelected || isNodeCritical ? 3 : node.isSubtask ? 2 : 1.5}
                     filter={isNodeCritical ? 'url(#cpm-neon-glow)' : 'none'}
                   />
+                )}
+
+                {/* Subtask indicator badge */}
+                {node.isSubtask && (
+                  <text
+                    x={-34}
+                    y={-22}
+                    fontSize="8"
+                    fontWeight="bold"
+                    fill="#f59e0b"
+                  >
+                    ↳ SUBTASK
+                  </text>
                 )}
 
                 {/* Node Icons / Labels */}

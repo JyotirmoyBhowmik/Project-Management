@@ -4,6 +4,7 @@ import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TenantMetadataProvider } from '@/lib/context/tenant-metadata-context';
 import { DynamicThemeProvider } from '@/lib/theme/dynamic-theme-provider';
+import { AppConfigProvider } from '@/lib/context/app-config-context';
 import { Toaster } from 'sonner';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -21,12 +22,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TenantMetadataProvider>
-        <DynamicThemeProvider>
-          {children}
-          <Toaster richColors position="top-right" />
-        </DynamicThemeProvider>
-      </TenantMetadataProvider>
+      <AppConfigProvider>
+        <TenantMetadataProvider>
+          <DynamicThemeProvider>
+            {children}
+            <Toaster richColors position="top-right" />
+          </DynamicThemeProvider>
+        </TenantMetadataProvider>
+      </AppConfigProvider>
     </QueryClientProvider>
   );
 }

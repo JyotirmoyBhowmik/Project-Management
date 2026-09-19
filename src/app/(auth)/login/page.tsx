@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { lookupSSOByDomainAction } from '@/actions/identity';
+import { useAppConfig } from '@/lib/context/app-config-context';
 import { cn } from '@/lib/utils';
 
 function LoginPageContent() {
@@ -37,6 +38,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const supabase = createClient();
   const { setActiveTenant, setCurrentUser } = useTenantStore();
+  const { config, renderAppIcon } = useAppConfig();
 
   const [step, setStep] = React.useState<1 | 2>(1);
   const [workspaceCode, setWorkspaceCode] = React.useState('');
@@ -279,14 +281,32 @@ function LoginPageContent() {
       <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-2xl space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="h-12 w-12 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center font-bold text-xl mx-auto shadow-lg shadow-blue-500/20">
-            P
+          <div
+            className="h-12 w-12 rounded-2xl text-white flex items-center justify-center font-bold text-xl mx-auto shadow-lg"
+            style={{ backgroundColor: config.primary_color || '#3b82f6' }}
+          >
+            {renderAppIcon({ className: 'h-6 w-6' })}
           </div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">Enterprise PMS</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
+            {config.app_name || 'Enterprise PMS'}
+          </h1>
           <p className="text-xs text-[var(--muted-foreground)]">
-            Multi-Tenant Project Management & Critical Path Scheduling Platform
+            {config.app_tagline || 'Multi-Tenant Project Management & Critical Path Scheduling Platform'}
           </p>
         </div>
+
+        {/* Maintenance Mode Public Alert */}
+        {config.control_features?.maintenance_mode && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-300 space-y-1">
+            <div className="flex items-center gap-1.5 font-bold text-amber-400">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>Scheduled Maintenance In Progress</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-amber-200/90">
+              {config.control_features.maintenance_message}
+            </p>
+          </div>
+        )}
 
         {/* Database Connection Notice (When Supabase env vars not configured) */}
         {!isSupabaseConfigured && (

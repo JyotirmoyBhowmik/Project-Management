@@ -27,6 +27,7 @@ import { useRouter } from 'next/navigation';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { useDynamicTheme } from '@/lib/theme/dynamic-theme-provider';
 import { useTenantMetadata } from '@/lib/context/tenant-metadata-context';
+import { useAppConfig } from '@/lib/context/app-config-context';
 import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
 import { dbService } from '@/lib/supabase/db-service';
@@ -38,6 +39,7 @@ export function Header() {
   const { activeTenant, activeRole, currentUser, memberships, setActiveTenant } = useTenantStore();
   const { activeThemeId, systemThemes, setTheme } = useDynamicTheme();
   const { rolePermissions } = useTenantMetadata();
+  const { config, renderAppIcon } = useAppConfig();
 
   const [tenantMenuOpen, setTenantMenuOpen] = React.useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = React.useState(false);
@@ -126,8 +128,34 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 sm:px-6 transition-colors shadow-xs">
-      {/* Left: Active Tenant Identifier & Workspace Switcher */}
+      {/* Left: Dynamic Application Branding & Workspace Switcher */}
       <div className="flex items-center gap-3">
+        <Link
+          href="/"
+          className="flex items-center gap-2 hover:opacity-90 transition-opacity pr-2 border-r border-[var(--border)]"
+          title={`${config.app_name} - ${config.app_tagline}`}
+        >
+          <div
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
+            style={{ backgroundColor: config.primary_color || '#3b82f6' }}
+          >
+            {renderAppIcon({ className: 'h-4 w-4' })}
+          </div>
+          <div className="hidden lg:flex flex-col text-left">
+            <div className="flex items-center gap-1.5 leading-tight">
+              <span className="font-bold text-xs text-[var(--foreground)] tracking-tight">
+                {config.app_name}
+              </span>
+              <span className="px-1 py-0.2 rounded text-[9px] font-mono font-semibold bg-[var(--secondary)] text-[var(--muted-foreground)]">
+                {config.app_short_name}
+              </span>
+            </div>
+            <span className="text-[9px] text-[var(--muted-foreground)] truncate max-w-[130px]">
+              {config.company_name}
+            </span>
+          </div>
+        </Link>
+
         <div className="relative">
           <button
             onClick={() => {

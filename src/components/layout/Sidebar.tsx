@@ -22,13 +22,16 @@ import {
   Trash2,
   Users,
   KeyRound,
+  Sliders,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
+import { useAppConfig } from '@/lib/context/app-config-context';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
   const { activeTenant, activeRole, currentUser } = useTenantStore();
+  const { config, isFeatureEnabled, renderAppIcon } = useAppConfig();
 
   const isGuest = activeRole === 'guest';
   const isSuperadmin = Boolean(currentUser?.is_superadmin) || currentUser?.email === 'admin@jyotirmoyb.com';
@@ -47,12 +50,16 @@ export function Sidebar() {
       icon: FolderGit2,
       disabled: false,
     },
-    {
-      label: 'Timesheets & EVM',
-      href: '/timesheets',
-      icon: Clock,
-      disabled: false,
-    },
+    ...(isFeatureEnabled('enable_evm')
+      ? [
+          {
+            label: 'Timesheets & EVM',
+            href: '/timesheets',
+            icon: Clock,
+            disabled: false,
+          },
+        ]
+      : []),
   ];
 
   const adminItems = [
@@ -95,6 +102,13 @@ export function Sidebar() {
       label: 'SuperAdmin Network',
       href: '/admin/superadmin',
       icon: Server,
+      disabled: !isSuperadmin,
+      restrictedMessage: 'Requires SuperAdmin role',
+    },
+    {
+      label: 'System Configuration',
+      href: '/admin/system/config',
+      icon: Sliders,
       disabled: !isSuperadmin,
       restrictedMessage: 'Requires SuperAdmin role',
     },
@@ -215,6 +229,15 @@ export function Sidebar() {
           <Database className="h-3 w-3" />
           <span>PostgreSQL 16 RLS Active</span>
         </div>
+      </div>
+
+      {/* Platform Version & App Branding */}
+      <div className="p-2.5 border-t border-[var(--border)] text-center text-[10px] text-[var(--muted-foreground)]">
+        <div className="font-semibold text-[var(--foreground)] flex items-center justify-center gap-1.5">
+          {renderAppIcon({ className: 'h-3.5 w-3.5 text-[var(--primary)]' })}
+          <span>{config.app_name}</span>
+        </div>
+        <div>v1.0 • {config.company_name}</div>
       </div>
     </aside>
   );

@@ -32,6 +32,7 @@ import {
   Flag,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
+import { useAppConfig } from '@/lib/context/app-config-context';
 import { createClient } from '@/lib/supabase/client';
 import { dbService } from '@/lib/supabase/db-service';
 import {
@@ -77,6 +78,7 @@ function ProjectWorkspaceContent() {
   const supabase = createClient();
 
   const { activeTenant, activeRole, currentUser } = useTenantStore();
+  const { isFeatureEnabled } = useAppConfig();
 
   const searchParams = useSearchParams();
   const rawView = searchParams?.get('view') || 'gantt';
@@ -416,16 +418,22 @@ function ProjectWorkspaceContent() {
         </div>
       </div>
 
-      {/* Navigation Tabs (Gantt, Kanban, Grid, Calendar, Resource) */}
+      {/* Navigation Tabs (Gantt, Kanban, Grid, Calendar, Resource, Agile, Docs, Graph) */}
       <div className="border-b border-[var(--border)]">
         <div className="flex gap-2 overflow-x-auto pb-px">
           {[
             { id: 'gantt', label: 'Interactive Gantt & CPM', icon: GanttChartSquare },
             { id: 'kanban', label: `Kanban Board (${displayedTasks.length})`, icon: Kanban },
             { id: 'grid', label: 'Hierarchical Grid', icon: Table },
-            { id: 'graph', label: 'Graphify Network', icon: Sparkles },
-            { id: 'sprint', label: `Agile Sprints (${sprints.length})`, icon: Flame },
-            { id: 'wiki', label: `Living Docs (${documents.length})`, icon: Layers },
+            ...(isFeatureEnabled('enable_graphify')
+              ? [{ id: 'graph', label: 'Graphify Network', icon: Sparkles }]
+              : []),
+            ...(isFeatureEnabled('enable_sprints')
+              ? [{ id: 'sprint', label: `Agile Sprints (${sprints.length})`, icon: Flame }]
+              : []),
+            ...(isFeatureEnabled('enable_wiki')
+              ? [{ id: 'wiki', label: `Living Docs (${documents.length})`, icon: Layers }]
+              : []),
             { id: 'calendar', label: 'Calendar Schedule', icon: CalendarDays },
             { id: 'resource', label: 'Resource Heatmap', icon: Users },
           ].map((tab) => {
