@@ -153,7 +153,7 @@ export async function getProjectEVMMetricsAction(
     // 2. Fetch Tasks with progress & dates
     const { data: tasksData, error: taskError } = await supabase
       .from('tasks')
-      .select('id, duration_days, progress, start_date, end_date')
+      .select('id, duration_days, progress, progress_percent, start_date, end_date')
       .eq('project_id', projectId)
       .is('deleted_at', null);
 
@@ -169,9 +169,9 @@ export async function getProjectEVMMetricsAction(
     let plannedProgress = 0;
     const nowStr = new Date().toISOString().split('T')[0];
 
-    tasks.forEach((t) => {
+    tasks.forEach((t: any) => {
       const weight = (Number(t.duration_days) || 1) / totalDuration;
-      const progress = (Number(t.progress) || 0) / 100;
+      const progress = (Number(t.progress ?? t.progress_percent) || 0) / 100;
       weightedProgress += weight * progress;
 
       // Planned Value calculation based on schedule

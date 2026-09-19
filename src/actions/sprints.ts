@@ -158,7 +158,7 @@ export async function getProjectSprintsAction(projectId: string): Promise<Action
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase
       .from('project_sprints')
-      .select('*, tasks:tasks(id, title, task_code, status, priority, story_points, progress, assignees:task_assignments(user_id, user:profiles(id, full_name, avatar_url)))')
+      .select('*, tasks:tasks(id, title, task_code, status, priority, story_points, progress, assignees:task_assignees(user_id, user:profiles(id, full_name, avatar_url)))')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
 

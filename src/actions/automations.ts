@@ -172,11 +172,15 @@ export async function dispatchAutomationTriggerAction(
             .eq('id', eventPayload.taskId);
           actionResults.push({ action: 'update_field', success: !error });
         } else if (act.action_type === 'assign_user' && eventPayload.taskId && act.payload.user_id) {
-          await supabase.from('task_assignments').upsert({
+          const { error: assignErr } = await supabase.from('task_assignees').upsert({
+            tenant_id: tenantId,
             task_id: eventPayload.taskId,
             user_id: act.payload.user_id,
+            allocation_percent: 100,
+            allocated_hours_per_day: 8,
+            role: 'Assignee',
           });
-          actionResults.push({ action: 'assign_user', success: true });
+          actionResults.push({ action: 'assign_user', success: !assignErr });
         }
       }
 

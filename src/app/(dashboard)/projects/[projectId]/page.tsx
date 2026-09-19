@@ -67,6 +67,7 @@ import { useProjectPresence } from '@/lib/realtime/presence-service';
 import { calculateCPM } from '@/lib/cpm/cpm-engine';
 import { getProjectSprintsAction } from '@/actions/sprints';
 import { getDocumentTreeAction } from '@/actions/wiki';
+import { toast } from 'sonner';
 
 function ProjectWorkspaceContent() {
   const params = useParams();
@@ -200,6 +201,7 @@ function ProjectWorkspaceContent() {
     if (tasks.length === 0 || !tenantId) return;
 
     setIsCpmCalculating(true);
+    const toastId = toast.loading('Calculating Critical Path (CPM)...');
     try {
       const cpmResult = calculateCPM(tasks, dependencies, calendar, holidays);
 
@@ -223,8 +225,11 @@ function ProjectWorkspaceContent() {
       );
 
       await refreshProjectData();
-    } catch (err) {
+      const criticalCount = cpmResult.criticalPathTaskIds?.length || cpmResult.tasks.filter(t => t.is_critical).length;
+      toast.success(`CPM completed successfully. ${criticalCount} critical task(s) identified.`, { id: toastId });
+    } catch (err: any) {
       console.error('CPM execution failed:', err);
+      toast.error(err?.message || 'CPM calculation failed. Check for circular dependencies.', { id: toastId });
     } finally {
       setIsCpmCalculating(false);
     }
@@ -251,9 +256,11 @@ function ProjectWorkspaceContent() {
       }
       setIsLockBaselineModalOpen(false);
       setBaselineName('');
+      toast.success(`Baseline "${baselineName.trim()}" locked successfully.`);
       await refreshProjectData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed creating baseline:', err);
+      toast.error(err?.message || 'Failed to lock baseline snapshot.');
     } finally {
       setIsLockingBaseline(false);
     }

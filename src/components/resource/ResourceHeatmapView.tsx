@@ -26,6 +26,7 @@ import {
   CalendarHoliday,
 } from '@/types/database';
 import { computeResourceWorkload, ResourceHeatmapResult } from '@/lib/resource/resource-engine';
+import { parseISODate, formatDateToISO } from '@/lib/calendar/calendar-engine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -83,7 +84,12 @@ export function ResourceHeatmapView({
         maxDate = dates[dates.length - 1];
       }
     }
-    const end = timeRange === '2weeks' ? minDate : maxDate;
+    let end = maxDate;
+    if (timeRange === '2weeks') {
+      const d = parseISODate(minDate);
+      d.setUTCDate(d.getUTCDate() + 13);
+      end = formatDateToISO(d);
+    }
     return { startDate: minDate, endDate: end };
   }, [timeRange, tasks]);
 

@@ -13,7 +13,14 @@ interface ProjectCalendarViewProps {
 }
 
 export function ProjectCalendarView({ tasks, calendar, holidays }: ProjectCalendarViewProps) {
-  const [currentMonthDate, setCurrentMonthDate] = React.useState(new Date(Date.UTC(2026, 9, 1))); // Oct 2026
+  const [currentMonthDate, setCurrentMonthDate] = React.useState<Date>(() => {
+    if (tasks.length > 0 && tasks[0].start_date) {
+      const parsed = parseISODate(tasks[0].start_date);
+      return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), 1));
+    }
+    const today = new Date();
+    return new Date(Date.UTC(today.getFullYear(), today.getMonth(), 1));
+  });
 
   const prevMonth = () => {
     setCurrentMonthDate(prev => new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth() - 1, 1)));
