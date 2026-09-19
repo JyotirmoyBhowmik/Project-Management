@@ -209,6 +209,12 @@ export interface Task {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+  // Phase 5 Fields
+  sprint_id?: string | null;
+  story_points?: number | null;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  sla_status?: 'ok' | 'warning' | 'breached';
   // Relations & Dynamic Custom Fields
   assignees?: TaskAssignee[];
   predecessors?: TaskDependency[];
@@ -463,4 +469,199 @@ export interface SystemHealthAuditReport {
     active_realtime_connections?: number;
   };
 }
+
+// ------------------------------------------------------------------------------
+// Phase 5: Financial Budgets & EVM, Agile Sprints, No-Code Automations,
+// Living Documentation (Wiki), Universal Soft-Delete & Governance
+// ------------------------------------------------------------------------------
+
+export interface TenantUserRate {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  hourly_cost_rate: number;
+  hourly_billable_rate: number;
+  effective_from: string;
+  created_at: string;
+  updated_at: string;
+  user?: UserProfile;
+}
+
+export interface ProjectBudget {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  total_planned_budget: number;
+  currency: string;
+  budget_type: 'fixed' | 'time_and_materials';
+  created_at: string;
+  updated_at: string;
+}
+
+export type TimeLogApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface TaskTimeLog {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  task_id: string;
+  user_id: string;
+  date_worked: string; // YYYY-MM-DD
+  hours_spent: number;
+  is_billable: boolean;
+  description: string | null;
+  approval_status: TimeLogApprovalStatus;
+  approved_by: string | null;
+  rejection_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+  user?: UserProfile;
+  task?: Task;
+}
+
+export interface EVMMetrics {
+  planned_value: number;       // PV
+  earned_value: number;        // EV
+  actual_cost: number;         // AC
+  cost_variance: number;       // CV = EV - AC
+  schedule_variance: number;   // SV = EV - PV
+  cpi: number;                 // CPI = EV / AC
+  spi: number;                 // SPI = EV / PV
+  budget_at_completion: number;// BAC
+  estimate_at_completion: number; // EAC = BAC / CPI
+  estimate_to_complete: number;   // ETC = EAC - AC
+  variance_at_completion: number; // VAC = BAC - EAC
+  total_hours_logged: number;
+  billable_hours_logged: number;
+}
+
+export type SprintStatus = 'planning' | 'active' | 'completed';
+
+export interface ProjectSprint {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  sprint_goal?: string | null;
+  start_date: string;
+  end_date: string;
+  status: SprintStatus;
+  created_at: string;
+  updated_at: string;
+  tasks?: Task[];
+  total_story_points?: number;
+  completed_story_points?: number;
+}
+
+export interface SprintBurndownPoint {
+  date: string;
+  ideal_remaining: number;
+  actual_remaining: number;
+}
+
+export interface SprintBurnupPoint {
+  date: string;
+  total_scope: number;
+  completed_points: number;
+}
+
+export interface CumulativeFlowPoint {
+  date: string;
+  todo: number;
+  in_progress: number;
+  in_review: number;
+  completed: number;
+}
+
+export interface AgileSprintMetrics {
+  sprint: ProjectSprint;
+  burndown: SprintBurndownPoint[];
+  burnup: SprintBurnupPoint[];
+  cfd: CumulativeFlowPoint[];
+  velocity_history: Array<{ sprint_name: string; points: number }>;
+}
+
+export interface TenantAutomation {
+  id: string;
+  tenant_id: string;
+  project_id?: string | null;
+  name: string;
+  is_active: boolean;
+  trigger_type: 'task_status_changed' | 'task_created' | 'due_date_approaching' | 'dependency_cleared';
+  trigger_config: Record<string, unknown>;
+  conditions: Array<{
+    field: string;
+    operator: 'equals' | 'not_equals' | 'greater_than' | 'contains' | 'is_empty';
+    value: unknown;
+  }>;
+  actions: Array<{
+    action_type: 'update_field' | 'assign_user' | 'dispatch_webhook' | 'create_subtask';
+    payload: Record<string, unknown>;
+  }>;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AutomationExecutionLog {
+  id: string;
+  tenant_id: string;
+  automation_id: string;
+  triggered_at: string;
+  status: 'success' | 'failed' | 'skipped';
+  log_details: Record<string, unknown>;
+}
+
+export interface TenantWebhook {
+  id: string;
+  tenant_id: string;
+  target_url: string;
+  secret_hash: string;
+  subscribed_events: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectDocument {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  parent_doc_id?: string | null;
+  title: string;
+  content_json: Record<string, unknown>;
+  sort_order: number;
+  created_by?: string | null;
+  updated_by?: string | null;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  author?: UserProfile;
+  children?: ProjectDocument[];
+  linked_tasks?: Task[];
+}
+
+export interface DocumentTaskLink {
+  doc_id: string;
+  task_id: string;
+  tenant_id: string;
+  created_at: string;
+  task?: Task;
+  document?: ProjectDocument;
+}
+
+export interface SoftDeletedItem {
+  id: string;
+  entity_type: 'task' | 'project' | 'phase' | 'document';
+  title: string;
+  code?: string;
+  deleted_at: string;
+  deleted_by?: string | null;
+  deleter_name?: string;
+  tenant_id: string;
+  project_id?: string;
+  project_name?: string;
+}
+
 

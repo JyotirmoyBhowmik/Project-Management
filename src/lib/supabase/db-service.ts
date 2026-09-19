@@ -10,6 +10,7 @@ import {
   UserProfile,
   TenantMembership,
   Project,
+  ProjectPhase,
   Task,
   TaskDependency,
   WorkingCalendar,
@@ -349,6 +350,30 @@ export class DatabaseService {
     } catch (err) {
       logger.error('Failed updating project', { fn: 'dbService.updateProject', err });
       throw err;
+    }
+  }
+
+  public async getProjectPhases(projectId: string, tenantId?: string, client?: any): Promise<ProjectPhase[]> {
+    const supabase = getSupabase(client);
+    try {
+      let query = supabase
+        .from('phases')
+        .select('*')
+        .eq('project_id', projectId)
+        .is('deleted_at', null)
+        .order('sort_order', { ascending: true });
+
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+
+      const { data, error } = await query;
+      if (error) {
+        logger.warn('Failed querying phases', { fn: 'dbService.getProjectPhases', ctx: { error: error.message } });
+        return [];
+      }
+      return (data || []) as ProjectPhase[];
+    } catch (err) {
+      logger.error('Exception querying project phases', { fn: 'dbService.getProjectPhases', err });
+      return [];
     }
   }
 

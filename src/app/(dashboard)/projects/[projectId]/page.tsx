@@ -43,6 +43,9 @@ import {
   TaskBaselineSnapshot,
   TaskPriority,
   TaskStatus,
+  ProjectSprint,
+  ProjectDocument,
+  ProjectPhase,
 } from '@/types/database';
 import { Tabs } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -54,11 +57,16 @@ import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { HierarchicalGrid } from '@/components/grid/HierarchicalGrid';
 import { ProjectCalendarView } from '@/components/calendar/ProjectCalendarView';
 import { ResourceHeatmapView } from '@/components/resource/ResourceHeatmapView';
+import { GraphCanvas } from '@/components/graphify/GraphCanvas';
+import { SprintPlanningView } from '@/components/agile/SprintPlanningView';
+import { WikiWorkspace } from '@/components/wiki/WikiWorkspace';
 import { ImportExportModal } from '@/components/exchange/ImportExportModal';
 import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
 import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
 import { useProjectPresence } from '@/lib/realtime/presence-service';
 import { calculateCPM } from '@/lib/cpm/cpm-engine';
+import { getProjectSprintsAction } from '@/actions/sprints';
+import { getDocumentTreeAction } from '@/actions/wiki';
 
 function ProjectWorkspaceContent() {
   const params = useParams();
@@ -71,7 +79,7 @@ function ProjectWorkspaceContent() {
   const searchParams = useSearchParams();
   const rawView = searchParams?.get('view') || 'gantt';
   const viewParam = rawView === 'heatmap' ? 'resource' : rawView;
-  const validViews = ['gantt', 'kanban', 'grid', 'calendar', 'resource'] as const;
+  const validViews = ['gantt', 'kanban', 'grid', 'graph', 'sprint', 'wiki', 'calendar', 'resource'] as const;
   type ViewType = typeof validViews[number];
   const activeView: ViewType = (validViews as readonly string[]).includes(viewParam) ? (viewParam as ViewType) : 'gantt';
 
@@ -98,6 +106,9 @@ function ProjectWorkspaceContent() {
   const [baselines, setBaselines] = React.useState<ProjectBaseline[]>([]);
   const [selectedBaselineId, setSelectedBaselineId] = React.useState<string | null>(null);
   const [baselineSnapshots, setBaselineSnapshots] = React.useState<TaskBaselineSnapshot[]>([]);
+  const [sprints, setSprints] = React.useState<ProjectSprint[]>([]);
+  const [documents, setDocuments] = React.useState<ProjectDocument[]>([]);
+  const [phases, setPhases] = React.useState<ProjectPhase[]>([]);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isCpmCalculating, setIsCpmCalculating] = React.useState(false);
@@ -107,8 +118,6 @@ function ProjectWorkspaceContent() {
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = React.useState(false);
   const [isLockBaselineModalOpen, setIsLockBaselineModalOpen] = React.useState(false);
   const [exchangeMode, setExchangeMode] = React.useState<'import' | 'export' | null>(null);
-
-
 
   // Baseline Form
   const [baselineName, setBaselineName] = React.useState('');
@@ -130,13 +139,16 @@ function ProjectWorkspaceContent() {
     try {
       setIsLoading(true);
 
-      const [prj, prjTasks, prjDeps, prjCal, prjHols, prjBaselines] = await Promise.all([
+      const [prj, prjTasks, prjDeps, prjCal, prjHols, prjBaselines, sprintsRes, docsRes, prjPhases] = await Promise.all([
         dbService.getProjectDetails(projectId, tenantId, supabase),
         dbService.getProjectTasks(projectId, tenantId, supabase),
         dbService.getProjectDependencies(projectId, tenantId, supabase),
         dbService.getWorkingCalendar(tenantId, null, supabase),
         dbService.getCalendarHolidays(tenantId, supabase),
         dbService.getProjectBaselines(projectId, tenantId, supabase),
+        getProjectSprintsAction(projectId),
+        getDocumentTreeAction(projectId),
+        dbService.getProjectPhases(projectId, tenantId, supabase),
       ]);
 
       setProject(prj);
@@ -145,6 +157,14 @@ function ProjectWorkspaceContent() {
       setCalendar(prjCal);
       setHolidays(prjHols);
       setBaselines(prjBaselines);
+      setPhases(prjPhases || []);
+
+      if (sprintsRes.success && sprintsRes.data) {
+        setSprints(sprintsRes.data);
+      }
+      if (docsRes.success && docsRes.data) {
+        setDocuments(docsRes.data);
+      }
 
       if (prjBaselines.length > 0 && !selectedBaselineId) {
         setSelectedBaselineId(prjBaselines[0].id);
@@ -363,6 +383,9 @@ function ProjectWorkspaceContent() {
             { id: 'gantt', label: 'Interactive Gantt & CPM', icon: GanttChartSquare },
             { id: 'kanban', label: `Kanban Board (${tasks.length})`, icon: Kanban },
             { id: 'grid', label: 'Hierarchical Grid', icon: Table },
+            { id: 'graph', label: 'Graphify Network', icon: Sparkles },
+            { id: 'sprint', label: `Agile Sprints (${sprints.length})`, icon: Flame },
+            { id: 'wiki', label: `Living Docs (${documents.length})`, icon: Layers },
             { id: 'calendar', label: 'Calendar Schedule', icon: CalendarDays },
             { id: 'resource', label: 'Resource Heatmap', icon: Users },
           ].map((tab) => {
@@ -485,6 +508,53 @@ function ProjectWorkspaceContent() {
               await dbService.updateTask(taskId, updates, supabase);
               await refreshProjectData();
             }}
+            onSelectTask={(t) => setSelectedTaskForDrawer(t)}
+          />
+        )}
+
+        {activeView === 'graph' && (
+          <GraphCanvas
+            tasks={tasks}
+            dependencies={dependencies}
+            phases={phases}
+            documents={documents}
+            onSelectTask={(t) => setSelectedTaskForDrawer(t)}
+            onCreateDependency={async (predId, succId, type) => {
+              if (!projectId || !tenantId) return;
+              await dbService.createDependency(
+                {
+                  project_id: projectId,
+                  tenant_id: tenantId,
+                  predecessor_id: predId,
+                  successor_id: succId,
+                  dependency_type: type,
+                  lag_days: 0,
+                },
+                supabase
+              );
+              await refreshProjectData();
+            }}
+          />
+        )}
+
+        {activeView === 'sprint' && (
+          <SprintPlanningView
+            tasks={tasks}
+            sprints={sprints}
+            projectId={projectId}
+            tenantId={tenantId || ''}
+            onRefresh={refreshProjectData}
+            onSelectTask={(t) => setSelectedTaskForDrawer(t)}
+          />
+        )}
+
+        {activeView === 'wiki' && (
+          <WikiWorkspace
+            documents={documents}
+            tasks={tasks}
+            projectId={projectId}
+            tenantId={tenantId || ''}
+            onRefresh={refreshProjectData}
             onSelectTask={(t) => setSelectedTaskForDrawer(t)}
           />
         )}

@@ -17,6 +17,9 @@ import {
   Layers,
   Database,
   Lock,
+  Clock,
+  Zap,
+  Trash2,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { cn } from '@/lib/utils';
@@ -42,6 +45,12 @@ export function Sidebar() {
       icon: FolderGit2,
       disabled: false,
     },
+    {
+      label: 'Timesheets & EVM',
+      href: '/timesheets',
+      icon: Clock,
+      disabled: false,
+    },
   ];
 
   const adminItems = [
@@ -49,6 +58,20 @@ export function Sidebar() {
       label: 'Tenant Admin',
       href: '/admin/tenant',
       icon: ShieldCheck,
+      disabled: isGuest && !isSuperadmin,
+      restrictedMessage: 'Restricted for guest accounts',
+    },
+    {
+      label: 'Workflow Automations',
+      href: '/settings/automations',
+      icon: Zap,
+      disabled: isGuest && !isSuperadmin,
+      restrictedMessage: 'Restricted for guest accounts',
+    },
+    {
+      label: 'Recycle Bin',
+      href: '/settings/trash',
+      icon: Trash2,
       disabled: isGuest && !isSuperadmin,
       restrictedMessage: 'Restricted for guest accounts',
     },

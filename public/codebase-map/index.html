@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise PMS - Codebase Architecture & Dependency Graph</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+    }
+
+    #graph-container {
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    svg:active {
+      cursor: grabbing;
+    }
+
+    /* Overlay Header & Controls */
+    .top-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-pill {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      font-weight: 600;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .search-box {
+      background: rgba(31, 41, 55, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #fff;
+      outline: none;
+      width: 220px;
+      transition: all 0.2s;
+    }
+
+    .search-box:focus {
+      border-color: var(--primary);
+      width: 280px;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .filter-btn {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      background: rgba(31, 41, 55, 0.6);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* Node & Link Styles */
+    .links line {
+      stroke: #374151;
+      stroke-opacity: 0.5;
+      stroke-width: 1.2px;
+      transition: stroke-opacity 0.2s, stroke 0.2s;
+    }
+
+    .links line.highlighted {
+      stroke: #60a5fa;
+      stroke-opacity: 1;
+      stroke-width: 2.5px;
+    }
+
+    .nodes circle {
+      stroke: #1f2937;
+      stroke-width: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nodes circle:hover {
+      stroke: #ffffff;
+      stroke-width: 3px;
+      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+    }
+
+    .nodes circle.selected {
+      stroke: #fbbf24;
+      stroke-width: 4px;
+      filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.8));
+    }
+
+    .nodes text {
+      font-size: 10px;
+      fill: #d1d5db;
+      pointer-events: none;
+      font-weight: 500;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Inspector Sidebar */
+    .sidebar {
+      width: 380px;
+      height: 100%;
+      background: var(--card-bg);
+      border-left: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      box-shadow: -10px 0 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sidebar-body {
+      padding: 16px;
+      overflow-y: auto;
+      flex: 1;
+      space-y: 16px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .metric-card {
+      background: rgba(31, 41, 55, 0.5);
+      border: 1px solid var(--card-border);
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+      font-family: monospace;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+
+    .symbol-list, .dep-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .symbol-item, .dep-item {
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(31, 41, 55, 0.4);
+      border: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .symbol-item:hover, .dep-item:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .symbol-kind {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* Floating Legend */
+    .legend {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      font-size: 11px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      max-width: 600px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div id="graph-container">
+    <div class="top-bar">
+      <div class="brand-title">
+        <span>⚡ Codebase Map</span>
+        <span class="badge-pill" id="stats-badge">Indexing...</span>
+      </div>
+      <input type="text" id="search-input" class="search-box" placeholder="Search files, actions, symbols...">
+      <div class="filter-pills" id="filter-container">
+        <button class="filter-btn active" data-type="all">All</button>
+        <button class="filter-btn" data-type="action">Actions</button>
+        <button class="filter-btn" data-type="component">Components</button>
+        <button class="filter-btn" data-type="lib">Lib</button>
+        <button class="filter-btn" data-type="page">Pages</button>
+        <button class="filter-btn" data-type="database">Database</button>
+      </div>
+    </div>
+
+    <svg id="canvas">
+      <defs>
+        <marker id="arrow" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,-5L10,0L0,5" fill="#4b5563" />
+        </marker>
+        <marker id="arrow-highlight" viewBox="0 -5 10 10" refX="18" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,-5L10,0L0,5" fill="#60a5fa" />
+        </marker>
+      </defs>
+      <g id="zoom-layer">
+        <g class="links"></g>
+        <g class="nodes"></g>
+      </g>
+    </svg>
+
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title" id="side-title">Select a Module</div>
+      <span class="badge-pill" id="side-category">-</span>
+    </div>
+    <div class="sidebar-body" id="side-body">
+      <p style="font-size: 12px; color: var(--text-muted);">
+        Click any node in the interactive force-directed graph to inspect its AST symbols, line metrics, and dependency links.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const TYPE_COLORS = {
+      action: '#ef4444',
+      component: '#3b82f6',
+      lib: '#10b981',
+      page: '#f59e0b',
+      api: '#8b5cf6',
+      type: '#ec4899',
+      database: '#06b6d4',
+      test: '#84cc16',
+      tooling: '#eab308',
+      config: '#6b7280'
+    };
+
+    let graphData = null;
+    let simulation = null;
+    let svg, g, linkElements, nodeElements;
+    let selectedNodeId = null;
+    let activeFilter = 'all';
+
+    // Populate Legend
+    const legendEl = document.getElementById('legend');
+    Object.entries(TYPE_COLORS).forEach(([type, color]) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<div class="legend-dot" style="background:${color}"></div><span>${type.toUpperCase()}</span>`;
+      legendEl.appendChild(item);
+    });
+
+    async function loadData() {
+      try {
+        const res = await fetch('graph.json');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        graphData = await res.json();
+      } catch (e) {
+        console.warn('Direct fetch failed, checking fallback...', e);
+        // Fallback placeholder if opened directly as file://
+        graphData = {
+          meta: { totalFiles: 0, totalEdges: 0, totalLines: 0 },
+          nodes: [],
+          edges: []
+        };
+      }
+      initGraph();
+    }
+
+    function initGraph() {
+      document.getElementById('stats-badge').innerText = 
+        `${graphData.nodes.length} files • ${graphData.edges.length} dependencies`;
+
+      const width = window.innerWidth - 380;
+      const height = window.innerHeight;
+
+      svg = d3.select('#canvas');
+      g = d3.select('#zoom-layer');
+
+      const zoom = d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => {
+          g.attr('transform', event.transform);
+        });
+
+      svg.call(zoom);
+
+      simulation = d3.forceSimulation(graphData.nodes)
+        .force('link', d3.forceLink(graphData.edges).id(d => d.id).distance(80))
+        .force('charge', d3.forceManyBody().strength(-150))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collide', d3.forceCollide().radius(d => Math.max(8, Math.sqrt(d.lines || 10) * 1.5) + 6));
+
+      renderElements();
+
+      simulation.on('tick', () => {
+        linkElements
+          .attr('x1', d => d.source.x)
+          .attr('y1', d => d.source.y)
+          .attr('x2', d => d.target.x)
+          .attr('y2', d => d.target.y);
+
+        nodeElements
+          .attr('transform', d => `translate(${d.x},${d.y})`);
+      });
+
+      // Filter click handler
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          activeFilter = btn.getAttribute('data-type');
+          applyFilterAndSearch();
+        });
+      });
+
+      // Search input handler
+      document.getElementById('search-input').addEventListener('input', applyFilterAndSearch);
+    }
+
+    function renderElements() {
+      // Links
+      linkElements = g.select('.links')
+        .selectAll('line')
+        .data(graphData.edges)
+        .join('line')
+        .attr('marker-end', 'url(#arrow)');
+
+      // Nodes
+      nodeElements = g.select('.nodes')
+        .selectAll('g')
+        .data(graphData.nodes)
+        .join('g')
+        .call(d3.drag()
+          .on('start', dragstarted)
+          .on('drag', dragged)
+          .on('end', dragended))
+        .on('click', (event, d) => {
+          event.stopPropagation();
+          selectNode(d);
+        });
+
+      nodeElements.selectAll('*').remove();
+
+      nodeElements.append('circle')
+        .attr('r', d => Math.max(8, Math.min(24, Math.sqrt(d.lines || 10) * 1.5)))
+        .attr('fill', d => TYPE_COLORS[d.type] || '#6b7280');
+
+      nodeElements.append('text')
+        .attr('dy', 18)
+        .attr('text-anchor', 'middle')
+        .text(d => d.label);
+    }
+
+    function applyFilterAndSearch() {
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+
+      nodeElements.style('display', d => {
+        const matchesType = (activeFilter === 'all' || d.type === activeFilter);
+        const matchesQuery = !query || 
+          d.path.toLowerCase().includes(query) || 
+          d.symbols?.some(s => s.name.toLowerCase().includes(query));
+        return (matchesType && matchesQuery) ? 'block' : 'none';
+      });
+
+      linkElements.style('display', l => {
+        const srcVisible = (activeFilter === 'all' || l.source.type === activeFilter);
+        const tgtVisible = (activeFilter === 'all' || l.target.type === activeFilter);
+        return (srcVisible && tgtVisible) ? 'block' : 'none';
+      });
+    }
+
+    function selectNode(node) {
+      selectedNodeId = node.id;
+      nodeElements.select('circle').classed('selected', d => d.id === node.id);
+
+      // Highlight incident edges
+      linkElements
+        .classed('highlighted', l => l.source.id === node.id || l.target.id === node.id)
+        .attr('marker-end', l => (l.source.id === node.id || l.target.id === node.id) ? 'url(#arrow-highlight)' : 'url(#arrow)');
+
+      // Populate sidebar
+      document.getElementById('side-title').innerText = node.label;
+      document.getElementById('side-category').innerText = node.type.toUpperCase();
+      document.getElementById('side-category').style.background = `${TYPE_COLORS[node.type]}33`;
+      document.getElementById('side-category').style.color = TYPE_COLORS[node.type];
+
+      const importsList = graphData.edges.filter(e => e.source.id === node.id || e.source === node.id);
+      const importedByList = graphData.edges.filter(e => e.target.id === node.id || e.target === node.id);
+
+      let html = `
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="metric-label">Lines of Code</div>
+            <div class="metric-value">${node.lines}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Symbols Extracted</div>
+            <div class="metric-value">${node.symbolsCount || 0}</div>
+          </div>
+        </div>
+
+        <div style="font-size: 11px; font-family: monospace; color: var(--text-muted); word-break: break-all; margin-bottom: 12px;">
+          ${node.path}
+        </div>
+      `;
+
+      // Symbols section
+      if (node.symbols && node.symbols.length > 0) {
+        html += `<div class="section-title">Declared Symbols (${node.symbols.length})</div><ul class="symbol-list">`;
+        node.symbols.forEach(s => {
+          html += `
+            <li class="symbol-item">
+              <span style="font-family: monospace; font-weight: 600;">${s.name}</span>
+              <span class="symbol-kind" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">L${s.line} • ${s.kind}</span>
+            </li>
+          `;
+        });
+        html += `</ul>`;
+      }
+
+      // Dependencies Outbound
+      html += `<div class="section-title">Imports (${importsList.length})</div><ul class="dep-list">`;
+      if (importsList.length === 0) {
+        html += `<li style="font-size: 11px; color: var(--text-muted);">No internal imports.</li>`;
+      } else {
+        importsList.forEach(e => {
+          const targetId = typeof e.target === 'object' ? e.target.id : e.target;
+          html += `<li class="dep-item" onclick="focusNode('${targetId}')"><span>${targetId}</span></li>`;
+        });
+      }
+      html += `</ul>`;
+
+      // Dependencies Inbound
+      html += `<div class="section-title">Imported By (${importedByList.length})</div><ul class="dep-list">`;
+      if (importedByList.length === 0) {
+        html += `<li style="font-size: 11px; color: var(--text-muted);">Not imported by other internal files.</li>`;
+      } else {
+        importedByList.forEach(e => {
+          const srcId = typeof e.source === 'object' ? e.source.id : e.source;
+          html += `<li class="dep-item" onclick="focusNode('${srcId}')"><span>${srcId}</span></li>`;
+        });
+      }
+      html += `</ul>`;
+
+      document.getElementById('side-body').innerHTML = html;
+    }
+
+    window.focusNode = function(id) {
+      const node = graphData.nodes.find(n => n.id === id);
+      if (node) selectNode(node);
+    };
+
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

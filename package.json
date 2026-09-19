@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "repo:map": "node tools/codebase-map/generate-repo-map.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -15,6 +16,7 @@
     "@supabase/supabase-js": "^2.49.1",
     "@tanstack/react-query": "^5.67.1",
     "clsx": "^2.1.1",
+    "d3-force": "^3.0.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.4.7",
     "lucide-react": "^1.16.0",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.9",
+    "@types/d3-force": "^3.0.10",
     "@types/node": "^22.13.9",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.0.10",
