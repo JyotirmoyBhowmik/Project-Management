@@ -132,23 +132,33 @@ export function ImportExportModal({
         .filter((d) => d.successor_id === t.id)
         .map((d) => {
           const predTask = tasks.find((pt) => pt.id === d.predecessor_id);
+          const predCode = predTask?.task_code || (predTask as any)?.code || d.predecessor_id;
           return {
-            id: predTask?.code || d.predecessor_id,
+            id: predCode,
             type: d.dep_type || d.type || 'FS',
-            lag_days: d.lag_days,
+            lag_days: d.lag_days || 0,
           };
         });
 
       return {
-        phase: 'Phase 1',
+        phase: (t as any).phase?.name || 'Default Phase',
+        task_code: t.task_code || (t as any).code || 'TASK',
         task_id: t.id,
         title: t.title,
-        description: t.description,
-        start_date: t.start_date,
-        duration_days: t.duration_days,
-        priority: t.priority,
+        description: t.description || '',
         status: t.status,
+        priority: t.priority,
+        start_date: t.start_date,
+        end_date: t.end_date,
+        duration_days: t.duration_days,
         progress: t.progress ?? t.progress_percent ?? 0,
+        is_critical: t.is_critical ? 'YES' : 'NO',
+        early_start: t.early_start || t.start_date,
+        early_finish: t.early_finish || t.end_date,
+        late_start: t.late_start || '',
+        late_finish: t.late_finish || '',
+        total_float: t.total_float ?? 0,
+        free_float: t.free_float ?? 0,
         assignee_emails: t.assignees?.map((a) => a.user?.email).filter(Boolean) || [],
         predecessors: preds,
       };
@@ -166,14 +176,23 @@ export function ImportExportModal({
       URL.revokeObjectURL(url);
     } else {
       const flatRows = formattedExport.map((r) => ({
-        'Task ID': r.task_id,
+        'Task Code': r.task_code,
         Title: r.title,
         Status: r.status,
         Priority: r.priority,
         'Start Date': r.start_date,
+        'End Date': r.end_date,
         'Duration Days': r.duration_days,
-        'Progress %': r.progress,
-        'Assignee Emails': r.assignee_emails.join(', '),
+        'Progress %': `${r.progress}%`,
+        'Critical Path': r.is_critical,
+        'Early Start': r.early_start,
+        'Early Finish': r.early_finish,
+        'Late Start': r.late_start,
+        'Late Finish': r.late_finish,
+        'Total Float (Days)': r.total_float,
+        'Free Float (Days)': r.free_float,
+        Predecessors: r.predecessors.map((p) => `${p.id}:${p.type}+${p.lag_days}`).join(', ') || 'None',
+        'Assignee Emails': r.assignee_emails.join(', ') || 'Unassigned',
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(flatRows);

@@ -211,12 +211,17 @@ describe('CPM & Scheduling Engine', () => {
     // t2 is parallel and shorter, so it has positive float and is not critical
     expect(t2.is_critical).toBe(false);
     expect(t2.total_float).toBeGreaterThan(0);
+    // Verify free float calculation: t2 finishes Oct 2, t3 starts Oct 8 => 3 days slack
+    expect(t2.free_float).toBe(3);
+    // Critical tasks have 0 total float and 0 free float
+    expect(t1.free_float).toBe(0);
+    expect(t3.free_float).toBe(0);
   });
 
-  it('should detect cyclic dependencies and throw DependencyCycleException', () => {
+  it('should detect cyclic dependencies and identify specific cycle participants in DependencyCycleException', () => {
     const tasks: Task[] = [
-      { id: 'tA', tenant_id: 'tenant-1', project_id: 'p1', phase_id: null, parent_id: null, title: 'A', description: null, status: 'todo', priority: 'medium', start_date: '2026-10-01', end_date: '2026-10-02', duration_days: 2, progress_percent: 0, is_milestone: false, early_start: null, early_finish: null, late_start: null, late_finish: null, total_float: 0, free_float: 0, is_critical: false, order_index: 1, created_by: null, created_at: '', updated_at: '' },
-      { id: 'tB', tenant_id: 'tenant-1', project_id: 'p1', phase_id: null, parent_id: null, title: 'B', description: null, status: 'todo', priority: 'medium', start_date: '2026-10-01', end_date: '2026-10-02', duration_days: 2, progress_percent: 0, is_milestone: false, early_start: null, early_finish: null, late_start: null, late_finish: null, total_float: 0, free_float: 0, is_critical: false, order_index: 2, created_by: null, created_at: '', updated_at: '' },
+      { id: 'tA', tenant_id: 'tenant-1', project_id: 'p1', phase_id: null, parent_id: null, title: 'Database Migration', description: null, status: 'todo', priority: 'medium', start_date: '2026-10-01', end_date: '2026-10-02', duration_days: 2, progress_percent: 0, is_milestone: false, early_start: null, early_finish: null, late_start: null, late_finish: null, total_float: 0, free_float: 0, is_critical: false, order_index: 1, created_by: null, created_at: '', updated_at: '' },
+      { id: 'tB', tenant_id: 'tenant-1', project_id: 'p1', phase_id: null, parent_id: null, title: 'API Gateway', description: null, status: 'todo', priority: 'medium', start_date: '2026-10-01', end_date: '2026-10-02', duration_days: 2, progress_percent: 0, is_milestone: false, early_start: null, early_finish: null, late_start: null, late_finish: null, total_float: 0, free_float: 0, is_critical: false, order_index: 2, created_by: null, created_at: '', updated_at: '' },
     ];
 
     // Cyclic dependency: A -> B and B -> A
@@ -225,6 +230,13 @@ describe('CPM & Scheduling Engine', () => {
       { id: 'd2', tenant_id: 'tenant-1', project_id: 'p1', predecessor_id: 'tB', successor_id: 'tA', type: 'FS', lag_days: 0, created_at: '' },
     ];
 
-    expect(() => calculateCPM(tasks, dependencies, calendar, holidays)).toThrow(DependencyCycleException);
+    try {
+      calculateCPM(tasks, dependencies, calendar, holidays);
+      expect.fail('Should have thrown DependencyCycleException');
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(DependencyCycleException);
+      expect(err.message).toMatch(/Database Migration/);
+      expect(err.message).toMatch(/API Gateway/);
+    }
   });
 });

@@ -38,10 +38,39 @@ export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
   };
 
   if (format === 'csv') {
-    // Generate CSV data string
-    const headers = ['ID', 'Title', 'Status', 'Priority', 'Start Date', 'End Date', 'Duration (Days)', 'Progress %', 'Critical Path'];
+    // Generate CSV data string with complete CPM scheduling fidelity
+    const headers = [
+      'Task Code',
+      'Title',
+      'Status',
+      'Priority',
+      'Start Date',
+      'End Date',
+      'Duration (Days)',
+      'Progress %',
+      'Critical Path',
+      'Early Start',
+      'Early Finish',
+      'Late Start',
+      'Late Finish',
+      'Total Float (Days)',
+      'Free Float (Days)',
+      'Predecessors',
+    ];
+
+    const predMap = new Map<string, string[]>();
+    for (const d of dependencies) {
+      const predTask = tasks.find((pt: Task) => pt.id === d.predecessor_id);
+      const code = predTask?.task_code || (predTask as any)?.code || d.predecessor_id;
+      const desc = `${code}:${d.dep_type || d.type || 'FS'}+${d.lag_days || 0}`;
+      if (!predMap.has(d.successor_id)) {
+        predMap.set(d.successor_id, []);
+      }
+      predMap.get(d.successor_id)!.push(desc);
+    }
+
     const rows = tasks.map((t: Task) => [
-      t.id,
+      t.task_code || (t as any).code || t.id,
       `"${t.title.replace(/"/g, '""')}"`,
       t.status,
       t.priority,
@@ -50,6 +79,13 @@ export const GET = apiHandler(async (req: NextRequest, { correlationId }) => {
       t.duration_days,
       `${t.progress ?? t.progress_percent ?? 0}%`,
       t.is_critical ? 'YES' : 'NO',
+      t.early_start || '',
+      t.early_finish || '',
+      t.late_start || '',
+      t.late_finish || '',
+      t.total_float ?? 0,
+      t.free_float ?? 0,
+      `"${(predMap.get(t.id) || []).join(', ') || 'None'}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r: (string | number)[]) => r.join(','))].join('\n');

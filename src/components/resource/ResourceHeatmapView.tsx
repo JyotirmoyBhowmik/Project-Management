@@ -15,6 +15,9 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  Search,
+  RotateCcw,
   TrendingUp,
   ShieldAlert,
 } from 'lucide-react';
@@ -29,6 +32,7 @@ import { computeResourceWorkload, ResourceHeatmapResult } from '@/lib/resource/r
 import { parseISODate, formatDateToISO } from '@/lib/calendar/calendar-engine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface ResourceHeatmapViewProps {
   tasks: Task[];
@@ -48,6 +52,8 @@ export function ResourceHeatmapView({
 }: ResourceHeatmapViewProps) {
   const [expandedUsers, setExpandedUsers] = React.useState<Record<string, boolean>>({});
   const [timeRange, setTimeRange] = React.useState<'2weeks' | 'month'>('2weeks');
+  const [dateOffsetDays, setDateOffsetDays] = React.useState<number>(0);
+  const [searchQuery, setSearchQuery] = React.useState<string>('');
 
   const resolvedAssignees = React.useMemo(() => {
     if (assignees && assignees.length > 0) return assignees;
@@ -71,27 +77,29 @@ export function ResourceHeatmapView({
     return Array.from(userMap.values());
   }, [users, resolvedAssignees]);
 
-  // Compute start and end dates for heatmap window
+  // Determine initial anchor date based on project schedule or current date
+  const anchorDateStr = React.useMemo(() => {
+    const todayStr = formatDateToISO(new Date());
+    if (tasks.length === 0) return todayStr;
+    const dates = tasks.flatMap((t) => [t.start_date, t.end_date].filter(Boolean));
+    if (dates.length === 0) return todayStr;
+    dates.sort();
+    return dates[0] || todayStr;
+  }, [tasks]);
+
+  // Compute window start and end dates with dateOffsetDays
   const { startDate, endDate } = React.useMemo(() => {
-    // Dynamic window based on tasks or current month
-    let minDate = '2026-10-01';
-    let maxDate = '2026-10-31';
-    if (tasks.length > 0) {
-      const dates = tasks.flatMap((t) => [t.start_date, t.end_date].filter(Boolean));
-      if (dates.length > 0) {
-        dates.sort();
-        minDate = dates[0];
-        maxDate = dates[dates.length - 1];
-      }
-    }
-    let end = maxDate;
-    if (timeRange === '2weeks') {
-      const d = parseISODate(minDate);
-      d.setUTCDate(d.getUTCDate() + 13);
-      end = formatDateToISO(d);
-    }
-    return { startDate: minDate, endDate: end };
-  }, [timeRange, tasks]);
+    const base = parseISODate(anchorDateStr);
+    base.setUTCDate(base.getUTCDate() + dateOffsetDays);
+    const startStr = formatDateToISO(base);
+
+    const spanDays = timeRange === '2weeks' ? 13 : 29;
+    const endObj = new Date(base.getTime());
+    endObj.setUTCDate(endObj.getUTCDate() + spanDays);
+    const endStr = formatDateToISO(endObj);
+
+    return { startDate: startStr, endDate: endStr };
+  }, [anchorDateStr, dateOffsetDays, timeRange]);
 
   const heatmap: ResourceHeatmapResult = React.useMemo(() => {
     return computeResourceWorkload(
@@ -105,6 +113,14 @@ export function ResourceHeatmapView({
       8 // 8 hours daily capacity
     );
   }, [startDate, endDate, resolvedUsers, tasks, resolvedAssignees, calendar, holidays]);
+
+  const filteredUsers = React.useMemo(() => {
+    if (!searchQuery.trim()) return heatmap.users;
+    const q = searchQuery.toLowerCase().trim();
+    return heatmap.users.filter(
+      (u) => u.userName.toLowerCase().includes(q) || u.userEmail.toLowerCase().includes(q)
+    );
+  }, [heatmap.users, searchQuery]);
 
   const toggleUser = (userId: string) => {
     setExpandedUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
@@ -192,22 +208,66 @@ export function ResourceHeatmapView({
       {/* Main Heatmap Grid */}
       <div className="flex-1 flex flex-col rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-xs">
         {/* Table Header Bar */}
-        <div className="flex items-center justify-between p-3 border-b border-[var(--border)] bg-[var(--secondary)]/40">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-[var(--primary)]" />
-            <span className="text-xs font-bold text-[var(--foreground)]">Resource Capacity Heatmap</span>
-            <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
-              ({startDate} to {endDate})
-            </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border-b border-[var(--border)] bg-[var(--secondary)]/40">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-[var(--primary)]" />
+              <span className="text-xs font-bold text-[var(--foreground)]">Resource Capacity Heatmap</span>
+              <span className="text-[10px] text-[var(--muted-foreground)] font-mono">
+                ({startDate} to {endDate})
+              </span>
+            </div>
+
+            {/* Timeline Period Navigation */}
+            <div className="flex items-center gap-1 border-l border-[var(--border)] pl-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDateOffsetDays((prev) => prev - (timeRange === '2weeks' ? 14 : 30))}
+                className="h-6 w-6 p-0"
+                title="Previous period"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant={dateOffsetDays === 0 ? 'secondary' : 'ghost'}
+                onClick={() => setDateOffsetDays(0)}
+                className="h-6 px-1.5 text-[10px] font-mono"
+                title="Reset to anchor period"
+              >
+                Today
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDateOffsetDays((prev) => prev + (timeRange === '2weeks' ? 14 : 30))}
+                className="h-6 w-6 p-0"
+                title="Next period"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-[10px] mr-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Quick Member Search Input */}
+            <div className="relative">
+              <Search className="absolute left-2 top-2 h-3 w-3 text-[var(--muted-foreground)]" />
+              <Input
+                placeholder="Search member..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-7 pl-7 pr-2 text-xs w-36 bg-[var(--card)]"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 text-[10px] mr-1 hidden lg:flex">
               <span className="inline-block w-2.5 h-2.5 rounded-xs bg-blue-500/20 border border-blue-500/40" />
               <span className="text-[var(--muted-foreground)]">&lt;70% Under</span>
-              <span className="inline-block w-2.5 h-2.5 rounded-xs bg-emerald-500/30 border border-emerald-500/50 ml-2" />
+              <span className="inline-block w-2.5 h-2.5 rounded-xs bg-emerald-500/30 border border-emerald-500/50 ml-1.5" />
               <span className="text-[var(--muted-foreground)]">70-100% Optimal</span>
-              <span className="inline-block w-2.5 h-2.5 rounded-xs bg-rose-500/40 border border-rose-500/60 ml-2" />
+              <span className="inline-block w-2.5 h-2.5 rounded-xs bg-rose-500/40 border border-rose-500/60 ml-1.5" />
               <span className="text-rose-400 font-bold">&gt;100% Over</span>
             </div>
 
@@ -262,7 +322,17 @@ export function ResourceHeatmapView({
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {heatmap.users.map((u) => {
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={heatmap.dates.length + 2}
+                    className="py-12 text-center text-xs text-[var(--muted-foreground)]"
+                  >
+                    {searchQuery ? `No team members match "${searchQuery}".` : 'No team members allocated.'}
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((u) => {
                 const isExpanded = expandedUsers[u.userId];
 
                 return (
@@ -393,7 +463,7 @@ export function ResourceHeatmapView({
                     )}
                   </React.Fragment>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

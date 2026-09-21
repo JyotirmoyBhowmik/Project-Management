@@ -59,7 +59,7 @@ export function subtractWorkingDays(
 export function topologicalSort(
   tasks: Task[],
   dependencies: TaskDependency[]
-): { order: string[]; hasCycle: boolean } {
+): { order: string[]; hasCycle: boolean; cycleNodes?: string[] } {
   const taskMap = new Map(tasks.map(t => [t.id, t]));
   const inDegree = new Map<string, number>();
   const adj = new Map<string, string[]>();
@@ -94,7 +94,12 @@ export function topologicalSort(
   }
 
   const hasCycle = order.length !== tasks.length;
-  return { order, hasCycle };
+  if (hasCycle) {
+    const cycleNodes = tasks.filter((t) => !order.includes(t.id)).map((t) => t.id);
+    return { order, hasCycle, cycleNodes };
+  }
+
+  return { order, hasCycle: false };
 }
 
 /**
@@ -146,10 +151,16 @@ export function calculateCPM(
   }
 
   // Topological sorting and cycle verification
-  const { order, hasCycle } = topologicalSort(rawTasks, dependencies);
+  const { order, hasCycle, cycleNodes } = topologicalSort(rawTasks, dependencies);
   if (hasCycle) {
     // Locate cycle participants
-    throw new DependencyCycleException('Cyclic Dependency', 'Task Graph Loop');
+    const nodeAId = cycleNodes?.[0];
+    const nodeBId = cycleNodes?.[1] || cycleNodes?.[0];
+    const taskA = nodeAId ? taskMap.get(nodeAId) : null;
+    const taskB = nodeBId ? taskMap.get(nodeBId) : null;
+    const nameA = taskA ? (taskA.task_code || (taskA as any).code || taskA.title) : 'Task A';
+    const nameB = taskB ? (taskB.task_code || (taskB as any).code || taskB.title) : 'Task B';
+    throw new DependencyCycleException(nameA, nameB);
   }
 
   // ----------------------------------------------------------------------------
@@ -337,6 +348,72 @@ export function calculateCPM(
 
     task.total_float = totalFloat;
     task.is_critical = totalFloat <= 0;
+
+    // --------------------------------------------------------------------------
+    // 5. FREE FLOAT
+    // Free Float = Amount of delay that can occur without delaying the early start
+    // of any immediate successor. Terminal tasks inherit total float.
+    // --------------------------------------------------------------------------
+    let freeFloat = totalFloat;
+
+    if (succs.length > 0) {
+      let minSlack = Infinity;
+      for (const dep of succs) {
+        const succTask = taskMap.get(dep.successor_id)!;
+        const succES = parseISODate(succTask.early_start!);
+        const succEF = parseISODate(succTask.early_finish!);
+        const taskES = parseISODate(task.early_start!);
+        const taskEF = parseISODate(task.early_finish!);
+        const lag = dep.lag_days || 0;
+
+        const depType = dep.dep_type || dep.type;
+        let earliestRequiredSuccDate: Date = new Date(taskEF.getTime());
+
+        switch (depType) {
+          case 'SS': {
+            earliestRequiredSuccDate = addWorkingDays(taskES, lag, calendar, holidays);
+            break;
+          }
+          case 'FF': {
+            earliestRequiredSuccDate = addWorkingDays(taskEF, lag, calendar, holidays);
+            break;
+          }
+          case 'SF': {
+            earliestRequiredSuccDate = addWorkingDays(taskES, lag, calendar, holidays);
+            break;
+          }
+          case 'FS':
+          default: {
+            const nextDay = new Date(taskEF.getTime());
+            nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+            earliestRequiredSuccDate = addWorkingDays(nextDay, lag, calendar, holidays);
+            break;
+          }
+        }
+
+        earliestRequiredSuccDate = getNextWorkingDay(earliestRequiredSuccDate, calendar, holidays);
+
+        let linkSlack = 0;
+        if (depType === 'FF' || depType === 'SF') {
+          if (succEF > earliestRequiredSuccDate) {
+            linkSlack = calculateWorkingDays(earliestRequiredSuccDate, succEF, calendar, holidays) - 1;
+          }
+        } else {
+          if (succES > earliestRequiredSuccDate) {
+            linkSlack = calculateWorkingDays(earliestRequiredSuccDate, succES, calendar, holidays) - 1;
+          }
+        }
+
+        if (linkSlack < minSlack) {
+          minSlack = linkSlack;
+        }
+      }
+
+      freeFloat = minSlack === Infinity ? 0 : minSlack;
+    }
+
+    // Free float cannot be negative or exceed total float
+    task.free_float = Math.max(0, Math.min(Math.max(0, totalFloat), freeFloat));
   }
 
   const updatedTasks = Array.from(taskMap.values());
