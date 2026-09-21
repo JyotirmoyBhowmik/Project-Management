@@ -34,8 +34,10 @@ import { Modal } from '@/components/ui/dialog';
 import { Tabs } from '@/components/ui/tabs';
 import { EditUserModal } from '@/components/modals/EditUserModal';
 import { GlobalConfigManager } from '@/components/admin/GlobalConfigManager';
+import { useTenantStore } from '@/lib/stores/tenant-store';
 
 export function SuperAdminPanel() {
+  const { currentUser } = useTenantStore();
   const [activeTab, setActiveTab] = React.useState<'tenants' | 'users' | 'themes' | 'features' | 'config' | 'audit'>('tenants');
   const [tenants, setTenants] = React.useState<Tenant[]>([]);
   const [users, setUsers] = React.useState<any[]>([]);
@@ -125,41 +127,55 @@ export function SuperAdminPanel() {
     e.preventDefault();
     if (!name || !code || !slug) return;
 
-    const newTenant = await dbService.createTenant({
-      name,
-      code: code.toUpperCase(),
-      tenant_code: code.toUpperCase(),
-      slug: slug.toLowerCase(),
-      domain: domain || null,
-      logo_url: null,
-      is_active: true,
-      week_starts_on: 1,
-      weekend_days: [0, 6],
-      status: 'active',
-      branding_json: {
-        primary_color: editingTokens.primary || '#3b82f6',
-        theme_preset: selectedThemeId as any,
-        company_tagline: 'Enterprise Provisioned Tenant',
-      },
-      feature_flags: {
-        cpm_enabled: true,
-        export_enabled: true,
-        audit_enabled: true,
-        custom_fields_enabled: true,
-        resource_heatmap_enabled: true,
-      },
-      storage_quota_mb: storageQuota,
-    });
+    try {
+      const newTenant = await dbService.createTenant({
+        name,
+        code: code.toUpperCase(),
+        tenant_code: code.toUpperCase(),
+        slug: slug.toLowerCase(),
+        domain: domain || null,
+        is_active: true,
+        week_starts_on: 1,
+        weekend_days: [0, 6],
+        status: 'active',
+        branding_json: {
+          primary_color: editingTokens.primary || '#3b82f6',
+          theme_preset: selectedThemeId as any,
+          company_tagline: 'Enterprise Provisioned Tenant',
+        },
+        feature_flags: {
+          cpm_enabled: true,
+          export_enabled: true,
+          audit_enabled: true,
+          custom_fields_enabled: true,
+          resource_heatmap_enabled: true,
+        },
+        storage_quota_mb: storageQuota,
+      });
 
-    const refreshed = await dbService.getAllTenants();
-    setTenants(refreshed);
-    setIsProvisionModalOpen(false);
+      if (newTenant && currentUser?.id) {
+        const supabase = createClient();
+        await supabase.from('tenant_memberships').upsert({
+          tenant_id: newTenant.id,
+          user_id: currentUser.id,
+          role: 'owner',
+          is_active: true,
+        });
+      }
 
-    setName('');
-    setCode('');
-    setSlug('');
-    setDomain('');
-    showNotification(`Tenant "${newTenant?.name || name}" provisioned with isolated database boundary.`);
+      const refreshed = await dbService.getAllTenants();
+      setTenants(refreshed);
+      setIsProvisionModalOpen(false);
+
+      setName('');
+      setCode('');
+      setSlug('');
+      setDomain('');
+      showNotification(`Tenant "${newTenant?.name || name}" provisioned with isolated database boundary.`);
+    } catch (err: any) {
+      console.error('Failed to provision tenant', err);
+      showNotification(`Failed to provision tenant: ${err?.message || 'Database error'}`);
+    }
   };
 
   const toggleTenantStatus = async (tenantId: string) => {
@@ -223,27 +239,42 @@ export function SuperAdminPanel() {
   };
 
   const handleCloneTenant = async (sourceTenant: Tenant) => {
-    const clonedCode = `${sourceTenant.code}-COPY`;
-    const clonedSlug = `${sourceTenant.slug}-copy`;
+    try {
+      const clonedCode = `${sourceTenant.code}-COPY`;
+      const clonedSlug = `${sourceTenant.slug}-copy`;
 
-    const cloned = await dbService.createTenant({
-      name: `${sourceTenant.name} (Clone)`,
-      code: clonedCode,
-      tenant_code: clonedCode,
-      slug: clonedSlug,
-      domain: null,
-      is_active: true,
-      week_starts_on: sourceTenant.week_starts_on,
-      weekend_days: sourceTenant.weekend_days,
-      status: 'active',
-      branding_json: sourceTenant.branding_json,
-      feature_flags: sourceTenant.feature_flags,
-      storage_quota_mb: sourceTenant.storage_quota_mb,
-    });
+      const cloned = await dbService.createTenant({
+        name: `${sourceTenant.name} (Clone)`,
+        code: clonedCode,
+        tenant_code: clonedCode,
+        slug: clonedSlug,
+        domain: null,
+        is_active: true,
+        week_starts_on: sourceTenant.week_starts_on,
+        weekend_days: sourceTenant.weekend_days,
+        status: 'active',
+        branding_json: sourceTenant.branding_json,
+        feature_flags: sourceTenant.feature_flags,
+        storage_quota_mb: sourceTenant.storage_quota_mb,
+      });
 
-    const refreshed = await dbService.getAllTenants();
-    setTenants(refreshed);
-    showNotification(`Cloned tenant ${sourceTenant.name} -> ${cloned?.name || clonedCode}.`);
+      if (cloned && currentUser?.id) {
+        const supabase = createClient();
+        await supabase.from('tenant_memberships').upsert({
+          tenant_id: cloned.id,
+          user_id: currentUser.id,
+          role: 'owner',
+          is_active: true,
+        });
+      }
+
+      const refreshed = await dbService.getAllTenants();
+      setTenants(refreshed);
+      showNotification(`Cloned tenant ${sourceTenant.name} -> ${cloned?.name || clonedCode}.`);
+    } catch (err: any) {
+      console.error('Failed to clone tenant', err);
+      showNotification(`Failed to clone tenant: ${err?.message || 'Database error'}`);
+    }
   };
 
   return (

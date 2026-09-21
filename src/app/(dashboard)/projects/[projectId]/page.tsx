@@ -63,7 +63,7 @@ import { GraphCanvas } from '@/components/graphify/GraphCanvas';
 import { SprintPlanningView } from '@/components/agile/SprintPlanningView';
 import { WikiWorkspace } from '@/components/wiki/WikiWorkspace';
 import { ImportExportModal } from '@/components/exchange/ImportExportModal';
-import { TaskDetailDrawer } from '@/components/tasks/TaskDetailDrawer';
+import { TaskDetailDrawer, DrawerErrorBoundary } from '@/components/tasks/TaskDetailDrawer';
 import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
 import { useProjectPresence } from '@/lib/realtime/presence-service';
 import { calculateCPM } from '@/lib/cpm/cpm-engine';
@@ -638,28 +638,30 @@ function ProjectWorkspaceContent() {
       </div>
 
       {/* Interactive Task Detail Drawer */}
-      <TaskDetailDrawer
-        isOpen={!!selectedTaskForDrawer}
-        task={selectedTaskForDrawer}
-        onClose={() => setSelectedTaskForDrawer(null)}
-        tenantId={tenantId || ''}
-        projectId={projectId || ''}
-        currentUserId={userId}
-        currentUserProfile={currentUser}
-        calendar={calendar}
-        holidays={holidays}
-        onTaskUpdate={async (taskId, updates) => {
-          await dbService.updateTask(taskId, updates, supabase);
-          if (selectedTaskForDrawer && selectedTaskForDrawer.id === taskId) {
-            setSelectedTaskForDrawer((prev) => (prev ? { ...prev, ...updates } : null));
-          }
-          await refreshProjectData();
-        }}
-        onTaskDeleted={async () => {
-          setSelectedTaskForDrawer(null);
-          await refreshProjectData();
-        }}
-      />
+      <DrawerErrorBoundary onClose={() => setSelectedTaskForDrawer(null)}>
+        <TaskDetailDrawer
+          isOpen={!!selectedTaskForDrawer}
+          task={selectedTaskForDrawer}
+          onClose={() => setSelectedTaskForDrawer(null)}
+          tenantId={tenantId || ''}
+          projectId={projectId || ''}
+          currentUserId={userId}
+          currentUserProfile={currentUser}
+          calendar={calendar}
+          holidays={holidays}
+          onTaskUpdate={async (taskId, updates) => {
+            await dbService.updateTask(taskId, updates, supabase);
+            if (selectedTaskForDrawer && selectedTaskForDrawer.id === taskId) {
+              setSelectedTaskForDrawer((prev) => (prev ? { ...prev, ...updates } : null));
+            }
+            await refreshProjectData();
+          }}
+          onTaskDeleted={async () => {
+            setSelectedTaskForDrawer(null);
+            await refreshProjectData();
+          }}
+        />
+      </DrawerErrorBoundary>
 
       {/* Create Task / Subtask Dialog */}
       <CreateTaskDialog

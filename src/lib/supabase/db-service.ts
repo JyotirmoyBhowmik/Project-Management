@@ -119,12 +119,47 @@ export class DatabaseService {
   public async createTenant(tenantData: Partial<Tenant>, client?: any): Promise<Tenant | null> {
     const supabase = getSupabase(client);
     try {
-      const payload = {
-        ...tenantData,
-        id: tenantData.id || crypto.randomUUID(),
+      const {
+        id,
+        name,
+        slug,
+        code,
+        tenant_code,
+        domain,
+        status,
+        branding_json,
+        feature_flags,
+        storage_quota_mb,
+        is_active,
+        week_starts_on,
+        weekend_days,
+      } = tenantData as any;
+
+      // Extract logo_url into branding_json if provided at root level to prevent PGRST204
+      const logoUrl = (tenantData as any).logo_url;
+      const finalBranding = {
+        ...(branding_json || {}),
+        ...(logoUrl ? { logo_url: logoUrl } : {}),
+      };
+
+      const payload: Record<string, any> = {
+        id: id || crypto.randomUUID(),
+        name: name || 'New Workspace',
+        slug: slug || `ws-${Date.now()}`,
+        code: (code || tenant_code || 'WS').toUpperCase(),
+        tenant_code: (tenant_code || code || 'WS').toUpperCase(),
+        domain: domain || null,
+        status: status || 'active',
+        branding_json: finalBranding,
+        feature_flags: feature_flags || { cpm_enabled: true, export_enabled: true, audit_enabled: true },
+        storage_quota_mb: storage_quota_mb ?? 5120,
+        is_active: is_active ?? true,
+        week_starts_on: week_starts_on ?? 1,
+        weekend_days: weekend_days ?? [0, 6],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+
       const { data, error } = await supabase
         .from('tenants')
         .insert(payload)
@@ -364,7 +399,7 @@ export class DatabaseService {
         .select('*')
         .eq('project_id', projectId)
         .is('deleted_at', null)
-        .order('sort_order', { ascending: true });
+        .order('order_index', { ascending: true });
 
       if (tenantId) query = query.eq('tenant_id', tenantId);
 
@@ -1395,20 +1430,6 @@ export class DatabaseService {
   public async getAllUsers(client?: any): Promise<any[]> {
     const supabase = getSupabase(client);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, memberships:tenant_memberships(*, tenant:tenants(id, name, slug, code))')
-        .order('created_at', { ascending: false });
-      if (!error && data) {
-        return data;
-      }
-
-      logger.warn('Joined getAllUsers query failed, attempting flat fallback', {
-        fn: 'dbService.getAllUsers',
-        ctx: { error: error?.message },
-      });
-
-      // Resilient fallback
       const { data: rawProfiles, error: profError } = await supabase
         .from('profiles')
         .select('*')
@@ -1503,8 +1524,33 @@ export class DatabaseService {
         .eq('task_id', taskId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      return (data as TaskComment[]) || [];
+      if (!error && data) {
+        return data as TaskComment[];
+      }
+
+      // Flat fallback if joined relationship fails
+      const { data: flatData, error: flatError } = await supabase
+        .from('task_comments')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: true });
+
+      if (flatError || !flatData || flatData.length === 0) return [];
+
+      const userIds = [...new Set(flatData.map((c: any) => c.user_id).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: authors } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', userIds);
+        const authorMap = new Map((authors || []).map((a: any) => [a.id, a]));
+        return flatData.map((c: any) => ({
+          ...c,
+          author: authorMap.get(c.user_id) || null,
+        })) as TaskComment[];
+      }
+
+      return flatData as TaskComment[];
     } catch (err) {
       logger.error('Failed to fetch task comments', { fn: 'dbService.getTaskComments', ctx: { taskId }, err });
       return [];
@@ -1570,8 +1616,33 @@ export class DatabaseService {
         .eq('task_id', taskId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return (data as TaskActivityLog[]) || [];
+      if (!error && data) {
+        return data as TaskActivityLog[];
+      }
+
+      // Flat fallback if joined relationship fails
+      const { data: flatData, error: flatError } = await supabase
+        .from('task_activity_log')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: false });
+
+      if (flatError || !flatData || flatData.length === 0) return [];
+
+      const actorIds = [...new Set(flatData.map((a: any) => a.actor_id).filter(Boolean))];
+      if (actorIds.length > 0) {
+        const { data: actors } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', actorIds);
+        const actorMap = new Map((actors || []).map((a: any) => [a.id, a]));
+        return flatData.map((a: any) => ({
+          ...a,
+          actor: actorMap.get(a.actor_id) || null,
+        })) as TaskActivityLog[];
+      }
+
+      return flatData as TaskActivityLog[];
     } catch (err) {
       logger.error('Failed to fetch task activity logs', { fn: 'dbService.getTaskActivityLogs', ctx: { taskId }, err });
       return [];

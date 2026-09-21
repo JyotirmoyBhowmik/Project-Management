@@ -54,8 +54,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class DrawerErrorBoundary extends React.Component<
-  { children: React.ReactNode; onClose: () => void },
+export class DrawerErrorBoundary extends React.Component<
+  { children: React.ReactNode; onClose?: () => void },
   ErrorBoundaryState
 > {
   constructor(props: any) {
@@ -84,7 +84,7 @@ class DrawerErrorBoundary extends React.Component<
             variant="outline"
             onClick={() => {
               this.setState({ hasError: false });
-              this.props.onClose();
+              this.props.onClose?.();
             }}
           >
             Close Drawer
@@ -93,6 +93,26 @@ class DrawerErrorBoundary extends React.Component<
       );
     }
     return this.props.children;
+  }
+}
+
+function formatSafeDateTime(val: string | null | undefined): string {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? '' : d.toLocaleString();
+  } catch {
+    return '';
+  }
+}
+
+function formatSafeTime(val: string | null | undefined): string {
+  if (!val) return '';
+  try {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
   }
 }
 
@@ -142,6 +162,37 @@ export function TaskDetailDrawer({
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
   const supabase = React.useMemo(() => createClient(), []);
+
+  // Unified Chronological History Feed (Declared at top level to satisfy Rule of Hooks)
+  const unifiedHistory = React.useMemo(() => {
+    type FeedItem =
+      | { type: 'comment'; data: TaskComment; timestamp: number }
+      | { type: 'activity'; data: TaskActivityLog; timestamp: number };
+
+    const items: FeedItem[] = [
+      ...comments.map((c) => ({
+        type: 'comment' as const,
+        data: c,
+        timestamp: c?.created_at ? new Date(c.created_at).getTime() || 0 : 0,
+      })),
+      ...activityLogs.map((a) => ({
+        type: 'activity' as const,
+        data: a,
+        timestamp: a?.created_at ? new Date(a.created_at).getTime() || 0 : 0,
+      })),
+    ];
+
+    return items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  }, [comments, activityLogs]);
+
+  // Filtered members for @mention autocomplete (Declared at top level)
+  const filteredMembers = React.useMemo(() => {
+    if (!mentionQuery) return [];
+    return teamMembers.filter((m) =>
+      m.profile?.full_name?.toLowerCase().includes(mentionQuery) ||
+      m.profile?.email?.toLowerCase().includes(mentionQuery)
+    );
+  }, [teamMembers, mentionQuery]);
 
   const loadSubtasks = React.useCallback(async () => {
     if (!task) return;
@@ -213,8 +264,6 @@ export function TaskDetailDrawer({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  if (!isOpen || !task) return null;
 
   // Handle saving task detail fields
   const handleSaveDetails = (updates: Partial<Task>) => {
@@ -328,47 +377,7 @@ export function TaskDetailDrawer({
     );
   };
 
-function formatSafeDateTime(val: string | null | undefined): string {
-  if (!val) return '';
-  try {
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? '' : d.toLocaleString();
-  } catch {
-    return '';
-  }
-}
 
-function formatSafeTime(val: string | null | undefined): string {
-  if (!val) return '';
-  try {
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '';
-  }
-}
-
-  // Unified Chronological History Feed
-  const unifiedHistory = React.useMemo(() => {
-    type FeedItem =
-      | { type: 'comment'; data: TaskComment; timestamp: number }
-      | { type: 'activity'; data: TaskActivityLog; timestamp: number };
-
-    const items: FeedItem[] = [
-      ...comments.map((c) => ({
-        type: 'comment' as const,
-        data: c,
-        timestamp: c?.created_at ? new Date(c.created_at).getTime() || 0 : 0,
-      })),
-      ...activityLogs.map((a) => ({
-        type: 'activity' as const,
-        data: a,
-        timestamp: a?.created_at ? new Date(a.created_at).getTime() || 0 : 0,
-      })),
-    ];
-
-    return items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  }, [comments, activityLogs]);
 
   // Handle Comment Submission & @Mentions
   const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -402,7 +411,7 @@ function formatSafeTime(val: string | null | undefined): string {
   };
 
   const submitComment = async () => {
-    if (!commentInput.trim() || !currentUserId || isSubmittingComment) return;
+    if (!commentInput.trim() || !currentUserId || !task || isSubmittingComment) return;
     setIsSubmittingComment(true);
 
     try {
@@ -458,13 +467,7 @@ function formatSafeTime(val: string | null | undefined): string {
     }
   };
 
-  const filteredMembers = React.useMemo(() => {
-    if (!mentionQuery) return [];
-    return teamMembers.filter((m) =>
-      m.profile?.full_name?.toLowerCase().includes(mentionQuery) ||
-      m.profile?.email?.toLowerCase().includes(mentionQuery)
-    );
-  }, [teamMembers, mentionQuery]);
+  if (!isOpen || !task) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
@@ -681,12 +684,12 @@ function formatSafeTime(val: string | null | undefined): string {
                 <div className="flex items-center justify-between pt-2 border-t border-[var(--border)] text-[11px] text-[var(--muted-foreground)] font-mono">
                   <div>
                     <span>Calculated End Date: </span>
-                    <strong className="text-[var(--foreground)]">{task.end_date}</strong>
+                    <strong className="text-[var(--foreground)]">{task.end_date || 'None'}</strong>
                   </div>
                   <div>
                     <span>Total Float: </span>
-                    <strong className={task.total_float === 0 ? 'text-amber-400' : 'text-emerald-400'}>
-                      {task.total_float} days
+                    <strong className={(task.total_float ?? 0) === 0 ? 'text-amber-400' : 'text-emerald-400'}>
+                      {task.total_float ?? 0} days
                     </strong>
                   </div>
                 </div>

@@ -58,6 +58,10 @@ export default function WorkspaceMembersPage() {
   // Active user menu popover state
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
 
+  // Member Deletion Modal State
+  const [memberToDelete, setMemberToDelete] = React.useState<TenantMembership | null>(null);
+  const [isRemoving, setIsRemoving] = React.useState(false);
+
   const loadMembers = React.useCallback(async () => {
     if (!tenantId) return;
     setIsLoading(true);
@@ -164,20 +168,27 @@ export default function WorkspaceMembersPage() {
   };
 
   // Remove Member
-  const handleRemoveMember = async (membershipId: string) => {
-    if (!tenantId) return;
-    if (!confirm('Are you sure you want to remove this member from the workspace?')) return;
+  const handleRemoveMember = (membership: TenantMembership) => {
     setOpenMenuId(null);
+    setMemberToDelete(membership);
+  };
+
+  const confirmRemoveMember = async () => {
+    if (!tenantId || !memberToDelete) return;
+    setIsRemoving(true);
     try {
-      const res = await removeMemberAction(membershipId, tenantId);
+      const res = await removeMemberAction(memberToDelete.id, tenantId);
       if (res.success) {
-        toast.success('Member removed from workspace.');
+        toast.success(`Member ${memberToDelete.user?.full_name || ''} removed from workspace.`);
+        setMemberToDelete(null);
         loadMembers();
       } else {
         toast.error(res.error || 'Failed to remove member');
       }
     } catch (err: any) {
       toast.error(err?.message || 'Member removal error');
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -353,77 +364,112 @@ export default function WorkspaceMembersPage() {
                     </td>
 
                     {isAdmin && (
-                      <td className="py-3 px-4 text-right relative">
-                        <div className="inline-block text-left">
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Direct, prominent Remove button */}
                           <button
                             type="button"
-                            onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
-                            className="p-1.5 rounded-md hover:bg-[var(--accent)] text-[var(--muted-foreground)]"
+                            onClick={() => handleRemoveMember(m)}
+                            disabled={
+                              m.user_id === currentUser?.id &&
+                              m.role === 'owner' &&
+                              members.filter((x) => x.role === 'owner' && !x.is_suspended).length <= 1
+                            }
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-md transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={
+                              m.user_id === currentUser?.id &&
+                              m.role === 'owner' &&
+                              members.filter((x) => x.role === 'owner' && !x.is_suspended).length <= 1
+                                ? 'Cannot remove sole workspace owner'
+                                : 'Remove member from workspace'
+                            }
                           >
-                            <MoreVertical className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Remove</span>
                           </button>
 
-                          {openMenuId === m.id && (
-                            <div className="absolute right-4 top-10 w-48 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-xl py-1 z-50 text-left">
-                              <div className="px-3 py-1 text-[10px] uppercase font-bold text-[var(--muted-foreground)]">
-                                Change Role
-                              </div>
-                              <button
-                                onClick={() => handleRoleChange(m.id, 'admin')}
-                                className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2"
-                              >
-                                <Shield className="w-3.5 h-3.5 text-blue-400" />
-                                <span>Set as Admin</span>
-                              </button>
-                              <button
-                                onClick={() => handleRoleChange(m.id, 'project_manager')}
-                                className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2"
-                              >
-                                <Shield className="w-3.5 h-3.5 text-purple-400" />
-                                <span>Set as Project Manager</span>
-                              </button>
-                              <button
-                                onClick={() => handleRoleChange(m.id, 'member')}
-                                className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2"
-                              >
-                                <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Set as Member</span>
-                              </button>
-                              <button
-                                onClick={() => handleRoleChange(m.id, 'guest')}
-                                className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2"
-                              >
-                                <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-                                <span>Set as Guest</span>
-                              </button>
+                          {/* Kebab menu for other management actions */}
+                          <div className="relative text-left">
+                            <button
+                              type="button"
+                              onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
+                              className="p-1.5 rounded-md hover:bg-[var(--accent)] text-[var(--muted-foreground)] cursor-pointer"
+                              title="More actions"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
 
-                              <div className="my-1 border-t border-[var(--border)]" />
+                            {openMenuId === m.id && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => setOpenMenuId(null)}
+                                />
+                                <div className="absolute right-0 top-8 w-48 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-xl py-1 z-50 text-left">
+                                  <div className="px-3 py-1 text-[10px] uppercase font-bold text-[var(--muted-foreground)]">
+                                    Change Role
+                                  </div>
+                                  <button
+                                    onClick={() => handleRoleChange(m.id, 'admin')}
+                                    className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Shield className="w-3.5 h-3.5 text-blue-400" />
+                                    <span>Set as Admin</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleRoleChange(m.id, 'project_manager')}
+                                    className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Shield className="w-3.5 h-3.5 text-purple-400" />
+                                    <span>Set as Project Manager</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleRoleChange(m.id, 'member')}
+                                    className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>Set as Member</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleRoleChange(m.id, 'guest')}
+                                    className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                                    <span>Set as Guest</span>
+                                  </button>
 
-                              <button
-                                onClick={() => handleToggleSuspend(m.id, Boolean(m.is_suspended))}
-                                className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 text-amber-400"
-                              >
-                                <UserX className="w-3.5 h-3.5" />
-                                <span>{m.is_suspended ? 'Reactivate Access' : 'Suspend Access'}</span>
-                              </button>
+                                  <div className="my-1 border-t border-[var(--border)]" />
 
-                              <button
-                                onClick={() => handleRevokeSessions(m.id, m.user_id)}
-                                className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 text-blue-400"
-                              >
-                                <LogOut className="w-3.5 h-3.5" />
-                                <span>Revoke Sessions</span>
-                              </button>
+                                  <button
+                                    onClick={() => handleToggleSuspend(m.id, Boolean(m.is_suspended))}
+                                    className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 text-amber-400 cursor-pointer"
+                                  >
+                                    <UserX className="w-3.5 h-3.5" />
+                                    <span>{m.is_suspended ? 'Reactivate Access' : 'Suspend Access'}</span>
+                                  </button>
 
-                              <button
-                                onClick={() => handleRemoveMember(m.id)}
-                                className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 text-red-400"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Remove from Workspace</span>
-                              </button>
-                            </div>
-                          )}
+                                  <button
+                                    onClick={() => handleRevokeSessions(m.id, m.user_id)}
+                                    className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 text-blue-400 cursor-pointer"
+                                  >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    <span>Revoke Sessions</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setOpenMenuId(null);
+                                      handleRemoveMember(m);
+                                    }}
+                                    className="w-full px-3 py-1.5 text-xs hover:bg-[var(--accent)] flex items-center gap-2 text-red-400 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Remove from Workspace</span>
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </td>
                     )}
@@ -499,6 +545,57 @@ export default function WorkspaceMembersPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Remove Member Confirmation Modal */}
+      <Modal
+        isOpen={!!memberToDelete}
+        onClose={() => setMemberToDelete(null)}
+        title="Remove Member from Workspace"
+        className="max-w-md"
+      >
+        <div className="space-y-4 pt-2">
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs">
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold text-red-400">Revoke Workspace Access</p>
+              <p className="text-[var(--muted-foreground)]">
+                Are you sure you want to remove <strong>{memberToDelete?.user?.full_name || 'this member'}</strong> ({memberToDelete?.user?.email}) from <strong>{activeTenant?.name}</strong>?
+              </p>
+              <p className="text-[var(--muted-foreground)]">
+                This will immediately invalidate their active sessions and revoke access to all projects, deliverables, and tasks in this workspace.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-[var(--border)] flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setMemberToDelete(null)}
+              disabled={isRemoving}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemoveMember}
+              disabled={isRemoving}
+            >
+              {isRemoving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Confirm Remove
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
