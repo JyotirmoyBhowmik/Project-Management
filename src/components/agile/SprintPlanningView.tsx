@@ -22,6 +22,8 @@ import {
   ArrowLeft,
   Sparkles,
   Clock,
+  Gauge,
+  AlertTriangle,
 } from 'lucide-react';
 import { Task, ProjectSprint, AgileSprintMetrics } from '@/types/database';
 import { Button } from '@/components/ui/button';
@@ -85,6 +87,7 @@ export function SprintPlanningView({
     return formatDateToISO(twoWeeks);
   });
   const [rolloverTarget, setRolloverTarget] = React.useState<'next_sprint' | 'backlog'>('backlog');
+  const [sprintCapacity, setSprintCapacity] = React.useState<number>(30);
 
   const activeSprint = sprints.find((s) => s.id === activeSprintId);
   const backlogTasks = tasks.filter((t) => !t.sprint_id);
@@ -95,6 +98,13 @@ export function SprintPlanningView({
   const sprintCompletedPoints = sprintTasks
     .filter((t) => t.status === 'completed' || t.status === 'done')
     .reduce((sum, t) => sum + (Number(t.story_points) || 1), 0);
+
+  const incompleteTasks = sprintTasks.filter((t) => t.status !== 'completed' && t.status !== 'done');
+  const incompletePoints = incompleteTasks.reduce((sum, t) => sum + (Number(t.story_points) || 1), 0);
+  const nextSprint = sprints.find((s) => s.id !== activeSprintId && s.status === 'planning');
+
+  const capacityPercent = sprintCapacity > 0 ? Math.round((sprintTotalPoints / sprintCapacity) * 100) : 0;
+  const isOverloaded = sprintTotalPoints > sprintCapacity;
 
   // Load Metrics when tab changes
   React.useEffect(() => {
@@ -409,18 +419,62 @@ export function SprintPlanningView({
               </div>
             </div>
 
-            {/* Velocity Progress Bar */}
+            {/* Team Capacity & Velocity Meter */}
             {activeSprint && (
-              <div className="mb-3 space-y-1">
-                <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
-                  <span>Sprint Progress</span>
-                  <span>{sprintTotalPoints > 0 ? Math.round((sprintCompletedPoints / sprintTotalPoints) * 100) : 0}%</span>
+              <div className="mb-3 p-3 rounded-xl bg-[var(--secondary)]/40 border border-[var(--border)] space-y-2.5">
+                {/* Team Capacity vs Planned Points */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-1.5 font-medium text-[var(--foreground)]">
+                      <Gauge className="h-3.5 w-3.5 text-[var(--muted-foreground)]" />
+                      <span>Sprint Capacity</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {isOverloaded && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+                          <AlertTriangle className="h-2.5 w-2.5" /> Overload (+{sprintTotalPoints - sprintCapacity} pts)
+                        </span>
+                      )}
+                      <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                        <strong className={isOverloaded ? 'text-rose-400 font-bold' : 'text-[var(--foreground)]'}>
+                          {sprintTotalPoints}
+                        </strong>{' '}
+                        / {sprintCapacity} pts ({capacityPercent}%)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-[var(--secondary)] rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${
+                        isOverloaded
+                          ? 'bg-rose-500'
+                          : capacityPercent >= 80
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, capacityPercent)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-[var(--secondary)] rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-2 rounded-full transition-all"
-                    style={{ width: `${sprintTotalPoints > 0 ? (sprintCompletedPoints / sprintTotalPoints) * 100 : 0}%` }}
-                  />
+
+                {/* Delivery Burn Progress */}
+                <div className="space-y-1 pt-1.5 border-t border-[var(--border)]/40">
+                  <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
+                    <span>Delivery Progress</span>
+                    <span className="font-mono">
+                      {sprintTotalPoints > 0 ? Math.round((sprintCompletedPoints / sprintTotalPoints) * 100) : 0}% ({sprintCompletedPoints}/{sprintTotalPoints} pts)
+                    </span>
+                  </div>
+                  <div className="w-full bg-[var(--secondary)] rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-1.5 rounded-full transition-all"
+                      style={{
+                        width: `${
+                          sprintTotalPoints > 0 ? (sprintCompletedPoints / sprintTotalPoints) * 100 : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -739,36 +793,135 @@ export function SprintPlanningView({
       {/* Complete Sprint Modal */}
       <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} title="Complete Sprint">
         <div className="space-y-4">
-          <p className="text-xs text-[var(--muted-foreground)]">
-            Select what should happen with incomplete tasks remaining in this sprint.
-          </p>
-          <div className="space-y-2 text-xs">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="rollover"
-                value="backlog"
-                checked={rolloverTarget === 'backlog'}
-                onChange={() => setRolloverTarget('backlog')}
-              />
-              <span>Move incomplete tasks back to Product Backlog</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="rollover"
-                value="next_sprint"
-                checked={rolloverTarget === 'next_sprint'}
-                onChange={() => setRolloverTarget('next_sprint')}
-              />
-              <span>Roll over to next upcoming sprint</span>
-            </label>
-          </div>
+          {incompleteTasks.length === 0 ? (
+            <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3 text-xs text-emerald-400">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-semibold text-sm">All sprint tasks completed!</p>
+                <p className="text-[11px] text-emerald-400/80">Every task in this sprint has been finished. No task rollover required.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-400">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold">
+                    {incompleteTasks.length} incomplete task{incompleteTasks.length !== 1 ? 's' : ''} ({incompletePoints} pts) remaining
+                  </p>
+                  <p className="text-[11px] text-amber-400/80">
+                    These tasks will not be marked as completed. Choose where they should be moved:
+                  </p>
+                </div>
+              </div>
+
+              {/* Incomplete Tasks Preview List */}
+              <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                <div className="bg-[var(--secondary)]/60 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] flex justify-between">
+                  <span>Task</span>
+                  <span>Estimate</span>
+                </div>
+                <div className="max-h-36 overflow-y-auto divide-y divide-[var(--border)]">
+                  {incompleteTasks.map((t) => (
+                    <div key={t.id} className="px-3 py-2 text-xs flex items-center justify-between hover:bg-[var(--secondary)]/30">
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <span className="font-mono text-[10px] font-bold text-[var(--primary)] shrink-0">
+                          {t.task_code || (t as any).code || 'TASK'}
+                        </span>
+                        <span className="truncate text-[var(--foreground)] text-xs">{t.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 capitalize">
+                          {t.status}
+                        </Badge>
+                        <span className="font-mono text-[10px] font-bold text-orange-400">
+                          {t.story_points || 1} pts
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rollover Destination Option Cards */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[var(--foreground)]">Rollover Destination</label>
+                <div className="space-y-2">
+                  <div
+                    onClick={() => setRolloverTarget('backlog')}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
+                      rolloverTarget === 'backlog'
+                        ? 'border-[var(--primary)] bg-[var(--primary)]/5 ring-1 ring-[var(--primary)]/30'
+                        : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)]/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="rollover"
+                      value="backlog"
+                      checked={rolloverTarget === 'backlog'}
+                      onChange={() => setRolloverTarget('backlog')}
+                      className="mt-0.5 cursor-pointer"
+                    />
+                    <div className="text-xs space-y-0.5">
+                      <div className="font-semibold text-[var(--foreground)]">Product Backlog</div>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        Return incomplete tasks to the unassigned backlog for future sprint cycles.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => {
+                      if (nextSprint) setRolloverTarget('next_sprint');
+                    }}
+                    className={`p-3 rounded-xl border transition-all flex items-start gap-3 ${
+                      !nextSprint
+                        ? 'opacity-50 cursor-not-allowed border-[var(--border)] bg-[var(--secondary)]/20'
+                        : rolloverTarget === 'next_sprint'
+                        ? 'border-[var(--primary)] bg-[var(--primary)]/5 ring-1 ring-[var(--primary)]/30 cursor-pointer'
+                        : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)]/50 cursor-pointer'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="rollover"
+                      value="next_sprint"
+                      disabled={!nextSprint}
+                      checked={rolloverTarget === 'next_sprint'}
+                      onChange={() => {
+                        if (nextSprint) setRolloverTarget('next_sprint');
+                      }}
+                      className="mt-0.5 cursor-pointer"
+                    />
+                    <div className="text-xs space-y-0.5">
+                      <div className="font-semibold text-[var(--foreground)] flex items-center gap-2">
+                        <span>Next Planned Sprint</span>
+                        {nextSprint && (
+                          <Badge variant="outline" className="text-[10px] font-normal">
+                            {nextSprint.name}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[var(--muted-foreground)]">
+                        {nextSprint
+                          ? `Directly transfer unfinished tasks into "${nextSprint.name}".`
+                          : 'No upcoming sprint in planning status found. Create a new sprint to enable rollover.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
             <Button variant="outline" onClick={() => setIsCompleteModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCompleteSprint}>Complete Sprint</Button>
+            <Button onClick={handleCompleteSprint} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+              Complete Sprint
+            </Button>
           </div>
         </div>
       </Modal>
