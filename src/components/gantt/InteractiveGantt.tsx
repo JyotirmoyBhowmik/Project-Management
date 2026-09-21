@@ -55,6 +55,53 @@ interface InteractiveGanttProps {
   onSelectTask?: (task: Task) => void;
 }
 
+/**
+ * Generates enterprise orthogonal (Manhattan) SVG path routing between predecessor
+ * and successor tasks with rounded fillet corners.
+ */
+function generateManhattanPath(
+  startX: number,
+  predY: number,
+  endX: number,
+  succY: number,
+  depType: 'FS' | 'SS' | 'FF' | 'SF' = 'FS',
+  rowHeight: number = 36
+): string {
+  const r = 4; // Fillet corner radius
+
+  if (Math.abs(predY - succY) < 2) {
+    return `M ${startX} ${predY} L ${endX} ${succY}`;
+  }
+
+  const goingDown = succY > predY;
+  const dy = goingDown ? r : -r;
+
+  if (depType === 'FS') {
+    if (endX >= startX + 16) {
+      // Normal finish-to-start forward step: exit right, turn vertically at midX, turn right into target
+      const midX = Math.round((startX + endX) / 2);
+      return `M ${startX} ${predY} L ${midX - r} ${predY} Q ${midX} ${predY} ${midX} ${predY + dy} L ${midX} ${succY - dy} Q ${midX} ${succY} ${midX + r} ${succY} L ${endX} ${succY}`;
+    } else {
+      // Backward or overlapping link: exit right past pred bar, route around in channel, turn into target from left
+      const exitX = startX + 12;
+      const enterX = endX - 12;
+      const midY = predY + (goingDown ? rowHeight * 0.45 : -rowHeight * 0.45);
+
+      return `M ${startX} ${predY} L ${exitX - r} ${predY} Q ${exitX} ${predY} ${exitX} ${predY + dy} L ${exitX} ${midY - dy} Q ${exitX} ${midY} ${exitX - r} ${midY} L ${enterX + r} ${midY} Q ${enterX} ${midY} ${enterX} ${midY + dy} L ${enterX} ${succY - dy} Q ${enterX} ${succY} ${enterX + r} ${succY} L ${endX} ${succY}`;
+    }
+  } else if (depType === 'SS') {
+    const leftX = Math.min(startX, endX) - 14;
+    return `M ${startX} ${predY} L ${leftX + r} ${predY} Q ${leftX} ${predY} ${leftX} ${predY + dy} L ${leftX} ${succY - dy} Q ${leftX} ${succY} ${leftX + r} ${succY} L ${endX} ${succY}`;
+  } else if (depType === 'FF') {
+    const rightX = Math.max(startX, endX) + 14;
+    return `M ${startX} ${predY} L ${rightX - r} ${predY} Q ${rightX} ${predY} ${rightX} ${predY + dy} L ${rightX} ${succY - dy} Q ${rightX} ${succY} ${rightX - r} ${succY} L ${endX} ${succY}`;
+  } else {
+    // SF: Start-to-Finish
+    const midX = Math.round((startX + endX) / 2);
+    return `M ${startX} ${predY} L ${midX + r} ${predY} Q ${midX} ${predY} ${midX} ${predY + dy} L ${midX} ${succY - dy} Q ${midX} ${succY} ${midX - r} ${succY} L ${endX} ${succY}`;
+  }
+}
+
 export function InteractiveGantt({
   tasks,
   dependencies,
@@ -105,6 +152,19 @@ export function InteractiveGantt({
     end_date: string;
     duration_days: number;
   } | null>(null);
+
+  // Splitter Resizing (Left task grid width with localStorage persistence)
+  const [splitterWidth, setSplitterWidth] = React.useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pms_gantt_splitter_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 220 && parsed <= 600) return parsed;
+      }
+    }
+    return 320;
+  });
+  const [isResizingSplitter, setIsResizingSplitter] = React.useState(false);
 
   const { priorities } = useTenantMetadata();
 
@@ -354,6 +414,34 @@ export function InteractiveGantt({
     };
   }, [draggingTask, updateDragPreviewPosition, handleMouseUp]);
 
+  // Window event listeners for draggable splitter resizing
+  React.useEffect(() => {
+    if (!isResizingSplitter) return;
+
+    const onSplitterMove = (e: MouseEvent) => {
+      if (containerRef.current) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const newW = Math.max(220, Math.min(600, e.clientX - containerRect.left));
+        setSplitterWidth(newW);
+      }
+    };
+
+    const onSplitterUp = () => {
+      setIsResizingSplitter(false);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pms_gantt_splitter_width', String(splitterWidth));
+      }
+    };
+
+    window.addEventListener('mousemove', onSplitterMove);
+    window.addEventListener('mouseup', onSplitterUp);
+
+    return () => {
+      window.removeEventListener('mousemove', onSplitterMove);
+      window.removeEventListener('mouseup', onSplitterUp);
+    };
+  }, [isResizingSplitter, splitterWidth]);
+
   // Drag-to-connect dependency complete handler with Kahn's loop guard
   const handleConnectorMouseUp = (targetTaskId: string, targetHandle: 'start' | 'finish') => {
     if (isConnectingDependency && sourceTaskId && sourceTaskId !== targetTaskId) {
@@ -519,7 +607,10 @@ export function InteractiveGantt({
         className="flex flex-1 overflow-x-auto overflow-y-auto select-none"
       >
         {/* Left Frozen Task Grid */}
-        <div className="w-80 shrink-0 border-r border-[var(--border)] bg-[var(--card)] sticky left-0 z-20 shadow-md">
+        <div
+          style={{ width: `${splitterWidth}px` }}
+          className="shrink-0 border-r border-[var(--border)] bg-[var(--card)] sticky left-0 z-20 shadow-md flex flex-col"
+        >
           {/* Grid Header */}
           <div
             style={{ height: headerHeight }}
@@ -547,12 +638,12 @@ export function InteractiveGantt({
                       : 'hover:bg-[var(--secondary)]/40 text-[var(--foreground)]'
                   }`}
                 >
-                  <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 mr-2">
                     <span className="text-[10px] text-[var(--muted-foreground)] font-mono w-4 shrink-0">
                       {index + 1}
                     </span>
-                    {task.parent_id && <span className="text-[var(--muted-foreground)] ml-2">↳</span>}
-                    <span className="truncate max-w-[170px]" title={task.title}>
+                    {task.parent_id && <span className="text-[var(--muted-foreground)] ml-1 shrink-0">↳</span>}
+                    <span className="truncate" title={task.title}>
                       {task.title}
                     </span>
                   </div>
@@ -571,6 +662,18 @@ export function InteractiveGantt({
               );
             })}
           </div>
+        </div>
+
+        {/* Draggable Splitter Resizer Handle */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsResizingSplitter(true);
+          }}
+          className="w-1.5 hover:w-2 hover:bg-purple-500 active:bg-purple-600 cursor-col-resize shrink-0 sticky z-30 transition-all bg-[var(--border)] select-none flex items-center justify-center group"
+          title="Drag to resize WBS task list"
+        >
+          <div className="h-8 w-0.5 rounded-full bg-[var(--muted-foreground)] group-hover:bg-white transition-colors" />
         </div>
 
         {/* Right Interactive SVG Timeline Canvas */}
@@ -890,8 +993,16 @@ export function InteractiveGantt({
                 const strokeWidth = isCriticalLink ? 2.5 : 1.5;
                 const markerEnd = isCriticalLink ? 'url(#dep-arrow-critical)' : 'url(#dep-arrow)';
 
-                const dx = Math.abs(endX - startX) / 2;
-                const pathD = `M ${startX} ${predY} C ${startX + dx} ${predY}, ${endX - dx} ${succY}, ${endX} ${succY}`;
+                const pathD = generateManhattanPath(
+                  startX,
+                  predY,
+                  endX,
+                  succY,
+                  (dep.type || (dep as any).dependency_type || 'FS') as any,
+                  rowHeight
+                );
+
+                const linkTooltip = `${predTask.code || predTask.task_code || predTask.title} -> ${succTask.code || succTask.task_code || succTask.title}\nType: ${dep.type || 'FS'}${dep.lag_days ? ` | Lag: +${dep.lag_days}d` : ''}\n${isCriticalLink ? 'CRITICAL PATH' : `Float: ${predTask.total_float ?? 0}d`}`;
 
                 return (
                   <path
@@ -901,8 +1012,10 @@ export function InteractiveGantt({
                     stroke={strokeColor}
                     strokeWidth={strokeWidth}
                     markerEnd={markerEnd}
-                    className="transition-all hover:stroke-indigo-400"
-                  />
+                    className="transition-all hover:stroke-indigo-400 hover:stroke-[3px] cursor-pointer"
+                  >
+                    <title>{linkTooltip}</title>
+                  </path>
                 );
               })}
             </g>
@@ -939,6 +1052,7 @@ export function InteractiveGantt({
 
                   return (
                     <g key={task.id} className="cursor-pointer group">
+                      <title>{`${task.code || task.task_code || 'MILESTONE'}: ${task.title}\nDate: ${task.start_date}\nTotal Float: ${task.total_float ?? 0}d | Free Float: ${task.free_float ?? 0}d\n${isCritical ? 'CRITICAL PATH' : 'Non-critical'}`}</title>
                       <polygon
                         points={`${centerX},${centerY - 10} ${centerX + 10},${centerY} ${centerX},${centerY + 10} ${centerX - 10},${centerY}`}
                         fill={isCritical ? '#f59e0b' : 'var(--primary)'}
@@ -960,6 +1074,7 @@ export function InteractiveGantt({
 
                 return (
                   <g key={task.id} className="group">
+                    <title>{`${task.code || task.task_code || 'TASK'}: ${task.title}\nStart: ${task.start_date} | End: ${task.end_date}\nDuration: ${task.duration_days}d | Total Float: ${task.total_float ?? 0}d | Free Float: ${task.free_float ?? 0}d\nProgress: ${task.progress ?? 0}%\n${isCritical ? 'CRITICAL PATH' : 'Non-critical'}`}</title>
                     {/* Ghost Baseline Rendering */}
                     {baselineSnapshot && (
                       <g className="pointer-events-none opacity-70">

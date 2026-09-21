@@ -39,6 +39,13 @@ interface WbsTaskNode {
   wbsCode: string;
   depth: number;
   children: WbsTaskNode[];
+  rollup?: {
+    earliestStart: string;
+    latestEnd: string;
+    durationDays: number;
+    averageProgress: number;
+    subtaskCount: number;
+  };
 }
 
 export function HierarchicalGrid({
@@ -78,11 +85,53 @@ export function HierarchicalGrid({
         const childrenTasks = parentMap[t.id] || t.subtasks || [];
         const childNodes = buildNodes(childrenTasks, prefix ? `${prefix}.${idx + 1}` : `${idx + 1}`, depth + 1);
 
+        let rollup: WbsTaskNode['rollup'] | undefined = undefined;
+        if (childNodes.length > 0) {
+          const allDescendants: Task[] = [];
+          function collectDescendants(nodes: WbsTaskNode[]) {
+            nodes.forEach((n) => {
+              allDescendants.push(n.task);
+              if (n.children && n.children.length > 0) collectDescendants(n.children);
+            });
+          }
+          collectDescendants(childNodes);
+
+          const starts = allDescendants.map((d) => d.start_date).filter(Boolean);
+          const ends = allDescendants.map((d) => d.end_date).filter(Boolean);
+          const progresses = allDescendants.map((d) => d.progress ?? (d as any).progress_percent ?? 0);
+
+          starts.sort();
+          ends.sort();
+
+          const earliestStart = starts[0] || t.start_date;
+          const latestEnd = ends[ends.length - 1] || t.end_date;
+          const avgProgress = progresses.length > 0
+            ? Math.round(progresses.reduce((a, b) => a + b, 0) / progresses.length)
+            : (t.progress ?? 0);
+
+          let durationDays = t.duration_days;
+          if (earliestStart && latestEnd) {
+            const s = new Date(earliestStart).getTime();
+            const e = new Date(latestEnd).getTime();
+            const diff = Math.round((e - s) / (1000 * 60 * 60 * 24));
+            durationDays = Math.max(1, diff + 1);
+          }
+
+          rollup = {
+            earliestStart,
+            latestEnd,
+            durationDays,
+            averageProgress: avgProgress,
+            subtaskCount: allDescendants.length,
+          };
+        }
+
         return {
           task: t,
           wbsCode,
           depth,
           children: childNodes,
+          rollup,
         };
       });
     }
@@ -295,6 +344,15 @@ export function HierarchicalGrid({
                 </span>
               )}
 
+              {node.rollup && (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[9px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 shrink-0"
+                  title={`Rolled up from ${node.rollup.subtaskCount} subtasks: ${node.rollup.earliestStart} to ${node.rollup.latestEnd} (${node.rollup.durationDays}d span, avg progress: ${node.rollup.averageProgress}%)`}
+                >
+                  Σ Rollup
+                </span>
+              )}
+
               {onAddSubtask && (
                 <Button
                   variant="ghost"
@@ -335,15 +393,36 @@ export function HierarchicalGrid({
 
           {/* Dates */}
           <td className="py-2.5 px-3 font-mono text-[11px] text-[var(--muted-foreground)]">
-            {task.start_date || '-'}
+            <div className="flex flex-col">
+              <span>{task.start_date || '-'}</span>
+              {node.rollup && node.rollup.earliestStart !== task.start_date && (
+                <span className="text-[9px] text-purple-400 font-mono" title="Rolled up earliest start date">
+                  Σ {node.rollup.earliestStart}
+                </span>
+              )}
+            </div>
           </td>
           <td className="py-2.5 px-3 font-mono text-[11px] text-[var(--muted-foreground)]">
-            {task.end_date || '-'}
+            <div className="flex flex-col">
+              <span>{task.end_date || '-'}</span>
+              {node.rollup && node.rollup.latestEnd !== task.end_date && (
+                <span className="text-[9px] text-purple-400 font-mono" title="Rolled up latest finish date">
+                  Σ {node.rollup.latestEnd}
+                </span>
+              )}
+            </div>
           </td>
 
           {/* Duration */}
           <td className="py-2.5 px-3 text-center font-mono font-semibold">
-            {task.duration_days}d
+            <div className="flex flex-col items-center">
+              <span>{task.duration_days}d</span>
+              {node.rollup && (
+                <span className="text-[9px] text-purple-400 font-mono font-normal" title="Total schedule span of subtasks">
+                  Σ {node.rollup.durationDays}d
+                </span>
+              )}
+            </div>
           </td>
 
           {/* Total Float */}
@@ -373,9 +452,16 @@ export function HierarchicalGrid({
                 }}
                 className="w-20 h-1.5 bg-[var(--secondary)] rounded-lg appearance-none cursor-pointer accent-[var(--primary)]"
               />
-              <span className="font-mono text-[11px] text-[var(--muted-foreground)] w-8">
-                {progressVal}%
-              </span>
+              <div className="flex flex-col">
+                <span className="font-mono text-[11px] text-[var(--muted-foreground)] w-8">
+                  {progressVal}%
+                </span>
+                {node.rollup && (
+                  <span className="text-[9px] font-mono text-purple-400 font-bold" title="Average subtask completion">
+                    Σ {node.rollup.averageProgress}%
+                  </span>
+                )}
+              </div>
             </div>
           </td>
 

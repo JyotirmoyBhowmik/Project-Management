@@ -316,11 +316,19 @@ export function TaskDetailDrawer({
     const nextStatus = isCompleted ? 'todo' : 'completed';
     const nextProgress = isCompleted ? 0 : 100;
 
-    setSubtasks((prev) =>
-      prev.map((s) =>
-        s.id === subtask.id ? { ...s, status: nextStatus, progress: nextProgress } : s
-      )
+    const updatedSubtasks = subtasks.map((s) =>
+      s.id === subtask.id ? { ...s, status: nextStatus, progress: nextProgress } : s
     );
+
+    setSubtasks(updatedSubtasks);
+
+    // Automatically recalculate and sync parent task progress
+    if (updatedSubtasks.length > 0) {
+      const completedCount = updatedSubtasks.filter((s) => s.status === 'completed').length;
+      const newParentProgress = Math.round((completedCount / updatedSubtasks.length) * 100);
+      setProgress(newParentProgress);
+      handleSaveDetails({ progress: newParentProgress, progress_percent: newParentProgress });
+    }
 
     await supabase
       .from('tasks')
@@ -724,6 +732,12 @@ export function TaskDetailDrawer({
                   </h4>
                   {subtasks.length > 0 && subtasksPercent !== null && (
                     <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 bg-[var(--secondary)] rounded-full overflow-hidden border border-[var(--border)]">
+                        <div
+                          className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                          style={{ width: `${subtasksPercent}%` }}
+                        />
+                      </div>
                       <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
                         {subtasksCompletedCount}/{subtasks.length} ({subtasksPercent}%)
                       </span>
@@ -733,8 +747,9 @@ export function TaskDetailDrawer({
                         size="sm"
                         onClick={handleSyncParentProgress}
                         className="h-6 text-[10px] py-0 px-2 border-purple-500/30 text-purple-400 hover:text-purple-300 hover:bg-purple-950/20"
+                        title="Force recalculate and sync parent completion"
                       >
-                        Sync Progress
+                        Sync
                       </Button>
                     </div>
                   )}
