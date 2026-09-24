@@ -21,6 +21,9 @@ import {
   ChevronRight,
   Database,
   Lock,
+  Copy,
+  Check,
+  Link2,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { TenantSSOConfig, TenantDirectorySyncConfig, DirectorySyncLog } from '@/types/database';
@@ -73,6 +76,25 @@ export default function IdentitySettingsPage() {
   const [isSyncingNow, setIsSyncingNow] = React.useState(false);
   const [syncLogs, setSyncLogs] = React.useState<DirectorySyncLog[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+
+  // Service Provider (SP) Metadata Quick Copy
+  const [origin, setOrigin] = React.useState('');
+  const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  const handleCopyText = (key: string, text: string, label: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      toast.success(`${label} copied to clipboard`);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
 
   // Load Configurations
   const loadData = React.useCallback(async () => {
@@ -239,6 +261,100 @@ export default function IdentitySettingsPage() {
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>PostgreSQL RLS Protected</span>
           </Badge>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* SERVICE PROVIDER (SP) FEDERATION METADATA (For Azure AD / Okta Config)   */}
+      {/* ========================================================================= */}
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--border)] pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+              <Link2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold flex items-center gap-2">
+                <span>Service Provider (SP) Federation Coordinates</span>
+                <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-500/30">
+                  Ready to copy
+                </Badge>
+              </h2>
+              <p className="text-[11px] text-[var(--muted-foreground)]">
+                Provide these metadata endpoints to your Identity Provider (Microsoft Entra ID, Okta, PingFederate, Google Workspace).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+          <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-lg space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[var(--foreground)] text-[11px]">SP Entity ID / Audience URI</span>
+              <button
+                type="button"
+                onClick={() => handleCopyText('entity_id', `${origin || 'https://app.domain.com'}/auth/saml/metadata`, 'SP Entity ID')}
+                className="flex items-center gap-1 text-[11px] text-[var(--primary)] hover:underline cursor-pointer"
+              >
+                {copiedKey === 'entity_id' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedKey === 'entity_id' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <div className="font-mono text-[11px] text-[var(--muted-foreground)] truncate select-all">
+              {origin || 'https://app.domain.com'}/auth/saml/metadata
+            </div>
+          </div>
+
+          <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-lg space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[var(--foreground)] text-[11px]">Assertion Consumer Service (ACS) URL</span>
+              <button
+                type="button"
+                onClick={() => handleCopyText('acs_url', `${origin || 'https://app.domain.com'}/auth/saml/acs`, 'ACS URL')}
+                className="flex items-center gap-1 text-[11px] text-[var(--primary)] hover:underline cursor-pointer"
+              >
+                {copiedKey === 'acs_url' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedKey === 'acs_url' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <div className="font-mono text-[11px] text-[var(--muted-foreground)] truncate select-all">
+              {origin || 'https://app.domain.com'}/auth/saml/acs
+            </div>
+          </div>
+
+          <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-lg space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[var(--foreground)] text-[11px]">SCIM 2.0 Base URL</span>
+              <button
+                type="button"
+                onClick={() => handleCopyText('scim_url', `${origin || 'https://app.domain.com'}/api/scim/v2`, 'SCIM Base URL')}
+                className="flex items-center gap-1 text-[11px] text-[var(--primary)] hover:underline cursor-pointer"
+              >
+                {copiedKey === 'scim_url' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedKey === 'scim_url' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <div className="font-mono text-[11px] text-[var(--muted-foreground)] truncate select-all">
+              {origin || 'https://app.domain.com'}/api/scim/v2
+            </div>
+          </div>
+
+          <div className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-lg space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[var(--foreground)] text-[11px]">Expected SAML NameID Format</span>
+              <button
+                type="button"
+                onClick={() => handleCopyText('name_id', 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress', 'NameID Format')}
+                className="flex items-center gap-1 text-[11px] text-[var(--primary)] hover:underline cursor-pointer"
+              >
+                {copiedKey === 'name_id' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedKey === 'name_id' ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <div className="font-mono text-[11px] text-[var(--muted-foreground)] truncate select-all">
+              urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
+            </div>
+          </div>
         </div>
       </div>
 

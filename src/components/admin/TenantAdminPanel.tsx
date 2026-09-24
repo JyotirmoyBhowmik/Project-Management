@@ -17,6 +17,14 @@ import {
   GitBranch,
   Layers,
   AlertCircle,
+  ChevronUp,
+  ChevronDown,
+  Search,
+  Filter,
+  Copy,
+  Check,
+  FileCode,
+  Code2,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { dbService } from '@/lib/supabase/db-service';
@@ -87,8 +95,13 @@ export function TenantAdminPanel() {
   const [newHolidayName, setNewHolidayName] = React.useState('');
   const [newHolidayDate, setNewHolidayDate] = React.useState('2026-12-31');
 
-  // Audit Logs
+  // Audit Logs & Inspection State
   const [auditLogs, setAuditLogs] = React.useState<AuditLog[]>([]);
+  const [auditActionFilter, setAuditActionFilter] = React.useState<string>('ALL');
+  const [auditEntityFilter, setAuditEntityFilter] = React.useState<string>('ALL');
+  const [auditSearchQuery, setAuditSearchQuery] = React.useState<string>('');
+  const [expandedLogId, setExpandedLogId] = React.useState<string | null>(null);
+  const [copiedTraceId, setCopiedTraceId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   // Live Supabase Data Fetching
@@ -191,6 +204,38 @@ export function TenantAdminPanel() {
     showNotification('Workflow status removed.');
   };
 
+  const handleMoveStatus = async (statusId: string, direction: 'up' | 'down') => {
+    if (!tenantId) return;
+    const index = statuses.findIndex((s) => s.id === statusId);
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= statuses.length) return;
+
+    const newStatuses = [...statuses];
+    const current = { ...newStatuses[index] };
+    const target = { ...newStatuses[targetIndex] };
+
+    const tempPos = current.position;
+    current.position = target.position === tempPos ? (direction === 'up' ? tempPos - 1 : tempPos + 1) : target.position;
+    target.position = tempPos;
+
+    newStatuses[index] = target;
+    newStatuses[targetIndex] = current;
+    newStatuses.sort((a, b) => a.position - b.position);
+    setStatuses(newStatuses);
+
+    try {
+      await Promise.all([
+        dbService.updateTenantTaskStatus(current.id, { position: current.position }),
+        dbService.updateTenantTaskStatus(target.id, { position: target.position }),
+      ]);
+      await refreshMetadata();
+      showNotification(`Reordered pipeline stage "${current.name}".`);
+    } catch (err) {
+      showNotification('Failed to update stage ordering.');
+    }
+  };
+
   // --- PRIORITY HANDLERS ---
   const handleAddPriority = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,6 +268,46 @@ export function TenantAdminPanel() {
     setPriorities(refreshed);
     await refreshMetadata();
     showNotification('Task priority level removed.');
+  };
+
+  const handleMovePriority = async (priorityId: string, direction: 'up' | 'down') => {
+    if (!tenantId) return;
+    const index = priorities.findIndex((p) => p.id === priorityId);
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= priorities.length) return;
+
+    const newPriorities = [...priorities];
+    const current = { ...newPriorities[index] };
+    const target = { ...newPriorities[targetIndex] };
+
+    let weight1 = current.urgency_weight;
+    let weight2 = target.urgency_weight;
+    if (weight1 === weight2) {
+      if (direction === 'up') {
+        weight1 = weight2 + 5;
+      } else {
+        weight1 = Math.max(0, weight2 - 5);
+      }
+    }
+
+    current.urgency_weight = weight2;
+    target.urgency_weight = weight1;
+    newPriorities[index] = target;
+    newPriorities[targetIndex] = current;
+    newPriorities.sort((a, b) => b.urgency_weight - a.urgency_weight);
+    setPriorities(newPriorities);
+
+    try {
+      await Promise.all([
+        dbService.updateTenantTaskPriority(current.id, { urgency_weight: current.urgency_weight }),
+        dbService.updateTenantTaskPriority(target.id, { urgency_weight: target.urgency_weight }),
+      ]);
+      await refreshMetadata();
+      showNotification(`Updated priority ranking for "${current.name}".`);
+    } catch (err) {
+      showNotification('Failed to update priority urgency weighting.');
+    }
   };
 
   // --- CUSTOM FIELD HANDLERS ---
@@ -342,6 +427,32 @@ export function TenantAdminPanel() {
 
   const ROLES = ['admin', 'manager', 'member', 'guest'];
 
+  const uniqueEntityTypes = React.useMemo(() => {
+    const set = new Set<string>();
+    auditLogs.forEach((l) => {
+      if (l.entity_type) set.add(l.entity_type);
+    });
+    return Array.from(set).sort();
+  }, [auditLogs]);
+
+  const filteredAuditLogs = React.useMemo(() => {
+    return auditLogs.filter((log) => {
+      if (auditActionFilter !== 'ALL' && log.action !== auditActionFilter) return false;
+      if (auditEntityFilter !== 'ALL' && log.entity_type !== auditEntityFilter) return false;
+      if (auditSearchQuery.trim()) {
+        const q = auditSearchQuery.toLowerCase();
+        const trace = log.correlation_id?.toLowerCase() || '';
+        const entityId = log.entity_id?.toLowerCase() || '';
+        const entityType = log.entity_type?.toLowerCase() || '';
+        const actor = log.actor_id?.toLowerCase() || '';
+        if (!trace.includes(q) && !entityId.includes(q) && !entityType.includes(q) && !actor.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [auditLogs, auditActionFilter, auditEntityFilter, auditSearchQuery]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -421,7 +532,7 @@ export function TenantAdminPanel() {
 
             {/* Statuses Table */}
             <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden text-xs">
-              {statuses.map((s) => (
+              {statuses.map((s, idx) => (
                 <div key={s.id} className="p-3 bg-[var(--card)] flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="w-4 h-4 rounded-full border border-black/20" style={{ backgroundColor: s.color_hex }} />
@@ -437,6 +548,26 @@ export function TenantAdminPanel() {
                         Terminal Closed State
                       </Badge>
                     )}
+                    <div className="flex items-center gap-1 border border-[var(--border)] rounded p-0.5 bg-[var(--muted)]/20">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveStatus(s.id, 'up')}
+                        className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        title="Move Stage Left / Up"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === statuses.length - 1}
+                        onClick={() => handleMoveStatus(s.id, 'down')}
+                        className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        title="Move Stage Right / Down"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <button
                       onClick={() => handleDeleteStatus(s.id)}
                       className="text-[var(--muted-foreground)] hover:text-rose-500 transition-colors cursor-pointer"
@@ -470,7 +601,7 @@ export function TenantAdminPanel() {
             </div>
 
             <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden text-xs">
-              {priorities.map((p) => (
+              {priorities.map((p, idx) => (
                 <div key={p.id} className="p-3 bg-[var(--card)] flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span
@@ -491,6 +622,26 @@ export function TenantAdminPanel() {
                         SLA: <strong className="text-[var(--foreground)]">{p.sla_response_hours}h</strong>
                       </span>
                     )}
+                    <div className="flex items-center gap-1 border border-[var(--border)] rounded p-0.5 bg-[var(--muted)]/20">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMovePriority(p.id, 'up')}
+                        className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        title="Move Up (Higher Urgency Weight)"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === priorities.length - 1}
+                        onClick={() => handleMovePriority(p.id, 'down')}
+                        className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                        title="Move Down (Lower Urgency Weight)"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <button
                       onClick={() => handleDeletePriority(p.id)}
                       className="text-[var(--muted-foreground)] hover:text-rose-500 transition-colors cursor-pointer"
@@ -753,35 +904,183 @@ export function TenantAdminPanel() {
 
       {/* Tab 7: Audit Logs */}
       {activeTab === 'audit' && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
             <div>
-              <h2 className="text-sm font-bold text-[var(--foreground)]">Immutable Compliance Audit Trail</h2>
-              <p className="text-[11px] text-[var(--muted-foreground)]">Captures destructive mutations, before/after JSON diffs, and distributed trace IDs.</p>
+              <h2 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                <Shield className="h-4 w-4 text-[var(--primary)]" />
+                Immutable Compliance Audit Trail
+              </h2>
+              <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
+                Captures destructive mutations, before/after JSON diffs, and distributed correlation trace IDs.
+              </p>
             </div>
-            <Badge variant="outline" className="font-mono">{auditLogs.length} Events</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs">
+                {filteredAuditLogs.length} of {auditLogs.length} Events
+              </Badge>
+            </div>
           </div>
 
-          <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden text-xs">
-            {auditLogs.map((log) => (
-              <div key={log.id} className="p-3 bg-[var(--card)] space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={log.action === 'DELETE' ? 'destructive' : log.action === 'INSERT' ? 'success' : 'secondary'}>
-                      {log.action}
-                    </Badge>
-                    <span className="font-semibold text-[var(--foreground)] capitalize">{log.entity_type}</span>
-                    <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{log.entity_id}</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-[var(--muted-foreground)]">{log.created_at}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-[var(--muted-foreground)] font-mono">
-                  <span>trace: {log.correlation_id}</span>
-                  <span>ip: {log.ip_address}</span>
-                </div>
-              </div>
-            ))}
+          {/* Audit Filters Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-[var(--muted-foreground)]" />
+              <Input
+                value={auditSearchQuery}
+                onChange={(e) => setAuditSearchQuery(e.target.value)}
+                placeholder="Search trace, entity UUID, actor..."
+                className="pl-8 text-xs"
+              />
+            </div>
+            <div>
+              <select
+                value={auditActionFilter}
+                onChange={(e) => setAuditActionFilter(e.target.value)}
+                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)] text-[var(--foreground)]"
+              >
+                <option value="ALL">All Actions (INSERT, UPDATE, DELETE...)</option>
+                <option value="INSERT">INSERT (Creations)</option>
+                <option value="UPDATE">UPDATE (Mutations)</option>
+                <option value="DELETE">DELETE (Removals)</option>
+                <option value="SECURITY_OVERRIDE">SECURITY_OVERRIDE</option>
+              </select>
+            </div>
+            <div>
+              <select
+                value={auditEntityFilter}
+                onChange={(e) => setAuditEntityFilter(e.target.value)}
+                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-md px-2.5 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--primary)] text-[var(--foreground)]"
+              >
+                <option value="ALL">All Entity Types</option>
+                {uniqueEntityTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {filteredAuditLogs.length === 0 ? (
+            <div className="p-8 text-center text-xs text-[var(--muted-foreground)] border border-[var(--border)] rounded-lg">
+              No compliance audit logs match the selected filters.
+            </div>
+          ) : (
+            <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-lg overflow-hidden text-xs">
+              {filteredAuditLogs.map((log) => {
+                const isExpanded = expandedLogId === log.id;
+                const hasDiff = Boolean(log.diff_before || log.diff_after || log.details);
+
+                return (
+                  <div key={log.id} className="p-3 bg-[var(--card)] transition-colors hover:bg-[var(--secondary)]/10">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant={
+                            log.action === 'DELETE'
+                              ? 'destructive'
+                              : log.action === 'INSERT'
+                              ? 'default'
+                              : log.action === 'UPDATE'
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                          className="text-[10px] uppercase font-bold"
+                        >
+                          {log.action}
+                        </Badge>
+                        <span className="font-semibold text-[var(--foreground)] capitalize">
+                          {log.entity_type}
+                        </span>
+                        <span className="text-[10px] font-mono text-[var(--muted-foreground)] bg-[var(--muted)]/50 px-1.5 py-0.5 rounded">
+                          {log.entity_id}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-[var(--muted-foreground)]">
+                          {new Date(log.created_at).toLocaleString()}
+                        </span>
+                        {hasDiff && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                            className="flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)] hover:underline cursor-pointer ml-1"
+                          >
+                            <Code2 className="w-3 h-3" />
+                            <span>{isExpanded ? 'Hide Diff' : 'View Diff'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--muted-foreground)] font-mono mt-1.5 pt-1 border-t border-[var(--border)]/40">
+                      <div className="flex items-center gap-1.5">
+                        <span>trace:</span>
+                        <span className="text-[var(--foreground)]">{log.correlation_id || 'n/a'}</span>
+                        {log.correlation_id && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (navigator?.clipboard) {
+                                navigator.clipboard.writeText(log.correlation_id!);
+                                setCopiedTraceId(log.correlation_id);
+                                setTimeout(() => setCopiedTraceId(null), 2000);
+                              }
+                            }}
+                            className="p-0.5 hover:text-[var(--foreground)] cursor-pointer"
+                            title="Copy correlation trace ID"
+                          >
+                            {copiedTraceId === log.correlation_id ? (
+                              <Check className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {log.actor_id && <span>actor: {log.actor_id.substring(0, 8)}...</span>}
+                        {log.ip_address && <span>ip: {log.ip_address}</span>}
+                      </div>
+                    </div>
+
+                    {/* Expandable JSON Diff Inspector */}
+                    {isExpanded && (
+                      <div className="mt-3 pt-2.5 border-t border-[var(--border)] space-y-2">
+                        <div className="text-[11px] font-semibold text-[var(--foreground)] flex items-center gap-1.5">
+                          <FileCode className="w-3.5 h-3.5 text-[var(--primary)]" />
+                          <span>Audit State Mutation Inspector</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[10px] font-mono">
+                          <div>
+                            <div className="font-semibold text-rose-400 mb-1 flex items-center justify-between">
+                              <span>diff_before (Pre-mutation State)</span>
+                            </div>
+                            <pre className="p-2.5 rounded bg-[var(--background)] border border-[var(--border)] overflow-x-auto max-h-56 text-[var(--muted-foreground)]">
+                              {log.diff_before ? JSON.stringify(log.diff_before, null, 2) : 'null (Initial record creation)'}
+                            </pre>
+                          </div>
+                          <div>
+                            <div className="font-semibold text-emerald-400 mb-1 flex items-center justify-between">
+                              <span>diff_after / details (Committed State)</span>
+                            </div>
+                            <pre className="p-2.5 rounded bg-[var(--background)] border border-[var(--border)] overflow-x-auto max-h-56 text-[var(--muted-foreground)]">
+                              {log.diff_after
+                                ? JSON.stringify(log.diff_after, null, 2)
+                                : log.details
+                                ? JSON.stringify(log.details, null, 2)
+                                : 'null (Deleted)'}
+                            </pre>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

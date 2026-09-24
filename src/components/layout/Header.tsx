@@ -80,6 +80,12 @@ export function Header() {
     refreshNotifications();
   };
 
+  const handleMarkAllAsRead = async () => {
+    if (!userId || !tenantId) return;
+    await dbService.markAllNotificationsRead(userId, tenantId, supabase);
+    refreshNotifications();
+  };
+
   const handleTenantSwitch = (tenant: Tenant) => {
     const isSuperAdmin = currentUser?.is_superadmin === true || currentUser?.email === 'admin@jyotirmoyb.com';
     const targetMem = memberships.find((m) => m.tenant_id === tenant.id);
@@ -310,6 +316,17 @@ export function Header() {
                     </span>
                   )}
                 </div>
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllAsRead}
+                    className="flex items-center gap-1 text-[11px] text-[var(--primary)] hover:underline cursor-pointer font-medium"
+                    title="Mark all notifications as read"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    <span>Mark all read</span>
+                  </button>
+                )}
               </div>
 
               <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">

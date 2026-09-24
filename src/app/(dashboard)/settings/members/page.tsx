@@ -20,6 +20,9 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
+  Copy,
+  Check,
+  ArrowUpDown,
 } from 'lucide-react';
 import { useTenantStore } from '@/lib/stores/tenant-store';
 import { TenantMembership, UserTenantRole } from '@/types/database';
@@ -46,6 +49,8 @@ export default function WorkspaceMembersPage() {
   const [members, setMembers] = React.useState<TenantMembership[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeTab, setActiveTab] = React.useState<'active' | 'suspended' | 'guest' | 'all'>('active');
+  const [sortBy, setSortBy] = React.useState<'name_asc' | 'name_desc' | 'role' | 'date_newest' | 'date_oldest'>('role');
+  const [copiedEmailId, setCopiedEmailId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   // Invite/Provision Modal State
@@ -192,19 +197,58 @@ export default function WorkspaceMembersPage() {
     }
   };
 
-  // Filter Members
-  const filteredMembers = members.filter((m) => {
-    const nameMatch =
-      m.user?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.user?.email?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Role hierarchy weight for sorting
+  const ROLE_WEIGHT: Record<string, number> = {
+    owner: 5,
+    admin: 4,
+    project_manager: 3,
+    member: 2,
+    guest: 1,
+  };
 
-    if (!nameMatch) return false;
+  // Filter & Sort Members
+  const filteredMembers = React.useMemo(() => {
+    const list = members.filter((m) => {
+      const nameMatch =
+        m.user?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.user?.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    if (activeTab === 'active') return !m.is_suspended && m.role !== 'guest';
-    if (activeTab === 'suspended') return Boolean(m.is_suspended);
-    if (activeTab === 'guest') return m.role === 'guest';
-    return true;
-  });
+      if (!nameMatch) return false;
+
+      if (activeTab === 'active') return !m.is_suspended && m.role !== 'guest';
+      if (activeTab === 'suspended') return Boolean(m.is_suspended);
+      if (activeTab === 'guest') return m.role === 'guest';
+      return true;
+    });
+
+    return list.sort((a, b) => {
+      if (sortBy === 'name_asc') {
+        const nameA = a.user?.full_name || a.user?.email || '';
+        const nameB = b.user?.full_name || b.user?.email || '';
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'name_desc') {
+        const nameA = a.user?.full_name || a.user?.email || '';
+        const nameB = b.user?.full_name || b.user?.email || '';
+        return nameB.localeCompare(nameA);
+      }
+      if (sortBy === 'role') {
+        const weightA = ROLE_WEIGHT[a.role] || 0;
+        const weightB = ROLE_WEIGHT[b.role] || 0;
+        if (weightB !== weightA) return weightB - weightA;
+        const nameA = a.user?.full_name || '';
+        const nameB = b.user?.full_name || '';
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === 'date_newest') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      if (sortBy === 'date_oldest') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      return 0;
+    });
+  }, [members, searchQuery, activeTab, sortBy]);
 
   return (
     <div className="space-y-6 pb-12 max-w-6xl mx-auto p-4 md:p-6">
@@ -273,15 +317,32 @@ export default function WorkspaceMembersPage() {
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:w-64">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-[var(--muted-foreground)]" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search members..."
-            className="pl-8 text-xs"
-          />
+        {/* Search & Sort Controls */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-[var(--muted-foreground)]" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search members..."
+              className="pl-8 text-xs"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-[var(--card)] border border-[var(--border)] rounded-md px-2.5 py-1">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[var(--muted-foreground)] shrink-0" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent text-xs text-[var(--foreground)] focus:outline-none cursor-pointer"
+            >
+              <option value="role">Role Hierarchy</option>
+              <option value="name_asc">Name (A-Z)</option>
+              <option value="name_desc">Name (Z-A)</option>
+              <option value="date_newest">Newest Joined</option>
+              <option value="date_oldest">Oldest Joined</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -325,7 +386,30 @@ export default function WorkspaceMembersPage() {
                               </Badge>
                             )}
                           </div>
-                          <div className="text-xs text-[var(--muted-foreground)] font-mono">{m.user?.email}</div>
+                          <div className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)] font-mono">
+                            <span>{m.user?.email}</span>
+                            {m.user?.email && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                    navigator.clipboard.writeText(m.user!.email!);
+                                    setCopiedEmailId(m.id);
+                                    toast.success('Email copied to clipboard');
+                                    setTimeout(() => setCopiedEmailId(null), 2000);
+                                  }
+                                }}
+                                className="p-0.5 hover:text-[var(--foreground)] cursor-pointer text-[var(--muted-foreground)]"
+                                title="Copy email address"
+                              >
+                                {copiedEmailId === m.id ? (
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>

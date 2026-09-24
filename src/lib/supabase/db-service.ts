@@ -771,6 +771,22 @@ export class DatabaseService {
     }
   }
 
+  public async markAllNotificationsRead(userId: string, tenantId: string, client?: any): Promise<boolean> {
+    const supabase = getSupabase(client);
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({ is_read: true })
+        .eq('recipient_id', userId)
+        .eq('tenant_id', tenantId)
+        .eq('is_read', false);
+
+      return !error;
+    } catch (err) {
+      return false;
+    }
+  }
+
   // ----------------------------------------------------------------------------
   // 8. System Themes & Metadata
   // ----------------------------------------------------------------------------
