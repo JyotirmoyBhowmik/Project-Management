@@ -47,7 +47,7 @@ export async function logTimeAction(rawInput: LogTimeInput): Promise<ActionRespo
         description: parsed.data.description || null,
         approval_status: 'pending',
       })
-      .select('*, user:profiles(id, full_name, email, avatar_url), task:tasks(id, title, task_code)')
+      .select('*, user:profiles!user_id(id, full_name, email, avatar_url), approver:profiles!approved_by(id, full_name, email, avatar_url), task:tasks(id, title, task_code)')
       .single();
 
     if (error) {
@@ -113,7 +113,7 @@ export async function getTimesheetsAction(
     const supabase = await createServerSupabaseClient();
     let query = supabase
       .from('task_time_logs')
-      .select('*, user:profiles(id, full_name, email, avatar_url), task:tasks(id, title, task_code, duration_days)')
+      .select('*, user:profiles!user_id(id, full_name, email, avatar_url), approver:profiles!approved_by(id, full_name, email, avatar_url), task:tasks(id, title, task_code, duration_days)')
       .eq('tenant_id', tenantId)
       .order('date_worked', { ascending: false });
 

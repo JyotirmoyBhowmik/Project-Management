@@ -35,6 +35,8 @@ export default function TrashPage() {
   const isAdmin = ['owner', 'admin'].includes(activeRole) || isSuperadmin;
 
   const [items, setItems] = React.useState<SoftDeletedItem[]>([]);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [isBulkOperating, setIsBulkOperating] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filterType, setFilterType] = React.useState<string>('all');
   const [isLoading, setIsLoading] = React.useState(true);
@@ -55,6 +57,15 @@ export default function TrashPage() {
   React.useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const categoryCounts = React.useMemo(() => {
+    return {
+      all: items.length,
+      task: items.filter((i) => i.entity_type === 'task').length,
+      project: items.filter((i) => i.entity_type === 'project').length,
+      document: items.filter((i) => i.entity_type === 'document').length,
+    };
+  }, [items]);
 
   const handleRestore = async (item: SoftDeletedItem) => {
     try {
@@ -84,6 +95,49 @@ export default function TrashPage() {
       }
     } catch {
       toast.error('Network error during deletion');
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkOperating(true);
+    let successCount = 0;
+    try {
+      const toRestore = items.filter((i) => selectedIds.has(i.id));
+      for (const item of toRestore) {
+        const res = await restoreEntityAction(item.entity_type, item.id, tenantId!, item.project_id);
+        if (res.success) successCount++;
+      }
+      toast.success(`Successfully restored ${successCount} item(s)`);
+      setSelectedIds(new Set());
+      await loadData();
+    } catch {
+      toast.error('Encountered an error while restoring selected items');
+    } finally {
+      setIsBulkOperating(false);
+    }
+  };
+
+  const handleBulkPermanentDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Are you sure you want to PERMANENTLY purge ${selectedIds.size} selected item(s)? This action cannot be undone.`)) {
+      return;
+    }
+    setIsBulkOperating(true);
+    let deleteCount = 0;
+    try {
+      const toDelete = items.filter((i) => selectedIds.has(i.id));
+      for (const item of toDelete) {
+        const res = await permanentDeleteEntityAction(item.entity_type, item.id, tenantId!, item.project_id);
+        if (res.success) deleteCount++;
+      }
+      toast.success(`Successfully purged ${deleteCount} item(s) permanently`);
+      setSelectedIds(new Set());
+      await loadData();
+    } catch {
+      toast.error('Encountered an error while permanently deleting items');
+    } finally {
+      setIsBulkOperating(false);
     }
   };
 
@@ -118,30 +172,87 @@ export default function TrashPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-8 text-xs w-48"
           />
-          <div className="flex items-center gap-1 bg-[var(--secondary)]/60 p-1 rounded-lg text-xs">
-            {['all', 'task', 'project', 'document'].map((t) => (
-              <button
-                key={t}
-                onClick={() => setFilterType(t)}
-                className={`px-2 py-0.5 rounded capitalize font-medium transition-colors ${
-                  filterType === t
-                    ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
-                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="flex items-center gap-1 bg-[var(--secondary)]/60 p-1 rounded-lg text-xs overflow-x-auto">
+            {(['all', 'task', 'project', 'document'] as const).map((t) => {
+              const count = categoryCounts[t];
+              return (
+                <button
+                  key={t}
+                  onClick={() => setFilterType(t)}
+                  className={`px-2.5 py-1 rounded capitalize font-medium transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                    filterType === t
+                      ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                      : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <span>{t}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    filterType === t ? 'bg-white/20 text-white' : 'bg-[var(--secondary)] text-[var(--muted-foreground)]'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
       {/* Main Retention Table */}
       <div className="bg-[var(--card)] p-5 rounded-2xl border border-[var(--border)] shadow-xs space-y-4">
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/30 animate-in fade-in">
+            <span className="text-xs font-semibold text-[var(--foreground)] flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[var(--primary)] animate-pulse" />
+              <span>{selectedIds.size} item{selectedIds.size > 1 ? 's' : ''} selected</span>
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkRestore}
+                disabled={isBulkOperating}
+                className="h-7 text-xs gap-1.5 bg-[var(--card)]"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>Restore Selected ({selectedIds.size})</span>
+              </Button>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleBulkPermanentDelete}
+                  disabled={isBulkOperating}
+                  className="h-7 text-xs gap-1.5"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>Purge Selected ({selectedIds.size})</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-[var(--border)] text-[var(--muted-foreground)]">
+                <th className="pb-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={filteredItems.length > 0 && selectedIds.size === filteredItems.length}
+                    onChange={() => {
+                      if (selectedIds.size === filteredItems.length) {
+                        setSelectedIds(new Set());
+                      } else {
+                        setSelectedIds(new Set(filteredItems.map((i) => i.id)));
+                      }
+                    }}
+                    className="rounded border-[var(--border)] cursor-pointer"
+                    title="Select all"
+                  />
+                </th>
                 <th className="pb-2">Type</th>
                 <th className="pb-2">Item Title / Code</th>
                 <th className="pb-2">Project</th>
@@ -154,13 +265,13 @@ export default function TrashPage() {
             <tbody className="divide-y divide-[var(--border)]">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-[var(--muted-foreground)]">
+                  <td colSpan={8} className="py-12 text-center text-[var(--muted-foreground)]">
                     Loading recycle bin records...
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-[var(--muted-foreground)]">
+                  <td colSpan={8} className="py-12 text-center text-[var(--muted-foreground)]">
                     Recycle bin is empty. No soft-deleted items found.
                   </td>
                 </tr>
@@ -173,6 +284,21 @@ export default function TrashPage() {
 
                   return (
                     <tr key={item.id} className="hover:bg-[var(--secondary)]/30">
+                      <td className="py-3 w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(item.id)}
+                          onChange={() => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(item.id)) next.delete(item.id);
+                              else next.add(item.id);
+                              return next;
+                            });
+                          }}
+                          className="rounded border-[var(--border)] cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3">
                         <Badge variant="outline" className="text-[10px] uppercase font-mono">
                           {item.entity_type}

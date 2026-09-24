@@ -32,6 +32,9 @@ import {
   Sparkles,
   Clock,
   User,
+  Columns,
+  Eye,
+  Edit3,
 } from 'lucide-react';
 import { ProjectDocument, Task } from '@/types/database';
 import { Button } from '@/components/ui/button';
@@ -184,6 +187,14 @@ export function WikiWorkspace({
   const [isLinkingTask, setIsLinkingTask] = React.useState(false);
   const [selectedTaskIdToLink, setSelectedTaskIdToLink] = React.useState('');
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [viewLayout, setViewLayout] = React.useState<'split' | 'edit' | 'preview'>('split');
+
+  // Track unsaved dirty state against active document
+  const isDirty = React.useMemo(() => {
+    if (!selectedDoc) return false;
+    const initialText = (selectedDoc.content_json as any)?.text || `# ${selectedDoc.title}\n\nStart typing documentation...`;
+    return title.trim() !== selectedDoc.title || markdownContent !== initialText;
+  }, [selectedDoc, title, markdownContent]);
 
   // Sync state when selected doc changes
   React.useEffect(() => {
@@ -292,6 +303,20 @@ export function WikiWorkspace({
       setIsSaving(false);
     }
   };
+
+  // Keyboard shortcut Ctrl+S / Cmd+S to save document
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (selectedDoc && !isSaving) {
+          handleSaveDoc();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedDoc, title, markdownContent, isSaving]);
 
   // Soft-delete active document to Recycle Bin
   const handleDeleteDoc = async (docIdToDelete?: string) => {
@@ -664,14 +689,50 @@ export function WikiWorkspace({
 
               {/* Title & Action Bar */}
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="h-8 text-sm font-bold max-w-md bg-transparent border-transparent hover:border-[var(--border)] focus:border-[var(--primary)] px-2"
-                  placeholder="Document Title"
-                />
+                <div className="flex items-center gap-2 max-w-md flex-1">
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="h-8 text-sm font-bold bg-transparent border-transparent hover:border-[var(--border)] focus:border-[var(--primary)] px-2"
+                    placeholder="Document Title"
+                  />
+                  {isDirty && (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/15 text-amber-500 border border-amber-500/30 shrink-0">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      Unsaved
+                    </span>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-2">
+                  {/* View Mode Toggle: Edit / Split / Preview */}
+                  <div className="flex items-center bg-[var(--secondary)]/60 p-0.5 rounded-md border border-[var(--border)]">
+                    <button
+                      type="button"
+                      onClick={() => setViewLayout('edit')}
+                      title="Editor Only"
+                      className={`p-1 rounded text-xs transition-colors ${viewLayout === 'edit' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewLayout('split')}
+                      title="Split View (Editor & Live Preview)"
+                      className={`p-1 rounded text-xs transition-colors ${viewLayout === 'split' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+                    >
+                      <Columns className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewLayout('preview')}
+                      title="Preview Only"
+                      className={`p-1 rounded text-xs transition-colors ${viewLayout === 'preview' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-xs' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
                   {/* + Sub-page button */}
                   <Button
                     size="sm"
@@ -701,9 +762,11 @@ export function WikiWorkspace({
                     onClick={handleSaveDoc}
                     disabled={isSaving}
                     className="h-7 text-xs gap-1.5 bg-[var(--primary)] text-[var(--primary-foreground)]"
+                    title="Save document changes (Ctrl+S)"
                   >
                     <Save className="h-3 w-3" />
                     <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                    <kbd className="hidden sm:inline-block font-mono text-[9px] opacity-70 bg-black/20 px-1 py-0.5 rounded">Ctrl+S</kbd>
                   </Button>
 
                   {/* Delete Page */}
@@ -853,32 +916,38 @@ export function WikiWorkspace({
               </Button>
             </div>
 
-            {/* Two-Pane Editor & Preview */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 overflow-hidden">
+            {/* Dynamic Layout Editor & Preview */}
+            <div className={`flex-1 overflow-hidden ${
+              viewLayout === 'split' ? 'grid grid-cols-1 md:grid-cols-2' : 'flex flex-col'
+            }`}>
               {/* Raw Editor */}
-              <div className="p-4 border-r border-[var(--border)] flex flex-col overflow-hidden bg-[var(--card)]">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 flex items-center justify-between">
-                  <span>Markdown Editor</span>
-                  <span className="font-mono">{markdownContent.length} chars</span>
+              {(viewLayout === 'split' || viewLayout === 'edit') && (
+                <div className={`p-4 ${viewLayout === 'split' ? 'border-r border-[var(--border)]' : ''} flex-1 flex flex-col overflow-hidden bg-[var(--card)]`}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 flex items-center justify-between">
+                    <span>Markdown Editor</span>
+                    <span className="font-mono">{markdownContent.length} chars</span>
+                  </div>
+                  <textarea
+                    value={markdownContent}
+                    onChange={(e) => setMarkdownContent(e.target.value)}
+                    className="flex-1 w-full bg-transparent border-0 resize-none font-mono text-xs text-[var(--foreground)] outline-none leading-relaxed"
+                    placeholder="Write your markdown living documentation here..."
+                  />
                 </div>
-                <textarea
-                  value={markdownContent}
-                  onChange={(e) => setMarkdownContent(e.target.value)}
-                  className="flex-1 w-full bg-transparent border-0 resize-none font-mono text-xs text-[var(--foreground)] outline-none leading-relaxed"
-                  placeholder="Write your markdown living documentation here..."
-                />
-              </div>
+              )}
 
               {/* Rendered Preview with Embedded Task Cards */}
-              <div className="p-4 overflow-y-auto bg-[var(--secondary)]/15">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 flex items-center justify-between">
-                  <span>Live Interactive Preview</span>
-                  <span className="text-[9px] text-[var(--muted-foreground)]">Rendered in Real-Time</span>
+              {(viewLayout === 'split' || viewLayout === 'preview') && (
+                <div className="p-4 flex-1 overflow-y-auto bg-[var(--secondary)]/15">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)] mb-2 flex items-center justify-between">
+                    <span>Live Interactive Preview</span>
+                    <span className="text-[9px] text-[var(--muted-foreground)]">Rendered in Real-Time</span>
+                  </div>
+                  <div className="prose dark:prose-invert max-w-none text-xs">
+                    {renderDocumentWithEmbeddedTasks(markdownContent)}
+                  </div>
                 </div>
-                <div className="prose dark:prose-invert max-w-none text-xs">
-                  {renderDocumentWithEmbeddedTasks(markdownContent)}
-                </div>
-              </div>
+              )}
             </div>
           </>
         ) : (

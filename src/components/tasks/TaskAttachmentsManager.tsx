@@ -14,11 +14,14 @@ import {
   Loader2,
   AlertCircle,
   Paperclip,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { TaskAttachment } from '@/types/database';
 import { dbService } from '@/lib/supabase/db-service';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface TaskAttachmentsManagerProps {
   tenantId: string;
@@ -43,6 +46,7 @@ export function TaskAttachmentsManager({
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = React.useState(false);
   const [signedUrls, setSignedUrls] = React.useState<Record<string, string>>({});
+  const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const supabase = React.useMemo(() => createClient(), []);
@@ -53,11 +57,16 @@ export function TaskAttachmentsManager({
       const data = await dbService.getTaskAttachments(taskId, supabase);
       setAttachments(data);
 
-      // Pre-fetch signed URLs for the attachments (15-minute TTL)
+      // Concurrently pre-fetch signed URLs for the attachments (15-minute TTL)
+      const urlEntries = await Promise.all(
+        data.map(async (item) => {
+          const url = await dbService.getAttachmentSignedUrl(item.storage_path, 900, supabase);
+          return [item.id, url] as const;
+        })
+      );
       const urlMap: Record<string, string> = {};
-      for (const item of data) {
-        const url = await dbService.getAttachmentSignedUrl(item.storage_path, 900, supabase);
-        if (url) urlMap[item.id] = url;
+      for (const [id, url] of urlEntries) {
+        if (url) urlMap[id] = url;
       }
       setSignedUrls(urlMap);
     } catch (err) {
@@ -249,8 +258,17 @@ export function TaskAttachmentsManager({
                   className="flex items-center justify-between p-3 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]/40 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-md bg-[var(--secondary)] flex items-center justify-center shrink-0">
-                      {getFileIcon(att.file_type, att.file_name)}
+                    <div className="h-10 w-10 rounded-md bg-[var(--secondary)] overflow-hidden flex items-center justify-center shrink-0 border border-[var(--border)]">
+                      {isImage && downloadUrl ? (
+                        <img
+                          src={downloadUrl}
+                          alt={att.file_name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        getFileIcon(att.file_type, att.file_name)
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-[var(--foreground)] truncate max-w-[200px] sm:max-w-xs" title={att.file_name}>
@@ -268,15 +286,38 @@ export function TaskAttachmentsManager({
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {downloadUrl && (
-                      <a
-                        href={downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 rounded-md hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
-                        title={isImage ? 'Preview Image' : 'Download File'}
-                      >
-                        {isImage ? <ExternalLink className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-                      </a>
+                      <>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(downloadUrl);
+                              setCopiedId(att.id);
+                              toast.success('Asset URL copied to clipboard');
+                              setTimeout(() => setCopiedId(null), 2000);
+                            } catch {
+                              toast.error('Failed to copy link');
+                            }
+                          }}
+                          className="p-1.5 rounded-md hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                          title="Copy Asset URL"
+                        >
+                          {copiedId === att.id ? (
+                            <Check className="h-4 w-4 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </button>
+                        <a
+                          href={downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-md hover:bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                          title={isImage ? 'Preview Image' : 'Download File'}
+                        >
+                          {isImage ? <ExternalLink className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                        </a>
+                      </>
                     )}
 
                     {canEdit && (

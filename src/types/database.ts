@@ -518,6 +518,7 @@ export interface TaskTimeLog {
   created_at: string;
   updated_at: string;
   user?: UserProfile;
+  approver?: UserProfile;
   task?: Task;
 }
 
