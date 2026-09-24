@@ -624,7 +624,12 @@ function ProjectWorkspaceContent() {
         )}
 
         {activeView === 'calendar' && (
-          <ProjectCalendarView tasks={displayedTasks} calendar={calendar} holidays={holidays} />
+          <ProjectCalendarView
+            tasks={displayedTasks}
+            calendar={calendar}
+            holidays={holidays}
+            onSelectTask={(t) => setSelectedTaskForDrawer(t)}
+          />
         )}
 
         {activeView === 'resource' && (

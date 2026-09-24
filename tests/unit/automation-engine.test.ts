@@ -4,43 +4,37 @@
 // ==============================================================================
 
 import { describe, it, expect } from 'vitest';
-
-interface Condition {
-  field: string;
-  operator: 'equals' | 'not_equals' | 'greater_than' | 'contains' | 'is_empty';
-  value: any;
-}
-
-function evaluateConditions(conditions: Condition[], payload: Record<string, any>): boolean {
-  for (const cond of conditions) {
-    const actual = payload[cond.field];
-    if (cond.operator === 'equals' && actual !== cond.value) return false;
-    if (cond.operator === 'not_equals' && actual === cond.value) return false;
-    if (cond.operator === 'greater_than' && !(Number(actual) > Number(cond.value))) return false;
-    if (cond.operator === 'contains' && !(String(actual).includes(String(cond.value)))) return false;
-    if (cond.operator === 'is_empty' && actual !== null && actual !== undefined && actual !== '') return false;
-  }
-  return true;
-}
+import { evaluateAutomationCondition } from '@/lib/automations/condition-evaluator';
 
 describe('Workflow Automation Engine Condition Evaluator', () => {
   it('should match exact equality conditions', () => {
-    const conditions: Condition[] = [{ field: 'priority', operator: 'equals', value: 'urgent' }];
-    expect(evaluateConditions(conditions, { priority: 'urgent' })).toBe(true);
-    expect(evaluateConditions(conditions, { priority: 'low' })).toBe(false);
+    expect(evaluateAutomationCondition({ field: 'priority', operator: 'equals', value: 'urgent' }, { priority: 'urgent' })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'priority', operator: 'equals', value: 'urgent' }, { priority: 'low' })).toBe(false);
   });
 
-  it('should match numeric thresholds (e.g. story points > 8)', () => {
-    const conditions: Condition[] = [{ field: 'story_points', operator: 'greater_than', value: 8 }];
-    expect(evaluateConditions(conditions, { story_points: 13 })).toBe(true);
-    expect(evaluateConditions(conditions, { story_points: 5 })).toBe(false);
-    expect(evaluateConditions(conditions, { story_points: 8 })).toBe(false);
+  it('should match not_equals conditions', () => {
+    expect(evaluateAutomationCondition({ field: 'status', operator: 'not_equals', value: 'completed' }, { status: 'in_progress' })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'status', operator: 'not_equals', value: 'completed' }, { status: 'completed' })).toBe(false);
   });
 
-  it('should detect empty assignees', () => {
-    const conditions: Condition[] = [{ field: 'assignee_id', operator: 'is_empty', value: null }];
-    expect(evaluateConditions(conditions, { assignee_id: null })).toBe(true);
-    expect(evaluateConditions(conditions, { assignee_id: '' })).toBe(true);
-    expect(evaluateConditions(conditions, { assignee_id: 'user-123' })).toBe(false);
+  it('should match numeric thresholds (greater_than and less_than)', () => {
+    expect(evaluateAutomationCondition({ field: 'story_points', operator: 'greater_than', value: 8 }, { story_points: 13 })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'story_points', operator: 'greater_than', value: 8 }, { story_points: 5 })).toBe(false);
+    expect(evaluateAutomationCondition({ field: 'story_points', operator: 'less_than', value: 5 }, { story_points: 3 })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'story_points', operator: 'less_than', value: 5 }, { story_points: 8 })).toBe(false);
+  });
+
+  it('should match case-insensitive text contains', () => {
+    expect(evaluateAutomationCondition({ field: 'title', operator: 'contains', value: 'Bug' }, { title: '[BUG-101] Fix crash' })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'title', operator: 'contains', value: 'frontend' }, { title: 'Backend API migration' })).toBe(false);
+  });
+
+  it('should detect empty and not_empty fields', () => {
+    expect(evaluateAutomationCondition({ field: 'assignee_id', operator: 'is_empty', value: null }, { assignee_id: null })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'assignee_id', operator: 'is_empty', value: null }, { assignee_id: '' })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'assignee_id', operator: 'is_empty', value: null }, { assignee_id: 'user-123' })).toBe(false);
+
+    expect(evaluateAutomationCondition({ field: 'assignee_id', operator: 'is_not_empty', value: null }, { assignee_id: 'user-123' })).toBe(true);
+    expect(evaluateAutomationCondition({ field: 'assignee_id', operator: 'is_not_empty', value: null }, { assignee_id: null })).toBe(false);
   });
 });

@@ -14,6 +14,7 @@ import {
   type CreateAutomationInput,
   type ActionResponse,
 } from '@/lib/validation/action-schemas';
+import { evaluateAutomationCondition } from '@/lib/automations/condition-evaluator';
 
 export async function createAutomationAction(rawInput: CreateAutomationInput): Promise<ActionResponse<TenantAutomation>> {
   const correlationId = `act-create-auto-${Date.now()}`;
@@ -117,6 +118,7 @@ export async function getTenantAutomationsAction(tenantId: string): Promise<Acti
   }
 }
 
+
 export async function dispatchAutomationTriggerAction(
   tenantId: string,
   triggerType: string,
@@ -124,6 +126,19 @@ export async function dispatchAutomationTriggerAction(
 ): Promise<ActionResponse<{ executedCount: number }>> {
   const correlationId = `act-dispatch-auto-${Date.now()}`;
   try {
+    // 0. Automation loop & cascading recursion guard
+    const currentDepth = Number(eventPayload._depth || 0);
+    if (currentDepth > 3) {
+      logger.warn('Automation recursion loop guard triggered: max depth exceeded', {
+        correlationId,
+        ctx: {
+          currentDepth,
+          taskId: eventPayload.taskId,
+        },
+      });
+      return { success: true, data: { executedCount: 0 }, correlation_id: correlationId };
+    }
+
     const supabase = await createServerSupabaseClient();
 
     // 1. Fetch matching active automations
@@ -145,10 +160,10 @@ export async function dispatchAutomationTriggerAction(
       let conditionsMet = true;
       if (Array.isArray(rule.conditions)) {
         for (const cond of rule.conditions) {
-          const actualVal = eventPayload[cond.field];
-          if (cond.operator === 'equals' && actualVal !== cond.value) conditionsMet = false;
-          if (cond.operator === 'not_equals' && actualVal === cond.value) conditionsMet = false;
-          if (cond.operator === 'is_empty' && actualVal !== null && actualVal !== undefined && actualVal !== '') conditionsMet = false;
+          if (!evaluateAutomationCondition(cond, eventPayload)) {
+            conditionsMet = false;
+            break;
+          }
         }
       }
 

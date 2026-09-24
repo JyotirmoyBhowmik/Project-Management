@@ -379,6 +379,46 @@ export function GraphCanvas({
   }, [nodes, edges, layoutMode]);
 
   // Pan & Zoom Handlers
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    setZoomLevel((z) => Math.min(2.5, Math.max(0.4, Number((z * zoomFactor).toFixed(2)))));
+  };
+
+  const handleZoomToFit = () => {
+    if (simNodes.length === 0 || !containerRef.current) {
+      setZoomLevel(1);
+      setPan({ x: 0, y: 0 });
+      return;
+    }
+    const validNodes = simNodes.filter((n) => n.x !== undefined && n.y !== undefined);
+    if (validNodes.length === 0) return;
+
+    const xs = validNodes.map((n) => n.x!);
+    const ys = validNodes.map((n) => n.y!);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const graphWidth = Math.max(maxX - minX + 120, 100);
+    const graphHeight = Math.max(maxY - minY + 120, 100);
+
+    const scaleX = (rect.width - 80) / graphWidth;
+    const scaleY = (rect.height - 80) / graphHeight;
+    const newScale = Math.min(1.8, Math.max(0.4, Number(Math.min(scaleX, scaleY).toFixed(2))));
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setZoomLevel(newScale);
+    setPan({
+      x: rect.width / 2 - centerX * newScale,
+      y: rect.height / 2 - centerY * newScale,
+    });
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.target === containerRef.current || (e.target as HTMLElement).tagName === 'svg') {
       setIsPanning(true);
@@ -410,6 +450,7 @@ export function GraphCanvas({
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onWheel={handleWheel}
       className={`relative w-full h-[700px] bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden select-none ${className}`}
     >
       {/* Top Controls Toolbar */}
@@ -473,12 +514,18 @@ export function GraphCanvas({
           size="sm"
           variant={highlightCritical ? 'default' : 'outline'}
           onClick={() => setHighlightCritical(!highlightCritical)}
-          className={`h-7 px-2 text-xs font-semibold gap-1 transition-all ${
+          className={`h-7 px-2 text-xs font-semibold gap-1.5 transition-all ${
             highlightCritical ? 'bg-red-600 hover:bg-red-700 text-white shadow-xs' : ''
           }`}
+          title="Highlight Critical Path (CPM) network chain"
         >
           <span className={`h-1.5 w-1.5 rounded-full ${highlightCritical ? 'bg-white animate-ping' : 'bg-red-500'}`} />
           <span>CPM</span>
+          {highlightCritical && (
+            <span className="bg-red-950/60 text-white px-1 py-0.2 rounded text-[10px] font-mono">
+              {simNodes.filter((n) => n.isCritical).length}
+            </span>
+          )}
         </Button>
 
         {/* Filter Pill */}
@@ -505,7 +552,8 @@ export function GraphCanvas({
           size="sm"
           variant="outline"
           className="h-8 w-8 p-0"
-          onClick={() => setZoomLevel((z) => Math.min(2.5, z + 0.15))}
+          onClick={() => setZoomLevel((z) => Math.min(2.5, Number((z + 0.15).toFixed(2))))}
+          title="Zoom In"
         >
           <ZoomIn className="h-4 w-4" />
         </Button>
@@ -513,7 +561,8 @@ export function GraphCanvas({
           size="sm"
           variant="outline"
           className="h-8 w-8 p-0"
-          onClick={() => setZoomLevel((z) => Math.max(0.4, z - 0.15))}
+          onClick={() => setZoomLevel((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))}
+          title="Zoom Out"
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
@@ -521,13 +570,53 @@ export function GraphCanvas({
           size="sm"
           variant="outline"
           className="h-8 w-8 p-0"
+          onClick={handleZoomToFit}
+          title="Zoom to Fit Network"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-8 p-0 text-[10px] font-mono text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
           onClick={() => {
             setZoomLevel(1);
             setPan({ x: 0, y: 0 });
           }}
+          title="Reset Viewport to 100%"
         >
-          <Maximize2 className="h-4 w-4" />
+          {Math.round(zoomLevel * 100)}%
         </Button>
+      </div>
+
+      {/* Compact Mini-Map Navigator */}
+      <div className="absolute bottom-4 left-4 z-20 pointer-events-none hidden sm:block">
+        <div className="bg-[var(--card)]/90 backdrop-blur-md p-1.5 rounded-xl border border-[var(--border)] shadow-md">
+          <div className="text-[9px] font-mono text-[var(--muted-foreground)] mb-1 px-1">Network Map</div>
+          <svg width={110} height={70} className="bg-[var(--secondary)]/40 rounded border border-[var(--border)]/50">
+            {simNodes.map((n) => {
+              if (n.x === undefined || n.y === undefined) return null;
+              const mx = Math.max(4, Math.min(106, ((n.x + 300) / 1500) * 110));
+              const my = Math.max(4, Math.min(66, ((n.y + 200) / 1000) * 70));
+              return (
+                <circle
+                  key={n.id}
+                  cx={mx}
+                  cy={my}
+                  r={n.isCritical && highlightCritical ? 2.5 : 1.5}
+                  fill={
+                    n.isCritical && highlightCritical
+                      ? '#ef4444'
+                      : n.type === 'milestone'
+                      ? '#fbbf24'
+                      : '#3b82f6'
+                  }
+                  opacity={0.8}
+                />
+              );
+            })}
+          </svg>
+        </div>
       </div>
 
       {/* SVG Canvas */}
